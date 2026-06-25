@@ -1,0 +1,12 @@
+# docker-compose.override.yml — tự động được docker compose merge với docker-compose.yml
+#
+# Mục đích: máy này dùng CPU Intel Pentium Gold G6405 KHÔNG có AVX2, nên image
+# database mặc định ParadeDB (paradedb/paradedb:v0.22.2-pg17) sẽ crash SIGILL.
+# Ta thay bằng Postgres 17 + pgvector tiêu chuẩn (không cần AVX2).
+#
+# Cách này hoạt động vì RETRIEVE_DRIVER=qdrant (xem .env) khiến app tự đặt
+# app.skip_embedding=true và BỎ QUA mọi migration cần pg_search/ParadeDB.
+# Truy hồi (vector + keyword) do Qdrant đảm nhiệm.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
