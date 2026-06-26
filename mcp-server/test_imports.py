@@ -1,44 +1,44 @@
 #!/usr/bin/env python3
 """
-测试 MCP 导入
+Kiểm thử import MCP
 """
 
 try:
     import mcp.types as types
 
-    print("✓ mcp.types 导入成功")
+    print("✓ mcp.types import thành công")
 except ImportError as e:
-    print(f"✗ mcp.types 导入失败: {e}")
+    print(f"✗ mcp.types import thất bại: {e}")
 
 try:
     from mcp.server import NotificationOptions, Server
 
-    print("✓ mcp.server 导入成功")
+    print("✓ mcp.server import thành công")
 except ImportError as e:
-    print(f"✗ mcp.server 导入失败: {e}")
+    print(f"✗ mcp.server import thất bại: {e}")
 
 try:
     import mcp.server.stdio
 
-    print("✓ mcp.server.stdio 导入成功")
+    print("✓ mcp.server.stdio import thành công")
 except ImportError as e:
-    print(f"✗ mcp.server.stdio 导入失败: {e}")
+    print(f"✗ mcp.server.stdio import thất bại: {e}")
 
 try:
     from mcp.server.models import InitializationOptions
 
-    print("✓ InitializationOptions 从 mcp.server.models 导入成功")
+    print("✓ InitializationOptions từ mcp.server.models import thành công")
 except ImportError:
     try:
         from mcp import InitializationOptions
 
-        print("✓ InitializationOptions 从 mcp 导入成功")
+        print("✓ InitializationOptions từ mcp import thành công")
     except ImportError as e:
-        print(f"✗ InitializationOptions 导入失败: {e}")
+        print(f"✗ InitializationOptions import thất bại: {e}")
 
-# 检查 MCP 包结构
+# Kiểm tra cấu trúc gói MCP
 import mcp
 
-print(f"\nMCP 包版本: {getattr(mcp, '__version__', '未知')}")
-print(f"MCP 包路径: {mcp.__file__}")
-print(f"MCP 包内容: {dir(mcp)}")
+print(f"\nPhiên bản gói MCP: {getattr(mcp, '__version__', 'Không rõ')}")
+print(f"Đường dẫn gói MCP: {mcp.__file__}")
+print(f"Nội dung gói MCP: {dir(mcp)}")

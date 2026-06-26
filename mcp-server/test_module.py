@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-WeKnora MCP Server 模组测试脚本
+Script kiểm thử mô-đun WeKnora MCP Server
 
-测试模组的各种启动方式和功能
+Kiểm thử các cách khởi động và chức năng của mô-đun
 """
 
 import os
@@ -12,63 +12,63 @@ from pathlib import Path
 
 
 def test_imports():
-    """测试模块导入"""
-    print("=== 测试模块导入 ===")
+    """Kiểm thử import mô-đun"""
+    print("=== Kiểm thử import mô-đun ===")
 
     try:
-        # 测试基础依赖
+        # Kiểm thử phụ thuộc cơ bản
         import mcp
 
-        print("✓ mcp 模块导入成功")
+        print("✓ mcp import mô-đun thành công")
 
         import requests
 
-        print("✓ requests 模块导入成功")
+        print("✓ requests import mô-đun thành công")
 
-        # 测试主模块
+        # Kiểm thử mô-đun chính
         import weknora_mcp_server
 
-        print("✓ weknora_mcp_server 模块导入成功")
+        print("✓ weknora_mcp_server import mô-đun thành công")
 
-        # 测试包导入
+        # Kiểm thử import gói
         from weknora_mcp_server import WeKnoraClient, run
 
-        print("✓ WeKnoraClient 和 run 函数导入成功")
+        print("✓ WeKnoraClient và hàm run import thành công")
 
-        # 测试主入口点
+        # Kiểm thử điểm vào chính
         import main
 
-        print("✓ main 模块导入成功")
+        print("✓ main import mô-đun thành công")
 
         return True
 
     except ImportError as e:
-        print(f"✗ 导入失败: {e}")
+        print(f"✗ import thất bại: {e}")
         return False
 
 
 def test_environment():
-    """测试环境配置"""
-    print("\n=== 测试环境配置 ===")
+    """Kiểm thử cấu hình môi trường"""
+    print("\n=== Kiểm thử cấu hình môi trường ===")
 
     base_url = os.getenv("WEKNORA_BASE_URL")
     api_key = os.getenv("WEKNORA_API_KEY")
 
-    print(f"WEKNORA_BASE_URL: {base_url or '未设置 (将使用默认值)'}")
-    print(f"WEKNORA_API_KEY: {'已设置' if api_key else '未设置'}")
+    print(f"WEKNORA_BASE_URL: {base_url or 'chưa đặt (sẽ dùng giá trị mặc định)'}")
+    print(f"WEKNORA_API_KEY: {'đã đặt' if api_key else 'chưa đặt'}")
 
     if not base_url:
-        print("提示: 可以设置环境变量 WEKNORA_BASE_URL")
+        print("Gợi ý: có thể đặt biến môi trường WEKNORA_BASE_URL")
 
     if not api_key:
-        print("提示: 建议设置环境变量 WEKNORA_API_KEY")
+        print("Gợi ý: nên đặt biến môi trường WEKNORA_API_KEY")
 
     return True
 
 
 def test_client_creation():
-    """测试客户端创建"""
-    print("\n=== 测试客户端创建 ===")
+    """Kiểm thử tạo client"""
+    print("\n=== Kiểm thử tạo client ===")
 
     try:
         from weknora_mcp_server import WeKnoraClient
@@ -77,23 +77,23 @@ def test_client_creation():
         api_key = os.getenv("WEKNORA_API_KEY", "test_key")
 
         client = WeKnoraClient(base_url, api_key)
-        print("✓ WeKnoraClient 创建成功")
+        print("✓ WeKnoraClient tạo thành công")
 
-        # 检查客户端属性
+        # Kiểm tra thuộc tính client
         assert client.base_url == base_url
         assert client.api_key == api_key
-        print("✓ 客户端配置正确")
+        print("✓ Cấu hình client đúng")
 
         return True
 
     except Exception as e:
-        print(f"✗ 客户端创建失败: {e}")
+        print(f"✗ Tạo client thất bại: {e}")
         return False
 
 
 def test_file_structure():
-    """测试文件结构"""
-    print("\n=== 测试文件结构 ===")
+    """Kiểm thử cấu trúc tệp"""
+    print("\n=== Kiểm thử cấu trúc tệp ===")
 
     required_files = [
         "__init__.py",
@@ -114,22 +114,22 @@ def test_file_structure():
         if Path(file).exists():
             print(f"✓ {file}")
         else:
-            print(f"✗ {file} (缺失)")
+            print(f"✗ {file} (thiếu)")
             missing_files.append(file)
 
     if missing_files:
-        print(f"缺失文件: {missing_files}")
+        print(f"Tệp thiếu: {missing_files}")
         return False
 
-    print("✓ 所有必需文件都存在")
+    print("✓ Mọi tệp bắt buộc đều tồn tại")
     return True
 
 
 def test_entry_points():
-    """测试入口点"""
-    print("\n=== 测试入口点 ===")
+    """Kiểm thử điểm vào"""
+    print("\n=== Kiểm thử điểm vào ===")
 
-    # 测试 main.py 的帮助选项
+    # Kiểm thử tùy chọn trợ giúp của main.py
     try:
         result = subprocess.run(
             [sys.executable, "main.py", "--help"],
@@ -138,18 +138,18 @@ def test_entry_points():
             timeout=10,
         )
         if result.returncode == 0:
-            print("✓ main.py --help 工作正常")
+            print("✓ main.py --help hoạt động bình thường")
         else:
-            print(f"✗ main.py --help 失败: {result.stderr}")
+            print(f"✗ main.py --help thất bại: {result.stderr}")
             return False
     except subprocess.TimeoutExpired:
-        print("✗ main.py --help 超时")
+        print("✗ main.py --help quá thời gian")
         return False
     except Exception as e:
-        print(f"✗ main.py --help 错误: {e}")
+        print(f"✗ main.py --help Lỗi: {e}")
         return False
 
-    # 测试环境检查
+    # Kiểm thử kiểm tra môi trường
     try:
         result = subprocess.run(
             [sys.executable, "main.py", "--check-only"],
@@ -158,47 +158,47 @@ def test_entry_points():
             timeout=10,
         )
         if result.returncode == 0:
-            print("✓ main.py --check-only 工作正常")
+            print("✓ main.py --check-only hoạt động bình thường")
         else:
-            print(f"✗ main.py --check-only 失败: {result.stderr}")
+            print(f"✗ main.py --check-only thất bại: {result.stderr}")
             return False
     except subprocess.TimeoutExpired:
-        print("✗ main.py --check-only 超时")
+        print("✗ main.py --check-only quá thời gian")
         return False
     except Exception as e:
-        print(f"✗ main.py --check-only 错误: {e}")
+        print(f"✗ main.py --check-only Lỗi: {e}")
         return False
 
     return True
 
 
 def test_wiki_tools():
-    """测试 Wiki 工具注册和 Client 方法"""
-    print("\n=== 测试 Wiki 工具 ===")
+    """Kiểm thử đăng ký công cụ Wiki và phương thức Client"""
+    print("\n=== Kiểm thử công cụ Wiki ===")
 
     try:
         import weknora_mcp_server
 
-        # 验证 Client 方法存在
+        # Xác minh phương thức Client tồn tại
         client = weknora_mcp_server.WeKnoraClient("http://localhost:8080/api/v1", "test")
         for method in ["wiki_search", "wiki_read_page", "wiki_index_view"]:
-            assert hasattr(client, method), f"WeKnoraClient 缺少方法: {method}"
-            assert callable(getattr(client, method)), f"{method} 不可调用"
-            print(f"✓ WeKnoraClient.{method} 存在")
+            assert hasattr(client, method), f"WeKnoraClient thiếu phương thức: {method}"
+            assert callable(getattr(client, method)), f"{method} không gọi được"
+            print(f"✓ WeKnoraClient.{method} tồn tại")
 
         return True
 
     except Exception as e:
-        print(f"✗ Wiki 工具测试失败: {e}")
+        print(f"✗ Kiểm thử công cụ Wiki thất bại: {e}")
         return False
 
 
 def test_package_installation():
-    """测试包安装 (开发模式)"""
-    print("\n=== 测试包安装 ===")
+    """Kiểm thử cài gói (chế độ phát triển)"""
+    print("\n=== Kiểm thử cài gói ===")
 
     try:
-        # 检查是否可以以开发模式安装
+        # Kiểm tra có thể cài ở chế độ phát triển không
         result = subprocess.run(
             [sys.executable, "setup.py", "check"],
             capture_output=True,
@@ -207,34 +207,34 @@ def test_package_installation():
         )
 
         if result.returncode == 0:
-            print("✓ setup.py 检查通过")
+            print("✓ setup.py kiểm tra đạt")
         else:
-            print(f"✗ setup.py 检查失败: {result.stderr}")
+            print(f"✗ setup.py kiểm tra thất bại: {result.stderr}")
             return False
 
     except subprocess.TimeoutExpired:
-        print("✗ setup.py 检查超时")
+        print("✗ setup.py kiểm tra quá thời gian")
         return False
     except Exception as e:
-        print(f"✗ setup.py 检查错误: {e}")
+        print(f"✗ setup.py kiểm tra lỗi: {e}")
         return False
 
     return True
 
 
 def main():
-    """运行所有测试"""
-    print("WeKnora MCP Server 模组测试")
+    """Chạy tất cả kiểm thử"""
+    print("Kiểm thử mô-đun WeKnora MCP Server")
     print("=" * 50)
 
     tests = [
-        ("模块导入", test_imports),
-        ("环境配置", test_environment),
-        ("客户端创建", test_client_creation),
-        ("文件结构", test_file_structure),
-        ("入口点", test_entry_points),
-        ("Wiki 工具", test_wiki_tools),
-        ("包安装", test_package_installation),
+        ("Import mô-đun", test_imports),
+        ("Cấu hình môi trường", test_environment),
+        ("Tạo client", test_client_creation),
+        ("Cấu trúc tệp", test_file_structure),
+        ("Điểm vào", test_entry_points),
+        ("Công cụ Wiki", test_wiki_tools),
+        ("Cài gói", test_package_installation),
     ]
 
     passed = 0
@@ -245,18 +245,18 @@ def main():
             if test_func():
                 passed += 1
             else:
-                print(f"测试失败: {test_name}")
+                print(f"Kiểm thử thất bại: {test_name}")
         except Exception as e:
-            print(f"测试异常: {test_name} - {e}")
+            print(f"Kiểm thử ngoại lệ: {test_name} - {e}")
 
     print("\n" + "=" * 50)
-    print(f"测试结果: {passed}/{total} 通过")
+    print(f"Kết quả kiểm thử: {passed}/{total} đạt")
 
     if passed == total:
-        print("✓ 所有测试通过！模组可以正常使用。")
+        print("✓ Tất cả kiểm thử đạt! Mô-đun có thể dùng bình thường.")
         return True
     else:
-        print("✗ 部分测试失败，请检查上述错误。")
+        print("✗ Một số kiểm thử thất bại, vui lòng kiểm tra các lỗi trên.")
         return False
 
 

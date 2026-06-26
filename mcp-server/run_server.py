@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-WeKnora MCP Server 启动脚本
+Script khởi động WeKnora MCP Server
 """
 
 import asyncio
@@ -9,25 +9,25 @@ import sys
 
 
 def check_environment():
-    """检查环境配置"""
+    """Kiểm tra cấu hình môi trường"""
     base_url = os.getenv("WEKNORA_BASE_URL")
     api_key = os.getenv("WEKNORA_API_KEY")
 
     if not base_url:
         print(
-            "警告: WEKNORA_BASE_URL 环境变量未设置，使用默认值: http://localhost:8080/api/v1"
+            "Cảnh báo: biến môi trường WEKNORA_BASE_URL chưa đặt, dùng giá trị mặc định: http://localhost:8080/api/v1"
         )
 
     if not api_key:
-        print("警告: WEKNORA_API_KEY 环境变量未设置")
+        print("Cảnh báo: biến môi trường WEKNORA_API_KEY chưa đặt")
 
     print(f"WeKnora Base URL: {base_url or 'http://localhost:8080/api/v1'}")
-    print(f"API Key: {'已设置' if api_key else '未设置'}")
+    print(f"API Key: {'đã đặt' if api_key else 'chưa đặt'}")
 
 
 def main():
-    """主函数"""
-    print("启动 WeKnora MCP Server...")
+    """Hàm chính"""
+    print("Đang khởi động WeKnora MCP Server...")
     check_environment()
 
     try:
@@ -35,13 +35,13 @@ def main():
 
         asyncio.run(run())
     except ImportError as e:
-        print(f"导入错误: {e}")
-        print("请确保已安装所有依赖: pip install -r requirements.txt")
+        print(f"Lỗi import: {e}")
+        print("Vui lòng đảm bảo đã cài tất cả phụ thuộc: pip install -r requirements.txt")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\n服务器已停止")
+        print("\nMáy chủ đã dừng")
     except Exception as e:
-        print(f"服务器运行错误: {e}")
+        print(f"Lỗi chạy máy chủ: {e}")
         sys.exit(1)
 
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-WeKnora MCP Server 安装脚本
+Script cài đặt WeKnora MCP Server
 """
 
 from setuptools import setup
 
 
-# 读取 README 文件
+# Đọc tệp README
 def read_readme():
     try:
         with open("README.md", "r", encoding="utf-8") as f:
@@ -15,7 +15,7 @@ def read_readme():
         return "WeKnora MCP Server - Model Context Protocol server for WeKnora API"
 
 
-# 读取依赖
+# Đọc phụ thuộc
 def read_requirements():
     try:
         with open("requirements.txt", "r", encoding="utf-8") as f:

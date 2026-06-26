@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-WeKnora MCP Server 便捷启动脚本
+Script khởi động nhanh WeKnora MCP Server
 
-这是一个简化的启动脚本，提供最基本的功能。
-对于更多选项，请使用 main.py
+Đây là script khởi động đơn giản, cung cấp các chức năng cơ bản nhất.
+Để có thêm tùy chọn, vui lòng dùng main.py
 """
 
 import os
@@ -12,34 +12,34 @@ from pathlib import Path
 
 
 def main():
-    """简单的启动函数"""
-    # 添加当前目录到 Python 路径
+    """Hàm khởi động đơn giản"""
+    # Thêm thư mục hiện tại vào đường dẫn Python
     current_dir = Path(__file__).parent.absolute()
     if str(current_dir) not in sys.path:
         sys.path.insert(0, str(current_dir))
 
-    # 检查环境变量
+    # Kiểm tra biến môi trường
     base_url = os.getenv("WEKNORA_BASE_URL", "http://localhost:8080/api/v1")
     api_key = os.getenv("WEKNORA_API_KEY", "")
 
     print("WeKnora MCP Server")
     print(f"Base URL: {base_url}")
-    print(f"API Key: {'已设置' if api_key else '未设置'}")
+    print(f"API Key: {'đã đặt' if api_key else 'chưa đặt'}")
     print("-" * 40)
 
     try:
-        # 导入并运行
+        # Import và chạy
         from main import sync_main
 
         sync_main()
     except ImportError:
-        print("错误: 无法导入必要模块")
-        print("请确保运行: pip install -r requirements.txt")
+        print("Lỗi: không thể import mô-đun cần thiết")
+        print("Vui lòng đảm bảo chạy: pip install -r requirements.txt")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\n服务器已停止")
+        print("\nMáy chủ đã dừng")
     except Exception as e:
-        print(f"错误: {e}")
+        print(f"Lỗi: {e}")
         sys.exit(1)
 
 
