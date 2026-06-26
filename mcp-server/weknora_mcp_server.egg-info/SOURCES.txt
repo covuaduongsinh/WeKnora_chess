@@ -16,6 +16,7 @@ run_server.py
 setup.py
 test_imports.py
 test_module.py
+uv.lock
 weknora_mcp_server.py
 weknora_mcp_server.egg-info/PKG-INFO
 weknora_mcp_server.egg-info/SOURCES.txt
