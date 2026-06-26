@@ -115,20 +115,20 @@ func dataKeys(data map[string]interface{}) []string {
 
 // toolDisplayNames maps internal tool names to user-friendly display labels.
 var toolDisplayNames = map[string]string{
-	agenttools.ToolThinking:            "深度思考",
-	agenttools.ToolTodoWrite:           "制定计划",
-	agenttools.ToolGrepChunks:          "关键词搜索",
-	agenttools.ToolKnowledgeSearch:     "知识搜索",
-	agenttools.ToolListKnowledgeChunks: "查看文档分块",
-	agenttools.ToolQueryKnowledgeGraph: "查询知识图谱",
-	agenttools.ToolGetDocumentInfo:     "获取文档信息",
-	agenttools.ToolDatabaseQuery:       "查询数据",
-	agenttools.ToolDataAnalysis:        "数据分析",
-	agenttools.ToolDataSchema:          "查看数据结构",
-	agenttools.ToolWebSearch:           "搜索网页",
-	agenttools.ToolWebFetch:            "获取网页",
-	agenttools.ToolExecuteSkillScript:  "执行技能脚本",
-	agenttools.ToolReadSkill:           "读取技能",
+	agenttools.ToolThinking:            "Suy luận sâu",
+	agenttools.ToolTodoWrite:           "Lập kế hoạch",
+	agenttools.ToolGrepChunks:          "Tìm từ khóa",
+	agenttools.ToolKnowledgeSearch:     "Tìm kiếm tri thức",
+	agenttools.ToolListKnowledgeChunks: "Xem khối tài liệu",
+	agenttools.ToolQueryKnowledgeGraph: "Truy vấn đồ thị tri thức",
+	agenttools.ToolGetDocumentInfo:     "Lấy thông tin tài liệu",
+	agenttools.ToolDatabaseQuery:       "Truy vấn dữ liệu",
+	agenttools.ToolDataAnalysis:        "Phân tích dữ liệu",
+	agenttools.ToolDataSchema:          "Xem cấu trúc dữ liệu",
+	agenttools.ToolWebSearch:           "Tìm kiếm trang web",
+	agenttools.ToolWebFetch:            "Lấy trang web",
+	agenttools.ToolExecuteSkillScript:  "Chạy script kỹ năng",
+	agenttools.ToolReadSkill:           "Đọc kỹ năng",
 }
 
 // toolHintSensitiveArgs lists tools whose arguments should NOT be shown in hints

@@ -410,12 +410,12 @@ func makeUserKey(channelID, userID, chatID, threadID string) string {
 	return fmt.Sprintf("%s:%s:%s", channelID, userID, chatID)
 }
 
-// nonTextTypeLabel maps a message type to a Chinese label for LLM instructions.
+// nonTextTypeLabel maps a message type to a Vietnamese label for LLM instructions.
 var nonTextTypeLabel = map[string]string{
-	"image": "图片",
-	"file":  "文件",
-	"video": "视频",
-	"voice": "语音",
+	"image": "hình ảnh",
+	"file":  "tệp",
+	"video": "video",
+	"voice": "giọng nói",
 }
 
 // formatQuotedContext formats a QuotedMessage into a labeled string for LLM context.
@@ -430,9 +430,9 @@ func formatQuotedContext(quote *QuotedMessage) string {
 	if quote.NonTextType != "" {
 		label := nonTextTypeLabel[quote.NonTextType]
 		if label == "" {
-			label = "该类型的"
+			label = "loại này"
 		}
-		return "用户引用了一条" + label + "消息，但你无法查看该内容。请直接告知用户你目前无法处理" + label + "消息，建议用户用文字描述问题。不要猜测该消息的内容。"
+		return "Người dùng đã trích dẫn một tin nhắn " + label + ", nhưng bạn không thể xem nội dung đó. Hãy báo trực tiếp cho người dùng rằng bạn hiện không xử lý được tin nhắn " + label + ", và đề nghị họ mô tả vấn đề bằng văn bản. Đừng đoán nội dung của tin nhắn đó."
 	}
 	if quote.Content == "" {
 		return ""

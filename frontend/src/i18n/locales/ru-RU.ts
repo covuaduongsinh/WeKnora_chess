@@ -3488,7 +3488,7 @@ export default {
     deepThoughtAlt: 'Глубокий анализ'
   },
   language: {
-    zhCN: '简体中文',
+    viVN: 'Tiếng Việt',
     enUS: 'English',
     ruRU: 'Русский',
     koKR: '한국어',

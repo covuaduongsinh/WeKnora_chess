@@ -4,9 +4,9 @@ templates:
     name: "Knowledge Base Q&A"
     description: "Standard template for answering questions based on knowledge base content"
     i18n:
-      zh-CN:
-        name: "知识库问答助手"
-        description: "基础的知识库问答模板，适用于大多数场景"
+      vi-VN:
+        name: "Trợ lý hỏi đáp kho tri thức"
+        description: "Mẫu hỏi đáp kho tri thức cơ bản, phù hợp hầu hết tình huống"
       en-US:
         name: "Knowledge Base Assistant"
         description: "Basic knowledge base Q&A template for most scenarios"
@@ -41,9 +41,9 @@ templates:
     name: "Domain Expert"
     description: "Expert template for in-depth domain-specific answers"
     i18n:
-      zh-CN:
-        name: "领域专家助手"
-        description: "专业深入的解答风格，适合技术或专业领域"
+      vi-VN:
+        name: "Trợ lý chuyên gia lĩnh vực"
+        description: "Phong cách trả lời chuyên sâu, phù hợp lĩnh vực kỹ thuật hoặc chuyên môn"
       en-US:
         name: "Domain Expert"
         description: "Professional and in-depth answers for technical domains"
@@ -74,9 +74,9 @@ templates:
     name: "Customer Service"
     description: "Friendly and professional customer service template"
     i18n:
-      zh-CN:
-        name: "客服助手"
-        description: "友善热情的服务风格，适合客户服务场景"
+      vi-VN:
+        name: "Trợ lý chăm sóc khách hàng"
+        description: "Phong cách phục vụ thân thiện, nhiệt tình, phù hợp tình huống chăm sóc khách hàng"
       en-US:
         name: "Customer Service"
         description: "Friendly and warm service style for customer support"
@@ -107,9 +107,9 @@ templates:
     name: "Technical Support"
     description: "Template for technical problem diagnosis and solutions"
     i18n:
-      zh-CN:
-        name: "技术支持"
-        description: "专业的技术问题解答，包含代码示例"
+      vi-VN:
+        name: "Hỗ trợ kỹ thuật"
+        description: "Trả lời câu hỏi kỹ thuật chuyên nghiệp, kèm ví dụ mã"
       en-US:
         name: "Technical Support"
         description: "Professional technical problem solving with code examples"
@@ -141,9 +141,9 @@ templates:
     name: "General Chat"
     description: "General conversation template without knowledge base"
     i18n:
-      zh-CN:
-        name: "通用对话"
-        description: "不依赖知识库的通用对话助手"
+      vi-VN:
+        name: "Trò chuyện đa năng"
+        description: "Trợ lý trò chuyện đa năng không phụ thuộc kho tri thức"
       en-US:
         name: "General Chat"
         description: "General conversation assistant without knowledge base"
@@ -169,9 +169,9 @@ templates:
     name: "Web Search Assistant"
     description: "Intelligent assistant template with web search capabilities"
     i18n:
-      zh-CN:
-        name: "网络搜索助手"
-        description: "结合网络搜索获取最新信息"
+      vi-VN:
+        name: "Trợ lý tìm kiếm trực tuyến"
+        description: "Kết hợp tìm kiếm trực tuyến để lấy thông tin mới nhất"
       en-US:
         name: "Web Search Assistant"
         description: "Combines web search for up-to-date information"

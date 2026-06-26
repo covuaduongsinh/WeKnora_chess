@@ -2841,7 +2841,7 @@ export default {
     builtinTag: '내장',
   },
   language: {
-    zhCN: "简体中文",
+    viVN: "Tiếng Việt",
     enUS: "English",
     ruRU: "Русский",
     koKR: "한국어",

@@ -38,64 +38,64 @@ var (
 	// Common placeholders
 	PlaceholderQuery = PromptPlaceholder{
 		Name:        "query",
-		Label:       "用户问题",
-		Description: "用户当前的问题或查询内容",
+		Label:       "Câu hỏi người dùng",
+		Description: "Câu hỏi hoặc nội dung truy vấn hiện tại của người dùng",
 	}
 
 	PlaceholderContexts = PromptPlaceholder{
 		Name:        "contexts",
-		Label:       "检索内容",
-		Description: "从知识库检索到的相关内容列表",
+		Label:       "Nội dung truy hồi",
+		Description: "Danh sách nội dung liên quan truy hồi được từ kho tri thức",
 	}
 
 	PlaceholderCurrentTime = PromptPlaceholder{
 		Name:        "current_time",
-		Label:       "当前时间",
-		Description: "当前系统时间（格式：2006-01-02 15:04:05）",
+		Label:       "Thời gian hiện tại",
+		Description: "Thời gian hệ thống hiện tại (định dạng: 2006-01-02 15:04:05)",
 	}
 
 	PlaceholderCurrentWeek = PromptPlaceholder{
 		Name:        "current_week",
-		Label:       "当前星期",
-		Description: "当前星期几（如：星期一、Monday）",
+		Label:       "Thứ hiện tại",
+		Description: "Hôm nay là thứ mấy (ví dụ: Thứ Hai, Monday)",
 	}
 
 	// Rewrite prompt placeholders
 	PlaceholderConversation = PromptPlaceholder{
 		Name:        "conversation",
-		Label:       "历史对话",
-		Description: "格式化的历史对话内容，用于多轮对话改写",
+		Label:       "Lịch sử hội thoại",
+		Description: "Nội dung lịch sử hội thoại đã định dạng, dùng để viết lại trong trò chuyện nhiều lượt",
 	}
 
 	PlaceholderYesterday = PromptPlaceholder{
 		Name:        "yesterday",
-		Label:       "昨天日期",
-		Description: "昨天的日期（格式：2006-01-02）",
+		Label:       "Ngày hôm qua",
+		Description: "Ngày hôm qua (định dạng: 2006-01-02)",
 	}
 
 	PlaceholderAnswer = PromptPlaceholder{
 		Name:        "answer",
-		Label:       "助手回答",
-		Description: "助手的回答内容（用于对话历史格式化）",
+		Label:       "Câu trả lời của trợ lý",
+		Description: "Nội dung câu trả lời của trợ lý (dùng để định dạng lịch sử hội thoại)",
 	}
 
 	// Agent mode specific placeholders
 	PlaceholderKnowledgeBases = PromptPlaceholder{
 		Name:        "knowledge_bases",
-		Label:       "知识库列表",
-		Description: "自动格式化的知识库列表，包含名称、描述、文档数量等信息",
+		Label:       "Danh sách kho tri thức",
+		Description: "Danh sách kho tri thức được định dạng tự động, gồm tên, mô tả, số tài liệu...",
 	}
 
 	PlaceholderWebSearchStatus = PromptPlaceholder{
 		Name:        "web_search_status",
-		Label:       "网络搜索状态",
-		Description: "网络搜索工具是否启用的状态（Enabled 或 Disabled）",
+		Label:       "Trạng thái tìm kiếm trực tuyến",
+		Description: "Trạng thái công cụ tìm kiếm trực tuyến đã bật hay chưa (Enabled hoặc Disabled)",
 	}
 
 	PlaceholderLanguage = PromptPlaceholder{
 		Name:        "language",
-		Label:       "用户语言",
-		Description: "用户界面的语言偏好，如 Chinese (Simplified)、English、Korean 等，用于控制 LLM 回答语言",
+		Label:       "Ngôn ngữ người dùng",
+		Description: "Ngôn ngữ giao diện người dùng, như Vietnamese, English, Korean..., dùng để điều khiển ngôn ngữ trả lời của LLM",
 	}
 )
 

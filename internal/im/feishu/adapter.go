@@ -612,7 +612,7 @@ func buildStreamingCardJSON() string {
 		"schema": "2.0",
 		"config": map[string]interface{}{
 			"streaming_mode": true,
-			"summary":        map[string]string{"content": "正在思考..."},
+			"summary":        map[string]string{"content": "Đang suy nghĩ..."},
 		},
 		"header": map[string]interface{}{
 			"template": "blue",
@@ -622,7 +622,7 @@ func buildStreamingCardJSON() string {
 			"elements": []map[string]interface{}{
 				{
 					"tag":        "markdown",
-					"content":    "💭 正在思考...",
+					"content":    "💭 Đang suy nghĩ...",
 					"text_size":  "normal",
 					"element_id": streamingElementID,
 				},
@@ -678,7 +678,7 @@ func (a *Adapter) SendStreamChunk(ctx context.Context, incoming *im.IncomingMess
 
 	state.mu.Lock()
 	if !state.firstChunk {
-		// Clear the "💭 正在思考..." placeholder on first real content
+		// Clear the "💭 Đang suy nghĩ..." placeholder on first real content
 		state.content.Reset()
 		state.firstChunk = true
 	}

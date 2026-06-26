@@ -5,9 +5,9 @@ templates:
     name: "Pure Agent"
     description: "System prompt for Pure Agent mode (no Knowledge Bases)"
     i18n:
-      zh-CN:
-        name: "纯智能体"
-        description: "纯智能体模式的系统提示词（不使用知识库）"
+      vi-VN:
+        name: "Trợ lý AI thuần"
+        description: "Câu lệnh hệ thống cho chế độ trợ lý AI thuần (không dùng kho tri thức)"
       en-US:
         name: "Pure Agent"
         description: "System prompt for Pure Agent mode (no Knowledge Bases)"
@@ -53,9 +53,9 @@ templates:
     name: "Progressive RAG Agent"
     description: "System prompt for Progressive Agentic RAG mode with Knowledge Bases"
     i18n:
-      zh-CN:
-        name: "渐进式 RAG 智能体"
-        description: "带知识库的渐进式检索增强生成智能体系统提示词"
+      vi-VN:
+        name: "Trợ lý AI RAG tiệm tiến"
+        description: "Câu lệnh hệ thống cho trợ lý AI sinh tăng cường truy hồi tiệm tiến có kho tri thức"
       en-US:
         name: "Progressive RAG Agent"
         description: "System prompt for Progressive Agentic RAG mode with Knowledge Bases"
@@ -170,9 +170,9 @@ templates:
     name: "Data Analyst"
     description: "System prompt for Data Analyst agent with DuckDB SQL analysis"
     i18n:
-      zh-CN:
-        name: "数据分析师"
-        description: "基于 DuckDB SQL 的数据分析智能体系统提示词"
+      vi-VN:
+        name: "Chuyên gia phân tích dữ liệu"
+        description: "Câu lệnh hệ thống cho trợ lý AI phân tích dữ liệu dựa trên DuckDB SQL"
       en-US:
         name: "Data Analyst"
         description: "System prompt for Data Analyst agent with DuckDB SQL analysis"
@@ -219,9 +219,9 @@ templates:
     name: "Wiki Researcher"
     description: "System prompt for Wiki Researcher agent with knowledge graph traversal"
     i18n:
-      zh-CN:
-        name: "维基研究员"
-        description: "专用于 Wiki 知识库图谱导航与深度阅读的智能体系统提示词"
+      vi-VN:
+        name: "Nhà nghiên cứu Wiki"
+        description: "Câu lệnh hệ thống cho trợ lý AI chuyên điều hướng đồ thị và đọc sâu kho tri thức Wiki"
       en-US:
         name: "Wiki Researcher"
         description: "System prompt for Wiki Researcher agent with knowledge graph traversal"
@@ -288,9 +288,9 @@ templates:
     name: "Wiki Fixer System Prompt"
     description: "System prompt for repairing and optimizing Wiki pages based on linter issues"
     i18n:
-      zh-CN:
-        name: "Wiki 修复系统提示词"
-        description: "用于根据巡检问题修复和优化 Wiki 页面的系统提示词"
+      vi-VN:
+        name: "Câu lệnh hệ thống sửa Wiki"
+        description: "Câu lệnh hệ thống dùng để sửa và tối ưu trang Wiki dựa trên vấn đề rà soát"
       en-US:
         name: "Wiki Fixer System Prompt"
         description: "System prompt for repairing and optimizing Wiki pages based on linter issues"
@@ -368,9 +368,9 @@ templates:
     name: "Hybrid RAG + Wiki Agent"
     description: "System prompt for agents working on KBs where BOTH Wiki and chunk (vector/keyword) indexes are enabled."
     i18n:
-      zh-CN:
-        name: "Wiki + RAG 混合智能体"
-        description: "同时启用 Wiki 与向量/关键词索引的知识库场景下使用的系统提示词"
+      vi-VN:
+        name: "Trợ lý AI lai Wiki + RAG"
+        description: "Câu lệnh hệ thống dùng cho tình huống kho tri thức bật đồng thời Wiki và chỉ mục vector/từ khóa"
       en-US:
         name: "Hybrid RAG + Wiki Agent"
         description: "System prompt for KBs with BOTH Wiki and chunk-level retrieval enabled"

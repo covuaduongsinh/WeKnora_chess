@@ -7,9 +7,9 @@ templates:
     name: "Standard Rewrite (with Intent Classification)"
     description: "Default rewrite system + user prompt pair for query rewriting with intent classification"
     i18n:
-      zh-CN:
-        name: "标准改写（含意图分类）"
-        description: "包含问题改写、意图分类和图片/附件分析的默认模板"
+      vi-VN:
+        name: "Viết lại chuẩn (kèm phân loại ý định)"
+        description: "Mẫu mặc định gồm viết lại câu hỏi, phân loại ý định và phân tích ảnh/tệp đính kèm"
       en-US:
         name: "Standard Rewrite (with Intent Classification)"
         description: "Default template with query rewriting, intent classification, and image/attachment analysis"
@@ -125,9 +125,9 @@ templates:
     name: "Standard Rewrite"
     description: "Standard question rewrite system prompt"
     i18n:
-      zh-CN:
-        name: "标准改写"
-        description: "消解指代、补全省略的标准改写规则"
+      vi-VN:
+        name: "Viết lại chuẩn"
+        description: "Quy tắc viết lại chuẩn: giải quyết tham chiếu, bổ sung phần lược bỏ"
       en-US:
         name: "Standard Rewrite"
         description: "Standard rules for resolving references and completing omissions"
@@ -164,9 +164,9 @@ templates:
     name: "Strict Rewrite"
     description: "Strict question rewrite template"
     i18n:
-      zh-CN:
-        name: "严格改写"
-        description: "更严格的改写要求，确保问题完整独立"
+      vi-VN:
+        name: "Viết lại nghiêm ngặt"
+        description: "Yêu cầu viết lại nghiêm ngặt hơn, đảm bảo câu hỏi đầy đủ và độc lập"
       en-US:
         name: "Strict Rewrite"
         description: "Stricter requirements for complete and independent questions"

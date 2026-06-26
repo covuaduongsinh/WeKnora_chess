@@ -578,7 +578,7 @@ const headerTitleModeOptions = computed(() => ([
 
 const defaultLocaleOptions = computed(() => ([
   { label: t('embedPublish.defaultLocaleBrowser'), value: '' },
-  { label: '简体中文', value: 'zh-CN' },
+  { label: 'Tiếng Việt', value: 'vi-VN' },
   { label: 'English', value: 'en-US' },
   { label: '한국어', value: 'ko-KR' },
   { label: 'Русский', value: 'ru-RU' },
