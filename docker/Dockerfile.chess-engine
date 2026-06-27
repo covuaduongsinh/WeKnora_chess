@@ -19,7 +19,7 @@ ARG ARASAN_VERSION=v25.4
 ARG ARASAN_BUILD=modern
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git ca-certificates make g++ gawk \
+        git ca-certificates make g++ gawk bc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -34,8 +34,8 @@ RUN make BUILD_TYPE=${ARASAN_BUILD} \
     && BIN="$(find /build/arasan -type f -name 'arasanx-64*' -perm -u+x | head -n1)" \
     && test -n "$BIN" \
     && cp "$BIN" /out/arasanx-64 \
-    # Sao chép mạng NNUE (từ submodule) cạnh binary để engine tự nạp khi chạy.
-    && find /build/arasan -type f -name '*.nnue' -exec cp {} /out/ \; 2>/dev/null || true \
+    # Sao chép mạng NNUE (từ submodule) cạnh binary; bọc riêng để thiếu nnue không làm fail build.
+    && ( find /build/arasan -type f -name '*.nnue' -exec cp {} /out/ \; || true ) \
     && ls -la /out
 
 # ---- Stage 2: runtime tối giản ----

@@ -26,6 +26,8 @@ const (
 	BuiltinWikiResearcherID = "builtin-wiki-researcher"
 	// BuiltinWikiFixerID is the ID for the built-in wiki fixer agent
 	BuiltinWikiFixerID = "builtin-wiki-fixer"
+	// BuiltinChessCoachID is the ID for the built-in chess coach agent (HLV Cờ vua)
+	BuiltinChessCoachID = "builtin-chess-coach"
 )
 
 // AgentMode constants for agent running mode
@@ -372,6 +374,7 @@ var builtinAgentIDsOrdered = []string{
 	BuiltinDataAnalystID,
 	BuiltinKnowledgeGraphExpertID,
 	BuiltinDocumentAssistantID,
+	BuiltinChessCoachID,
 }
 
 // GetBuiltinAgentIDs returns all built-in agent IDs in fixed order
