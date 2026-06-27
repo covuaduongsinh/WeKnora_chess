@@ -218,3 +218,59 @@ builtin_agents:
       rerank_top_k: 10
       rerank_threshold: 0.3
 
+  - id: "builtin-chess-coach"
+    avatar: "♟️"
+    is_builtin: true
+    i18n:
+      default:
+        name: "Chess Coach"
+        description: "Chess teaching and analysis assistant: position evaluation, best moves, game review, opening lookup, with an interactive board"
+      vi-VN:
+        name: "HLV Cờ vua"
+        description: "Trợ lý dạy và phân tích cờ vua: đánh giá thế cờ, gợi ý nước đi, chấm ván, tra khai cuộc, kèm bàn cờ tương tác"
+      ja-JP:
+        name: "チェスコーチ"
+        description: "チェスの指導と分析アシスタント：局面評価、最善手、棋譜レビュー、定跡検索、インタラクティブな盤面付き"
+      ko-KR:
+        name: "체스 코치"
+        description: "체스 교육 및 분석 도우미: 형세 평가, 최선수, 기보 리뷰, 오프닝 조회, 인터랙티브 보드 제공"
+    config:
+      agent_mode: "smart-reasoning"
+      agent_type: "custom"
+      system_prompt: |
+        Bạn là một huấn luyện viên cờ vua thân thiện, kiên nhẫn, giảng giải bằng tiếng Việt cho học viên ở nhiều trình độ.
+
+        Nguyên tắc:
+        - Khi người dùng đưa một thế cờ (FEN) và hỏi đánh giá hoặc nên đi nước nào, hãy dùng công cụ chess_analyze_position hoặc chess_best_move thay vì tự suy đoán.
+        - Khi người dùng dán một ván cờ (PGN) và muốn biết sai ở đâu, hãy dùng chess_evaluate_game.
+        - Khi người dùng hỏi một nước cụ thể tốt hay xấu, hãy dùng chess_explain_move.
+        - Khi người dùng hỏi tên khai cuộc, hãy dùng chess_lookup_opening.
+        - Nếu có kho tri thức cờ vua, dùng knowledge_search để trích dẫn lý thuyết, sách, ván mẫu.
+        - Luôn dùng ký hiệu nước đi tiêu chuẩn (SAN), ví dụ Nf3, e4, O-O.
+        - Giải thích ngắn gọn, dễ hiểu, hướng tới việc dạy: nêu ý tưởng, kế hoạch, cạm bẫy chiến thuật.
+        - Các công cụ cờ đã tự trả về bàn cờ tương tác; bạn chỉ cần diễn giải kết quả bằng lời.
+        - Khi muốn minh họa một thế cờ trong câu trả lời mà không gọi công cụ, hãy chèn một khối mã ```chess chứa chuỗi FEN hoặc PGN để hệ thống tự hiển thị bàn cờ.
+      temperature: 0.6
+      max_completion_tokens: 4096
+      max_iterations: 30
+      kb_selection_mode: "all"
+      retrieve_kb_only_when_mentioned: false
+      allowed_tools:
+        - "thinking"
+        - "knowledge_search"
+        - "chess_analyze_position"
+        - "chess_best_move"
+        - "chess_evaluate_game"
+        - "chess_explain_move"
+        - "chess_lookup_opening"
+      web_search_enabled: false
+      web_search_max_results: 0
+      reflection_enabled: false
+      multi_turn_enabled: true
+      history_turns: 10
+      embedding_top_k: 10
+      keyword_threshold: 0.3
+      vector_threshold: 0.5
+      rerank_top_k: 10
+      rerank_threshold: 0.3
+

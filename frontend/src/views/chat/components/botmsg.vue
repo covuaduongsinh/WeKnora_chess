@@ -30,10 +30,13 @@
         <div ref="parentMd" v-if="!session.hideContent && !session.isAgentMode">
             <!-- 直接渲染完整内容，避免切分导致的问题，样式与 thinking 一致 -->
             <!-- 只有当有实际内容时才显示包围框 -->
-            <div class="content-wrapper" v-if="hasActualContent">
+            <div class="content-wrapper" v-if="hasActualContent && renderedHTML">
                 <div class="ai-markdown-template markdown-content" v-stable-html="renderedHTML">
                 </div>
             </div>
+            <!-- Bàn cờ tương tác từ các khối ```chess (render bằng component Vue,
+                 nằm ngoài v-stable-html nên không bị morph ghi đè) -->
+            <ChessBoardDisplay v-for="(board, bi) in chessBoards" :key="'chess-' + bi" :data="board" />
             <!-- Streaming indicator (non-Agent mode) -->
             <div v-if="hasActualContent && !session.is_completed" class="loading-indicator">
                 <div class="loading-typing">
@@ -100,6 +103,8 @@ import {
     enhanceMarkdownContainer,
 } from '@/utils/mermaidShared';
 import { refreshMarkdownEnhancements } from '@/utils/markdownEnhancements';
+import { extractChessBlocks, stripChessBlocks } from '@/utils/chessBlocks';
+import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import { useChatCitationPopover } from '@/composables/useChatCitationPopover';
 import { useTypewriter } from '@/composables/useTypewriter';
 import { vStableHtml } from '@/directives/stableHtml';
@@ -185,8 +190,12 @@ const { displayed: typedAnswer } = useTypewriter(
 
 // 单次渲染整个 Markdown 内容（替代 token-by-token，修复 KaTeX 公式在 streaming 时闪烁消失的问题）
 const renderedHTML = computed(() => {
-    const text = typedAnswer.value;
-    if (!text || typeof text !== 'string') return '';
+    const raw = typedAnswer.value;
+    if (!raw || typeof raw !== 'string') return '';
+    // Loại khối ```chess khỏi markdown — chúng được render thành bàn cờ tương tác
+    // bằng component Vue riêng (xem chessBoards), không hiện dưới dạng code block.
+    const text = stripChessBlocks(raw);
+    if (!text.trim()) return '';
     return renderChatMarkdown(text, {
         renderer: markdownRenderer,
         escapeMarkdown: safeMarkdownToHTML,
@@ -195,6 +204,9 @@ const renderedHTML = computed(() => {
         knowledgeReferences: props.session?.knowledge_references,
     });
 });
+
+// Bàn cờ tương tác bóc từ các khối ```chess trong câu trả lời.
+const chessBoards = computed(() => extractChessBlocks(answerText.value));
 
 // 计算属性：判断是否有实际内容（非空且不只是空白）
 const hasActualContent = computed(() => {

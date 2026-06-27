@@ -7,3 +7,17 @@ declare module '*.vue' {
 
 declare const __FRONTEND_VERSION__: string;
 declare const __FRONTEND_COMMIT__: string;
+
+// cm-chessboard (MIT) không kèm khai báo type — khai báo tối thiểu phần đang dùng.
+declare module 'cm-chessboard/src/Chessboard.js' {
+    export const COLOR: { white: string; black: string };
+    export const FEN: { start: string; empty: string };
+    export const PIECES_FILE_TYPE: { svgSprite: string };
+    export class Chessboard {
+        constructor(context: HTMLElement, props?: Record<string, unknown>);
+        setPosition(fen: string, animated?: boolean): Promise<void>;
+        getPosition(): string;
+        setOrientation(color: string, animated?: boolean): Promise<void>;
+        destroy(): void;
+    }
+}

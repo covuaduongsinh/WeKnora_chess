@@ -25,7 +25,8 @@ export type DisplayType =
     | 'wiki_write_page'
     | 'wiki_replace_text'
     | 'wiki_rename_page'
-    | 'wiki_delete_page';
+    | 'wiki_delete_page'
+    | 'chess_board';
 
 // Search result item
 export interface SearchResultItem {
@@ -311,6 +312,38 @@ export interface WikiDeletePageData {
 // Union type for all wiki edit data
 export type WikiEditData = WikiWritePageData | WikiReplaceTextData | WikiRenamePageData | WikiDeletePageData;
 
+// Một nước đi trong ván cờ (khớp internal/chess GamePly)
+export interface ChessPly {
+    move_number: number;
+    side: 'w' | 'b';
+    san: string;
+    uci: string;
+    fen_before: string;
+    fen_after: string;
+}
+
+// Dữ liệu bàn cờ (tool cờ phát display_type: 'chess_board')
+export interface ChessBoardData {
+    display_type: 'chess_board';
+    // Thế cờ ban đầu để hiển thị (FEN). Bắt buộc.
+    fen: string;
+    // Nếu có pgn/plies, bàn cờ cho phép lật từng nước.
+    pgn?: string;
+    plies?: ChessPly[];
+    // Đánh giá engine (tùy chọn) cho thế cờ hiện tại.
+    eval_cp?: number;
+    is_mate?: boolean;
+    mate_in?: number;
+    best_move?: string;      // UCI
+    best_move_san?: string;  // SAN
+    depth?: number;
+    side_to_move?: 'w' | 'b';
+    // Tiêu đề/chú thích hiển thị phía trên bàn cờ.
+    caption?: string;
+    // Hướng nhìn ban đầu của bàn cờ.
+    orientation?: 'white' | 'black';
+}
+
 // Union type for all tool result data
 export type ToolResultData =
     | SearchResultsData
@@ -329,7 +362,8 @@ export type ToolResultData =
     | WikiWritePageData
     | WikiReplaceTextData
     | WikiRenamePageData
-    | WikiDeletePageData;
+    | WikiDeletePageData
+    | ChessBoardData;
 
 // Action data (from index.vue)
 export interface ActionData {

@@ -32,7 +32,26 @@ const (
 	ToolWikiFlagIssue     = "wiki_flag_issue"
 	ToolWikiReadIssue     = "wiki_read_issue"
 	ToolWikiUpdateIssue   = "wiki_update_issue"
+	// Chess-related tools (cờ vua) — không cần knowledge base; chỉ cần engine
+	// phân tích (Arasan) được cấu hình, riêng lookup_opening chỉ dùng logic luật cờ.
+	ToolChessAnalyzePosition = "chess_analyze_position"
+	ToolChessBestMove        = "chess_best_move"
+	ToolChessEvaluateGame    = "chess_evaluate_game"
+	ToolChessExplainMove     = "chess_explain_move"
+	ToolChessLookupOpening   = "chess_lookup_opening"
 )
+
+// ChessToolNames liệt kê toàn bộ tool cờ vua. Dùng để cấp quyền và để loại trừ
+// khỏi bộ lọc tool-cần-KB (các tool cờ KHÔNG cần knowledge base).
+func ChessToolNames() []string {
+	return []string{
+		ToolChessAnalyzePosition,
+		ToolChessBestMove,
+		ToolChessEvaluateGame,
+		ToolChessExplainMove,
+		ToolChessLookupOpening,
+	}
+}
 
 // AvailableTool defines a simple tool metadata used by settings APIs.
 type AvailableTool struct {
@@ -67,6 +86,11 @@ func AvailableToolDefinitions() []AvailableTool {
 		{Name: ToolWikiDeletePage, Label: "删除Wiki", Description: "删除Wiki页面并自动清理关联死链"},
 		{Name: ToolWikiReadIssue, Label: "查看Wiki问题", Description: "查看特定的Wiki页面问题详情"},
 		{Name: ToolWikiUpdateIssue, Label: "更新Wiki问题状态", Description: "更新特定的Wiki页面问题状态"},
+		{Name: ToolChessAnalyzePosition, Label: "Phân tích thế cờ", Description: "Đánh giá thế cờ (FEN) bằng engine, trả điểm và nước tốt nhất"},
+		{Name: ToolChessBestMove, Label: "Nước đi tốt nhất", Description: "Tìm nước đi tốt nhất cho một thế cờ"},
+		{Name: ToolChessEvaluateGame, Label: "Chấm ván cờ", Description: "Phân tích cả ván (PGN), chỉ ra sai lầm từng nước"},
+		{Name: ToolChessExplainMove, Label: "Giải thích nước đi", Description: "Giải thích một nước đi dựa trên đánh giá engine"},
+		{Name: ToolChessLookupOpening, Label: "Tra khai cuộc", Description: "Nhận diện tên khai cuộc và mã ECO từ chuỗi nước đi"},
 	}
 }
 

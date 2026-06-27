@@ -1,0 +1,36 @@
+# Overlay opt-in: thêm engine phân tích cờ vua (Arasan, MIT) vào WeKnora.
+#
+# Cách dùng:
+#   docker compose -f docker-compose.yml -f docker-compose.chess.yml up -d
+#
+# Overlay này:
+#   - Thêm service chess-engine (sidecar HTTP bọc Arasan qua UCI).
+#   - Cấu hình app gọi engine ở chế độ http qua biến WEKNORA_CHESS_*.
+#
+# Không sửa docker-compose.yml gốc nên các triển khai hiện có không bị ảnh hưởng.
+
+services:
+  chess-engine:
+    image: weknora-chess-engine:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.chess-engine
+      # Đổi ARASAN_BUILD thành "avx2" nếu CPU hỗ trợ để engine mạnh/nhanh hơn.
+      args:
+        ARASAN_VERSION: v25.4
+        ARASAN_BUILD: modern
+    container_name: WeKnora-chess-engine
+    networks:
+      - WeKnora-network
+    restart: unless-stopped
+
+  app:
+    # Dùng định dạng list cho khớp environment ở docker-compose.yml (tránh lỗi merge).
+    environment:
+      - WEKNORA_CHESS_ENABLED=true
+      - WEKNORA_CHESS_MODE=http
+      - WEKNORA_CHESS_ENGINE_ENDPOINT=http://chess-engine:8080
+      - WEKNORA_CHESS_DEFAULT_DEPTH=14
+      - WEKNORA_CHESS_TIMEOUT_SEC=15
+    depends_on:
+      - chess-engine

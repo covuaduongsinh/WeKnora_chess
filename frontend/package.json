@@ -18,6 +18,8 @@
     "@types/papaparse": "^5.5.2",
     "@vue-office/pptx": "^1.0.1",
     "axios": "^1.16.0",
+    "chess.js": "^1.4.0",
+    "cm-chessboard": "^8.12.12",
     "docx-preview": "^0.3.7",
     "dompurify": "^3.4.2",
     "highlight.js": "^11.11.1",

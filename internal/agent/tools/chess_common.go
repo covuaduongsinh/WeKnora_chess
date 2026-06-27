@@ -1,0 +1,89 @@
+package tools
+
+import (
+	"fmt"
+
+	"github.com/Tencent/WeKnora/internal/chess"
+)
+
+// chess_common.go gom các tiện ích dùng chung cho nhóm tool cờ vua.
+
+// chessBoardData chuyển một chess.Analysis thành map dữ liệu cho frontend
+// (display_type "chess_board") để hiển thị bàn cờ tương tác kèm đánh giá.
+func chessBoardData(a *chess.Analysis, caption string) map[string]interface{} {
+	d := map[string]interface{}{
+		"display_type": "chess_board",
+		"fen":          a.FEN,
+		"side_to_move": a.SideToMove,
+		"depth":        a.Depth,
+	}
+	if a.BestMove != "" {
+		d["best_move"] = a.BestMove
+	}
+	if a.BestMoveSAN != "" {
+		d["best_move_san"] = a.BestMoveSAN
+	}
+	if a.IsMate {
+		d["is_mate"] = true
+		d["mate_in"] = a.MateIn
+	} else {
+		d["eval_cp"] = a.EvalCP
+	}
+	if caption != "" {
+		d["caption"] = caption
+	}
+	return d
+}
+
+// formatEvalWhite định dạng đánh giá theo góc nhìn quân Trắng cho phần văn bản
+// gửi LLM (ví dụ "+0.45", "-1.20", "Chiếu hết sau 3 nước cho Trắng").
+func formatEvalWhite(a *chess.Analysis) string {
+	if a.IsMate {
+		n := a.MateIn
+		// MateIn dương: bên đang đi chiếu hết. Quy về bên Trắng/Đen.
+		whiteMating := (n >= 0) == (a.SideToMove != "b")
+		moves := n
+		if moves < 0 {
+			moves = -moves
+		}
+		side := "Trắng"
+		if !whiteMating {
+			side = "Đen"
+		}
+		return fmt.Sprintf("Chiếu hết sau %d nước cho %s", moves, side)
+	}
+	white := a.WhiteCentipawns()
+	return fmt.Sprintf("%+.2f", float64(white)/100)
+}
+
+// describeEval mô tả ngắn gọn ai đang ưu thế, phục vụ giải thích cho người học.
+func describeEval(a *chess.Analysis) string {
+	if a.IsMate {
+		return formatEvalWhite(a)
+	}
+	white := a.WhiteCentipawns()
+	abs := white
+	if abs < 0 {
+		abs = -abs
+	}
+	var who, level string
+	switch {
+	case abs < 30:
+		return "Thế cờ cân bằng"
+	case white > 0:
+		who = "Trắng"
+	default:
+		who = "Đen"
+	}
+	switch {
+	case abs < 80:
+		level = "nhỉnh hơn đôi chút"
+	case abs < 180:
+		level = "ưu thế rõ"
+	case abs < 400:
+		level = "ưu thế lớn"
+	default:
+		level = "thắng thế áp đảo"
+	}
+	return fmt.Sprintf("%s %s (%s)", who, level, formatEvalWhite(a))
+}

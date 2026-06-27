@@ -33,6 +33,7 @@ type Config struct {
 	PromptTemplates *PromptTemplatesConfig `yaml:"prompt_templates" json:"prompt_templates"`
 	IM              *IMConfig              `yaml:"im"               json:"im"`
 	Agent           *AgentConfig           `yaml:"agent"            json:"agent"`
+	Chess           *ChessConfig           `yaml:"chess"            json:"chess"`
 	// FrontendBaseURL is the externally-visible origin of the SPA, used
 	// to compose absolute share-link URLs. Empty falls back to a host-
 	// relative URL ("/register?token=…") which the SPA then resolves
@@ -49,6 +50,27 @@ type AgentConfig struct {
 	// ToolApprovalTimeoutSeconds is how long the agent waits for human approval on a flagged MCP tool.
 	// 0 means default 600 (10 minutes).
 	ToolApprovalTimeoutSeconds int `yaml:"tool_approval_timeout_seconds" json:"tool_approval_timeout_seconds"`
+}
+
+// ChessConfig cấu hình engine phân tích cờ vua.
+// Mọi trường đều tùy chọn — để trống thì khả năng phân tích bằng engine tắt
+// (các tool cờ vẫn dùng được logic luật cờ thuần như tra khai cuộc), nên các
+// triển khai cũ không cần đổi cấu hình.
+type ChessConfig struct {
+	// Enabled bật/tắt tích hợp engine. Mặc định false nếu thiếu EnginePath/Endpoint.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Mode: "uci" (spawn binary cục bộ, mặc định) hoặc "http" (gọi sidecar).
+	Mode string `yaml:"mode" json:"mode"`
+	// EnginePath là đường dẫn tới binary engine UCI (Arasan, MIT) cho chế độ uci.
+	EnginePath string `yaml:"engine_path" json:"engine_path"`
+	// EngineEndpoint là URL sidecar HTTP cho chế độ http.
+	EngineEndpoint string `yaml:"engine_endpoint" json:"engine_endpoint"`
+	// DefaultDepth là độ sâu tìm kiếm mặc định. Mặc định 14.
+	DefaultDepth int `yaml:"default_depth" json:"default_depth"`
+	// MaxConcurrent là số tiến trình engine tối đa đồng thời. Mặc định 2.
+	MaxConcurrent int `yaml:"max_concurrent" json:"max_concurrent"`
+	// TimeoutSec là thời gian tối đa cho một lần phân tích (giây). Mặc định 15.
+	TimeoutSec int `yaml:"timeout_sec" json:"timeout_sec"`
 }
 
 // IMConfig configures the IM integration service.
@@ -562,6 +584,7 @@ func LoadConfig() (*Config, error) {
 	// Validate configuration values
 	applyOIDCEnvOverrides(&cfg)
 	applyAgentEnvOverrides(&cfg)
+	applyChessEnvOverrides(&cfg)
 	applyKnowledgeBaseEnvOverrides(&cfg)
 	applyAuthAndTenantDefaults(&cfg)
 	applyAuditDefaults(&cfg)
@@ -764,6 +787,63 @@ func applyAgentEnvOverrides(cfg *Config) {
 			cfg.Agent.ToolApprovalTimeoutSeconds = int(d.Seconds())
 		} else if d, err := time.ParseDuration(value + "s"); err == nil {
 			cfg.Agent.ToolApprovalTimeoutSeconds = int(d.Seconds())
+		}
+	}
+}
+
+// applyChessEnvOverrides điền mặc định và áp các biến môi trường WEKNORA_CHESS_*
+// cho cấu hình engine cờ vua, để operator bật engine mà không sửa config.yaml.
+//
+// Env:
+//   - WEKNORA_CHESS_ENABLED       ("true"/"false")
+//   - WEKNORA_CHESS_MODE          ("uci" | "http")
+//   - WEKNORA_CHESS_ENGINE_PATH   (đường dẫn binary engine UCI, ví dụ Arasan)
+//   - WEKNORA_CHESS_ENGINE_ENDPOINT (URL sidecar HTTP)
+//   - WEKNORA_CHESS_DEFAULT_DEPTH (số nguyên)
+//   - WEKNORA_CHESS_MAX_CONCURRENT (số nguyên)
+//   - WEKNORA_CHESS_TIMEOUT_SEC   (số nguyên, giây)
+func applyChessEnvOverrides(cfg *Config) {
+	if cfg.Chess == nil {
+		cfg.Chess = &ChessConfig{}
+	}
+	c := cfg.Chess
+
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_MODE")); value != "" {
+		c.Mode = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_ENGINE_PATH")); value != "" {
+		c.EnginePath = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_ENGINE_ENDPOINT")); value != "" {
+		c.EngineEndpoint = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_DEFAULT_DEPTH")); value != "" {
+		if d, err := strconv.Atoi(value); err == nil && d > 0 {
+			c.DefaultDepth = d
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_MAX_CONCURRENT")); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			c.MaxConcurrent = n
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_TIMEOUT_SEC")); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			c.TimeoutSec = n
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_ENABLED")); value != "" {
+		c.Enabled = strings.EqualFold(value, "true")
+	}
+
+	// Tự suy ra Enabled: nếu chưa bật tường minh nhưng đã có đủ thông tin engine
+	// thì coi như bật, để chỉ cần đặt ENGINE_PATH là dùng được.
+	if !c.Enabled {
+		switch c.Mode {
+		case "http":
+			c.Enabled = c.EngineEndpoint != ""
+		default: // "uci" hoặc rỗng
+			c.Enabled = c.EnginePath != ""
 		}
 	}
 }

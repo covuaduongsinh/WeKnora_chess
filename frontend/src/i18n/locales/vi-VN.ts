@@ -5787,4 +5787,14 @@ export default {
       generic: "Thao tác thất bại, vui lòng thử lại sau.",
     },
   },
+  chess: {
+    bestMove: "Nước tốt nhất",
+    depth: "Độ sâu",
+    start: "Về đầu",
+    prev: "Nước trước",
+    next: "Nước sau",
+    end: "Tới cuối",
+    flip: "Lật bàn cờ",
+    startPosition: "Thế cờ ban đầu",
+  },
 };

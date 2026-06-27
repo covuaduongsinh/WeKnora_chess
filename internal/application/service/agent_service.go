@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/agent/approval"
 	"github.com/Tencent/WeKnora/internal/agent/skills"
 	"github.com/Tencent/WeKnora/internal/agent/tools"
+	"github.com/Tencent/WeKnora/internal/chess"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -61,6 +63,44 @@ type agentService struct {
 	wikiPageService       interfaces.WikiPageService
 	tenantService         interfaces.TenantService
 	toolApprovalGate      approval.MCPApproval
+
+	// Engine cờ vua dùng chung, khởi tạo lười và tái sử dụng giữa các phiên.
+	chessEngine     chess.EngineClient
+	chessEngineOnce sync.Once
+}
+
+// getChessEngine khởi tạo (một lần) và trả về engine cờ vua theo cấu hình.
+// Trả về nil nếu engine chưa được bật/cấu hình — caller bỏ qua các tool cần engine.
+func (s *agentService) getChessEngine(ctx context.Context) chess.EngineClient {
+	s.chessEngineOnce.Do(func() {
+		cc := s.cfg.Chess
+		if cc == nil || !cc.Enabled {
+			return
+		}
+		client, err := chess.NewEngineClient(chess.Config{
+			Mode:           cc.Mode,
+			EnginePath:     cc.EnginePath,
+			EngineEndpoint: cc.EngineEndpoint,
+			DefaultDepth:   cc.DefaultDepth,
+			MaxConcurrent:  cc.MaxConcurrent,
+			TimeoutSec:     cc.TimeoutSec,
+		})
+		if err != nil {
+			logger.Warnf(ctx, "Không khởi tạo được engine cờ vua: %v", err)
+			return
+		}
+		s.chessEngine = client
+		logger.Infof(ctx, "Đã khởi tạo engine cờ vua (mode=%s)", cc.Mode)
+	})
+	return s.chessEngine
+}
+
+// chessDefaultDepth trả về độ sâu mặc định đã cấu hình cho engine cờ.
+func (s *agentService) chessDefaultDepth() int {
+	if s.cfg.Chess != nil && s.cfg.Chess.DefaultDepth > 0 {
+		return s.cfg.Chess.DefaultDepth
+	}
+	return chess.DefaultDepth
 }
 
 // NewAgentService creates a new agent service
@@ -579,6 +619,34 @@ func (s *agentService) registerTools(
 			toolToRegister = tools.NewWikiRenamePageTool(s.wikiPageService, wikiKBIDs)
 		case tools.ToolWikiDeletePage:
 			toolToRegister = tools.NewWikiDeletePageTool(s.wikiPageService, wikiKBIDs)
+
+		// Chess tools — không cần KB. lookup_opening chỉ dùng luật cờ; còn lại cần engine.
+		case tools.ToolChessLookupOpening:
+			toolToRegister = tools.NewChessLookupOpeningTool()
+		case tools.ToolChessAnalyzePosition:
+			if eng := s.getChessEngine(ctx); eng != nil {
+				toolToRegister = tools.NewChessAnalyzePositionTool(eng, s.chessDefaultDepth())
+			} else {
+				logger.Warnf(ctx, "Bỏ qua %s: engine cờ vua chưa sẵn sàng", toolName)
+			}
+		case tools.ToolChessBestMove:
+			if eng := s.getChessEngine(ctx); eng != nil {
+				toolToRegister = tools.NewChessBestMoveTool(eng, s.chessDefaultDepth())
+			} else {
+				logger.Warnf(ctx, "Bỏ qua %s: engine cờ vua chưa sẵn sàng", toolName)
+			}
+		case tools.ToolChessEvaluateGame:
+			if eng := s.getChessEngine(ctx); eng != nil {
+				toolToRegister = tools.NewChessEvaluateGameTool(eng)
+			} else {
+				logger.Warnf(ctx, "Bỏ qua %s: engine cờ vua chưa sẵn sàng", toolName)
+			}
+		case tools.ToolChessExplainMove:
+			if eng := s.getChessEngine(ctx); eng != nil {
+				toolToRegister = tools.NewChessExplainMoveTool(eng, s.chessDefaultDepth())
+			} else {
+				logger.Warnf(ctx, "Bỏ qua %s: engine cờ vua chưa sẵn sàng", toolName)
+			}
 
 		default:
 			logger.Warnf(ctx, "Unknown tool: %s", toolName)

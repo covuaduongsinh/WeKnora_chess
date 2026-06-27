@@ -263,6 +263,9 @@
                 <div v-stable-html="renderAnswerContent(event === activeAnswerEventRef ? typedAnswer : event.content)">
                 </div>
               </div>
+              <!-- Bàn cờ tương tác từ các khối ```chess trong câu trả lời (component Vue, ngoài v-stable-html) -->
+              <ChessBoardDisplay v-for="(board, cbi) in answerChessBoards(event.content)" :key="'cb-' + cbi"
+                :data="board" />
               <div v-if="event.done && event.content && event.content.trim() && !embeddedMode" class="answer-toolbar">
                 <t-button size="small" variant="outline" shape="round" @click.stop="handleCopyAnswer(event)"
                   :title="$t('agent.copy')">
@@ -418,6 +421,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { marked } from 'marked';
 import 'katex/dist/katex.min.css';
 import ToolResultRenderer from './ToolResultRenderer.vue';
+import ChessBoardDisplay from './tool-results/ChessBoardDisplay.vue';
+import { extractChessBlocks, stripChessBlocks } from '@/utils/chessBlocks';
 import ToolApprovalCard from './ToolApprovalCard.vue';
 import ChatRequestInfoButton from '@/components/ChatRequestInfoButton.vue';
 import ChatCitationFloat from '@/components/ChatCitationFloat.vue';
@@ -1734,7 +1739,14 @@ const renderMarkdownContent = (content: unknown): string => {
 // plain-text answer in, then delegates to the standard markdown renderer.
 const renderAnswerContent = (content: unknown): string => {
   const contentStr = typeof content === 'string' ? content : String(content || '');
-  return renderMarkdownContent(unwrapFinalAnswerWrappers(contentStr));
+  // Loại khối ```chess — render thành bàn cờ tương tác bằng component riêng.
+  return renderMarkdownContent(stripChessBlocks(unwrapFinalAnswerWrappers(contentStr)));
+};
+
+// Bóc bàn cờ từ nội dung một answer event để render bằng <ChessBoardDisplay>.
+const answerChessBoards = (content: unknown) => {
+  const contentStr = typeof content === 'string' ? content : String(content || '');
+  return extractChessBlocks(unwrapFinalAnswerWrappers(contentStr));
 };
 
 // Legacy Markdown rendering function (kept for summaries)

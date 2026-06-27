@@ -1,0 +1,62 @@
+# WeKnora Chess Engine sidecar
+#
+# Build engine cờ vua Arasan (giấy phép MIT — tự do tùy biến + bán thương mại)
+# từ nguồn, rồi chạy một cầu nối HTTP<->UCI bằng Python stdlib để WeKnora gọi
+# qua internal/chess/http_engine.go.
+#
+# Arasan là C++ thuần. Mặc định build với -msse4.2/-mpopcnt (tương thích rộng);
+# nếu CPU không hỗ trợ, chỉnh ARASAN_BUILD cho phù hợp (xem src/Makefile).
+#
+# KHÔNG dùng Stockfish/Lc0 (GPL). Engine chạy như tiến trình/dịch vụ riêng nên
+# không ràng buộc giấy phép phần còn lại của WeKnora.
+
+# ---- Stage 1: build Arasan từ nguồn ----
+FROM debian:bookworm-slim AS builder
+
+ARG ARASAN_VERSION=v25.4
+# BUILD_TYPE của src/Makefile: rỗng (generic SSE2) | modern (POPCNT/SSE4.1) | avx2.
+# CPU Pentium Gold G6405 không có AVX2 → dùng "modern". Mạng NNUE đến từ submodule.
+ARG ARASAN_BUILD=modern
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates make g++ gawk \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+RUN git clone --depth 1 --branch ${ARASAN_VERSION} --recurse-submodules \
+        https://github.com/jdart1/arasan-chess.git arasan
+
+# Build engine từ thư mục src. Binary đầu ra tên theo BUILD_TYPE (vd arasanx-64-modern);
+# ta dò tìm và chuẩn hóa tên thành /out/arasanx-64 cho runtime, kèm mạng NNUE.
+WORKDIR /build/arasan/src
+RUN make BUILD_TYPE=${ARASAN_BUILD} \
+    && mkdir -p /out \
+    && BIN="$(find /build/arasan -type f -name 'arasanx-64*' -perm -u+x | head -n1)" \
+    && test -n "$BIN" \
+    && cp "$BIN" /out/arasanx-64 \
+    # Sao chép mạng NNUE (từ submodule) cạnh binary để engine tự nạp khi chạy.
+    && find /build/arasan -type f -name '*.nnue' -exec cp {} /out/ \; 2>/dev/null || true \
+    && ls -la /out
+
+# ---- Stage 2: runtime tối giản ----
+FROM python:3.11-slim
+
+RUN groupadd -g 1000 chess && useradd -u 1000 -g chess -m -s /bin/bash chess
+
+WORKDIR /app
+COPY --from=builder /out/ /app/engine/
+COPY docker/chess-engine/uci_http_bridge.py /app/uci_http_bridge.py
+
+ENV CHESS_ENGINE_PATH=/app/engine/arasanx-64 \
+    CHESS_BRIDGE_PORT=8080 \
+    CHESS_DEFAULT_DEPTH=14
+
+# Engine nạp NNUE từ thư mục làm việc; chạy trong /app/engine để tìm thấy file.
+WORKDIR /app/engine
+USER chess
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health').read()==b'ok' else 1)"
+
+CMD ["python3", "/app/uci_http_bridge.py"]
