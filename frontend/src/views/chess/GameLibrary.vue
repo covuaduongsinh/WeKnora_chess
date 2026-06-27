@@ -1,0 +1,126 @@
+<template>
+  <div class="gl">
+    <div class="gl-toolbar">
+      <t-input v-model="filter.white" placeholder="Trắng" clearable style="width:140px" @change="load" />
+      <t-input v-model="filter.black" placeholder="Đen" clearable style="width:140px" @change="load" />
+      <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
+      <t-select v-model="filter.result" :options="resultOptions" placeholder="Kết quả" clearable
+        style="width:120px" @change="load" />
+      <div style="flex:1"></div>
+      <t-button theme="primary" size="small" @click="importDialog.visible = true">
+        <template #icon><t-icon name="upload" /></template>Import PGN
+      </t-button>
+    </div>
+
+    <div class="gl-body">
+      <div class="gl-list">
+        <div v-if="games.length === 0" class="gl-empty">Chưa có ván cờ. Nhấn "Import PGN" để thêm.</div>
+        <div v-for="g in games" :key="g.id" class="gl-row" :class="{ active: selected && selected.id === g.id }"
+          @click="select(g)">
+          <div class="gl-row-main">
+            <div class="gl-players"><b>{{ g.white || '?' }}</b> – <b>{{ g.black || '?' }}</b>
+              <span class="gl-result">{{ g.result || '*' }}</span>
+            </div>
+            <div class="gl-meta">
+              <span v-if="g.eco" class="gl-tag">{{ g.eco }}</span>
+              <span v-if="g.event">{{ g.event }}</span>
+              <span>{{ g.ply_count }} nửa-nước</span>
+            </div>
+          </div>
+          <t-button size="small" variant="text" theme="danger" @click.stop="remove(g)"><t-icon name="delete" /></t-button>
+        </div>
+      </div>
+      <div class="gl-viewer">
+        <ChessBoardDisplay v-if="selected" :key="selected.id" :data="viewerData" />
+        <div v-else class="gl-empty gl-empty--big">Chọn một ván để xem lại (lật từng nước).</div>
+      </div>
+    </div>
+
+    <t-dialog v-model:visible="importDialog.visible" header="Import PGN (nhiều ván)" :on-confirm="doImport" width="640px">
+      <div class="gl-form">
+        <label>Dán nội dung PGN (có thể nhiều ván):</label>
+        <t-textarea v-model="importDialog.pgn" :autosize="{ minRows: 8 }"
+          placeholder='[Event "..."]...&#10;1. e4 e5 ... 1-0' />
+      </div>
+    </t-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed } from 'vue';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
+import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
+import type { ChessBoardData } from '@/types/tool-results';
+import { listGames, deleteGame, importGames, type ChessGame } from '@/api/chess';
+
+const STARTFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+const resultOptions = [
+  { label: '1-0', value: '1-0' }, { label: '0-1', value: '0-1' },
+  { label: '½-½', value: '1/2-1/2' }, { label: 'Chưa xong', value: '*' },
+];
+
+const games = ref<ChessGame[]>([]);
+const selected = ref<ChessGame | null>(null);
+const filter = reactive({ white: '', black: '', eco: '', result: '' });
+const importDialog = reactive({ visible: false, pgn: '' });
+
+const viewerData = computed<ChessBoardData>(() => ({
+  display_type: 'chess_board',
+  fen: STARTFEN,
+  pgn: selected.value?.pgn || '',
+  caption: selected.value ? `${selected.value.white} – ${selected.value.black}` : '',
+}));
+
+async function load() {
+  try {
+    const res: any = await listGames(filter);
+    games.value = res?.data || [];
+  } catch { MessagePlugin.error('Tải kho ván thất bại'); }
+}
+function select(g: ChessGame) { selected.value = g; }
+function remove(g: ChessGame) {
+  DialogPlugin.confirm({
+    header: 'Xóa ván', body: `Xóa ván ${g.white} – ${g.black}?`,
+    theme: 'warning', confirmBtn: { content: 'Xóa', theme: 'danger' },
+    onConfirm: async () => {
+      try {
+        await deleteGame(g.id);
+        if (selected.value?.id === g.id) selected.value = null;
+        await load();
+        MessagePlugin.success('Đã xóa');
+      } catch { MessagePlugin.error('Xóa thất bại'); }
+    },
+  });
+}
+async function doImport() {
+  if (!importDialog.pgn.trim()) { MessagePlugin.warning('Dán PGN'); return; }
+  try {
+    const res: any = await importGames(importDialog.pgn);
+    importDialog.visible = false;
+    importDialog.pgn = '';
+    await load();
+    MessagePlugin.success(`Đã nhập ${res?.data?.imported || 0} ván`);
+  } catch (e: any) {
+    MessagePlugin.error(e?.error || e?.message || 'Import thất bại');
+  }
+}
+load();
+</script>
+
+<style lang="less" scoped>
+.gl { display: flex; flex-direction: column; height: 100%; }
+.gl-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.gl-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
+.gl-list { width: 380px; flex: 0 0 380px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 12px; }
+.gl-viewer { flex: 1; overflow-y: auto; }
+.gl-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
+.gl-empty--big { text-align: center; padding-top: 80px; }
+.gl-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--td-component-stroke); border-radius: 8px; margin-bottom: 6px; cursor: pointer;
+  &:hover { background: var(--td-bg-color-container-hover); }
+  &.active { background: var(--td-bg-color-secondarycontainer); border-color: var(--td-brand-color); } }
+.gl-players { font-size: 14px; color: var(--td-text-color-primary); }
+.gl-result { margin-left: 6px; color: var(--td-text-color-secondary); font-weight: 600; }
+.gl-meta { display: flex; gap: 8px; margin-top: 3px; font-size: 12px; color: var(--td-text-color-secondary); }
+.gl-tag { background: var(--td-brand-color-light); color: var(--td-brand-color); padding: 0 6px; border-radius: 4px; }
+.gl-form { display: flex; flex-direction: column; gap: 6px; label { font-size: 13px; color: var(--td-text-color-secondary); } }
+</style>

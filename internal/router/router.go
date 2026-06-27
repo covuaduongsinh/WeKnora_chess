@@ -73,6 +73,8 @@ type RouterParams struct {
 	VectorStoreHandler           *handler.VectorStoreHandler
 	FAQHandler                   *handler.FAQHandler
 	TagHandler                   *handler.TagHandler
+	ChessCourseHandler           *handler.ChessCourseHandler
+	ChessLibraryHandler          *handler.ChessLibraryHandler
 	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
@@ -205,6 +207,8 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterMyInvitationRoutes(v1, params.TenantInvitationHandler)
 		RegisterKnowledgeBaseRoutes(v1, params.KBHandler, rbacGuards)
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
+		RegisterChessCourseRoutes(v1, params.ChessCourseHandler, rbacGuards)
+		RegisterChessLibraryRoutes(v1, params.ChessLibraryHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
@@ -427,6 +431,56 @@ func RegisterKnowledgeTagRoutes(r *gin.RouterGroup, tagHandler *handler.TagHandl
 		kbTags.POST("", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), tagHandler.CreateTag)
 		kbTags.PUT("/:tag_id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), tagHandler.UpdateTag)
 		kbTags.DELETE("/:tag_id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), tagHandler.DeleteTag)
+	}
+}
+
+// RegisterChessCourseRoutes đăng ký API quản lý khóa học & bài học cờ vua.
+// Đây là tài nguyên cấp tenant (không gắn KB): đọc cần Viewer, ghi cần Contributor.
+func RegisterChessCourseRoutes(r *gin.RouterGroup, h *handler.ChessCourseHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	courses := r.Group("/chess/courses")
+	{
+		courses.GET("", g.Viewer(), h.ListCourses)
+		courses.POST("", g.Contributor(), h.CreateCourse)
+		courses.GET("/:id", g.Viewer(), h.GetCourse)
+		courses.PUT("/:id", g.Contributor(), h.UpdateCourse)
+		courses.DELETE("/:id", g.Contributor(), h.DeleteCourse)
+		courses.GET("/:id/lessons", g.Viewer(), h.ListLessons)
+		courses.POST("/:id/lessons", g.Contributor(), h.CreateLesson)
+	}
+	lessons := r.Group("/chess/lessons")
+	{
+		lessons.GET("/:lesson_id", g.Viewer(), h.GetLesson)
+		lessons.PUT("/:lesson_id", g.Contributor(), h.UpdateLesson)
+		lessons.DELETE("/:lesson_id", g.Contributor(), h.DeleteLesson)
+	}
+}
+
+// RegisterChessLibraryRoutes đăng ký API kho ván đấu & ngân hàng bài tập cờ vua.
+// Tài nguyên cấp tenant: đọc cần Viewer, ghi cần Contributor.
+func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	games := r.Group("/chess/games")
+	{
+		games.GET("", g.Viewer(), h.ListGames)
+		games.POST("", g.Contributor(), h.CreateGame)
+		games.POST("/import", g.Contributor(), h.ImportGames)
+		games.GET("/:id", g.Viewer(), h.GetGame)
+		games.PUT("/:id", g.Contributor(), h.UpdateGame)
+		games.DELETE("/:id", g.Contributor(), h.DeleteGame)
+	}
+	puzzles := r.Group("/chess/puzzles")
+	{
+		puzzles.GET("", g.Viewer(), h.ListPuzzles)
+		puzzles.POST("", g.Contributor(), h.CreatePuzzle)
+		puzzles.GET("/random", g.Viewer(), h.RandomPuzzle)
+		puzzles.GET("/:id", g.Viewer(), h.GetPuzzle)
+		puzzles.PUT("/:id", g.Contributor(), h.UpdatePuzzle)
+		puzzles.DELETE("/:id", g.Contributor(), h.DeletePuzzle)
 	}
 }
 

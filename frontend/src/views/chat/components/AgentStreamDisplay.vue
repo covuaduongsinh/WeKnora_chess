@@ -143,7 +143,7 @@
                     <div class="results-summary-text" v-html="getKnowledgeChunksSummary(event.tool_data)"></div>
                   </div>
 
-                  <div v-if="isEventExpanded(event.tool_call_id) && !event.pending && hasResults(event)"
+                  <div v-if="(isEventExpanded(event.tool_call_id) || event.tool_name?.startsWith('chess_')) && !event.pending && hasResults(event)"
                     class="action-details">
                     <div v-if="event.display_type && event.tool_data" class="tool-result-wrapper">
                       <ToolResultRenderer :display-type="event.display_type" :tool-data="event.tool_data"
@@ -500,6 +500,12 @@ const TOOL_NAME_KEYS: Record<string, string> = {
   data_analysis: 'agentStream.tools.dataAnalysis',
   data_schema: 'agentStream.tools.dataSchema',
   database_query: 'agentStream.tools.databaseQuery',
+  chess_analyze_position: 'chess.toolAnalyzePosition',
+  chess_best_move: 'chess.toolBestMove',
+  chess_evaluate_game: 'chess.toolEvaluateGame',
+  chess_explain_move: 'chess.toolExplainMove',
+  chess_lookup_opening: 'chess.toolLookupOpening',
+  chess_generate_puzzle: 'chess.toolGeneratePuzzle',
 };
 
 const getLocalizedToolName = (toolName?: string | null): string => {

@@ -173,3 +173,43 @@ func ParsePGN(pgn string) (*GameInfo, error) {
 	}
 	return info, nil
 }
+
+// ImportedGame là một ván cờ rút gọn dùng cho việc import kho ván:
+// metadata (thẻ PGN), PGN chuẩn hóa, số nước và kết quả.
+type ImportedGame struct {
+	Tags     map[string]string `json:"tags"`
+	PGN      string            `json:"pgn"`
+	PlyCount int               `json:"ply_count"`
+	Outcome  string            `json:"outcome"`
+}
+
+// ParseMultiPGN tách một chuỗi PGN chứa NHIỀU ván thành danh sách ImportedGame,
+// dùng notnil GamesFromPGN (MIT). Tiện cho việc import kho ván đấu.
+func ParseMultiPGN(pgn string) ([]ImportedGame, error) {
+	games, err := notnil.GamesFromPGN(strings.NewReader(pgn))
+	if err != nil {
+		return nil, fmt.Errorf("chess: PGN không hợp lệ: %v", err)
+	}
+	out := make([]ImportedGame, 0, len(games))
+	for _, g := range games {
+		tags := map[string]string{}
+		for _, tp := range g.TagPairs() {
+			tags[tp.Key] = tp.Value
+		}
+		out = append(out, ImportedGame{
+			Tags:     tags,
+			PGN:      g.String(),
+			PlyCount: len(g.Moves()),
+			Outcome:  string(g.Outcome()),
+		})
+	}
+	return out, nil
+}
+
+// TagOr trả về giá trị thẻ PGN theo key, hoặc fallback nếu thiếu.
+func (ig ImportedGame) TagOr(key, fallback string) string {
+	if v, ok := ig.Tags[key]; ok && strings.TrimSpace(v) != "" {
+		return v
+	}
+	return fallback
+}

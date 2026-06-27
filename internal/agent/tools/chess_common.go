@@ -2,11 +2,21 @@ package tools
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Tencent/WeKnora/internal/chess"
 )
 
 // chess_common.go gom các tiện ích dùng chung cho nhóm tool cờ vua.
+
+// fenSide trả về "w" hoặc "b" — bên đang đi, đọc từ trường thứ hai của FEN.
+func fenSide(fen string) string {
+	f := strings.Fields(fen)
+	if len(f) >= 2 && (f[1] == "w" || f[1] == "b") {
+		return f[1]
+	}
+	return "w"
+}
 
 // chessBoardData chuyển một chess.Analysis thành map dữ liệu cho frontend
 // (display_type "chess_board") để hiển thị bàn cờ tương tác kèm đánh giá.

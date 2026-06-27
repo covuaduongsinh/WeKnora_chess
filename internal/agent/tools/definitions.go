@@ -39,6 +39,7 @@ const (
 	ToolChessEvaluateGame    = "chess_evaluate_game"
 	ToolChessExplainMove     = "chess_explain_move"
 	ToolChessLookupOpening   = "chess_lookup_opening"
+	ToolChessGeneratePuzzle  = "chess_generate_puzzle"
 )
 
 // ChessToolNames liệt kê toàn bộ tool cờ vua. Dùng để cấp quyền và để loại trừ
@@ -50,6 +51,7 @@ func ChessToolNames() []string {
 		ToolChessEvaluateGame,
 		ToolChessExplainMove,
 		ToolChessLookupOpening,
+		ToolChessGeneratePuzzle,
 	}
 }
 
@@ -91,6 +93,7 @@ func AvailableToolDefinitions() []AvailableTool {
 		{Name: ToolChessEvaluateGame, Label: "Chấm ván cờ", Description: "Phân tích cả ván (PGN), chỉ ra sai lầm từng nước"},
 		{Name: ToolChessExplainMove, Label: "Giải thích nước đi", Description: "Giải thích một nước đi dựa trên đánh giá engine"},
 		{Name: ToolChessLookupOpening, Label: "Tra khai cuộc", Description: "Nhận diện tên khai cuộc và mã ECO từ chuỗi nước đi"},
+		{Name: ToolChessGeneratePuzzle, Label: "Ra bài tập cờ", Description: "Sinh một thế cờ bài tập để học viên luyện tập"},
 	}
 }
 

@@ -2,6 +2,7 @@ export default {
   menu: {
     knowledgeBase: "Kho tri thức",
     agents: "Trợ lý AI",
+    chessCourses: "Quản lý cờ vua",
     organizations: "Không gian chia sẻ",
     chat: "Trò chuyện",
     newChat: "Cuộc trò chuyện mới",
@@ -5796,5 +5797,11 @@ export default {
     end: "Tới cuối",
     flip: "Lật bàn cờ",
     startPosition: "Thế cờ ban đầu",
+    toolAnalyzePosition: "Phân tích thế cờ",
+    toolBestMove: "Tìm nước tốt nhất",
+    toolEvaluateGame: "Chấm ván cờ",
+    toolExplainMove: "Giải thích nước đi",
+    toolLookupOpening: "Tra khai cuộc",
+    toolGeneratePuzzle: "Ra bài tập cờ",
   },
 };

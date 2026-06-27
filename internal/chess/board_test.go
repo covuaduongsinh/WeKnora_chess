@@ -84,6 +84,39 @@ func TestParsePGN(t *testing.T) {
 	}
 }
 
+func TestParseMultiPGN(t *testing.T) {
+	pgn := `[Event "Giải A"]
+[White "An"]
+[Black "Bình"]
+[Result "1-0"]
+[ECO "C50"]
+
+1. e4 e5 2. Nf3 Nc6 1-0
+
+[Event "Giải B"]
+[White "Cường"]
+[Black "Dũng"]
+[Result "0-1"]
+
+1. d4 d5 2. c4 e6 0-1`
+	games, err := ParseMultiPGN(pgn)
+	if err != nil {
+		t.Fatalf("lỗi không mong đợi: %v", err)
+	}
+	if len(games) != 2 {
+		t.Fatalf("muốn 2 ván, nhận %d", len(games))
+	}
+	if games[0].TagOr("White", "") != "An" || games[0].TagOr("ECO", "") != "C50" {
+		t.Fatalf("metadata ván 1 sai: %+v", games[0].Tags)
+	}
+	if games[1].TagOr("Black", "") != "Dũng" {
+		t.Fatalf("metadata ván 2 sai: %+v", games[1].Tags)
+	}
+	if games[0].PlyCount != 4 {
+		t.Fatalf("ván 1 phải 4 nước, nhận %d", games[0].PlyCount)
+	}
+}
+
 func TestWhiteCentipawns(t *testing.T) {
 	a := &Analysis{EvalCP: 50, SideToMove: "b"}
 	if got := a.WhiteCentipawns(); got != -50 {

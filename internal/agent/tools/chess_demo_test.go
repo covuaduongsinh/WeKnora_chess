@@ -88,3 +88,21 @@ func TestDemoChessTools(t *testing.T) {
 	t.Logf("Output:\n%s", eres.Output)
 	t.Logf("Data: display_type=%v số_nước=%d", eres.Data["display_type"], len(plies))
 }
+
+// TestEmbeddedPuzzlesValid đảm bảo mọi FEN bài tập nhúng đều hợp lệ.
+func TestEmbeddedPuzzlesValid(t *testing.T) {
+	for i, p := range embeddedPuzzles {
+		if err := chess.ValidateFEN(p.fen); err != nil {
+			t.Errorf("bài tập #%d (%s) FEN không hợp lệ: %v\nFEN: %s", i, p.theme, err, p.fen)
+		}
+	}
+	// Tool generate_puzzle phải trả về display_type bàn cờ.
+	res, err := NewChessGeneratePuzzleTool().Execute(context.Background(), []byte(`{"theme":"chiếu hết"}`))
+	if err != nil || !res.Success {
+		t.Fatalf("generate_puzzle lỗi: %v / %s", err, res.Error)
+	}
+	if res.Data["display_type"] != "chess_board" {
+		t.Fatalf("muốn display_type chess_board, nhận %v", res.Data["display_type"])
+	}
+	t.Logf("Bài tập mẫu:\n%s", res.Output)
+}

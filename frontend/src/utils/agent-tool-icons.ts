@@ -30,5 +30,8 @@ export function getAgentToolIconName(toolName: string): string {
   if (toolName.startsWith('mcp_')) {
     return 'terminal'
   }
+  if (toolName.startsWith('chess_')) {
+    return 'flag'
+  }
   return 'file-paste'
 }

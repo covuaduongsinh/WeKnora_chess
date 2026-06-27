@@ -620,9 +620,12 @@ func (s *agentService) registerTools(
 		case tools.ToolWikiDeletePage:
 			toolToRegister = tools.NewWikiDeletePageTool(s.wikiPageService, wikiKBIDs)
 
-		// Chess tools — không cần KB. lookup_opening chỉ dùng luật cờ; còn lại cần engine.
+		// Chess tools — không cần KB. lookup_opening & generate_puzzle chỉ dùng
+		// luật cờ/thế cờ nhúng; còn lại cần engine.
 		case tools.ToolChessLookupOpening:
 			toolToRegister = tools.NewChessLookupOpeningTool()
+		case tools.ToolChessGeneratePuzzle:
+			toolToRegister = tools.NewChessGeneratePuzzleTool()
 		case tools.ToolChessAnalyzePosition:
 			if eng := s.getChessEngine(ctx); eng != nil {
 				toolToRegister = tools.NewChessAnalyzePositionTool(eng, s.chessDefaultDepth())

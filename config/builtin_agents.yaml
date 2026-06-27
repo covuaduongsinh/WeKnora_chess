@@ -263,6 +263,7 @@ builtin_agents:
         - "chess_evaluate_game"
         - "chess_explain_move"
         - "chess_lookup_opening"
+        - "chess_generate_puzzle"
       web_search_enabled: false
       web_search_max_results: 0
       reflection_enabled: false
