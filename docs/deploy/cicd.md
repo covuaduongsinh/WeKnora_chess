@@ -26,7 +26,7 @@ ssh-keygen -t ed25519 -f deploy_key -N "" -C "github-actions-deploy"
   |---|---|
   | `VPS_HOST` | `65.109.129.242` |
   | `VPS_USER` | `root` |
-  | `VPS_SSH_KEY` | **toàn bộ nội dung file `deploy_key`** (private key, gồm cả dòng BEGIN/END) |
+  | `VPS_SSH_KEY` | private key **mã hóa base64 1 dòng**: trên VPS chạy `base64 -w0 ~/deploy_key` rồi copy dòng kết quả. (Workflow tự `base64 -d` lại — tránh lỗi `error in libcrypto` do xuống dòng khi copy.) |
 - Xóa `deploy_key` / `deploy_key.pub` trên PC sau khi đã nạp xong (giữ bí mật).
 
 ### 2. Cho VPS quyền kéo image private từ GHCR
