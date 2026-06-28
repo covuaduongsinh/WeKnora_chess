@@ -1,0 +1,21 @@
+# Overlay CI/CD: trỏ 4 image cờ vua sang image DỰNG SẴN trên GHCR (ghcr.io) thay vì
+# build trên VPS. Dùng cho luồng "push → Actions build → VPS chỉ pull" (xem
+# docs/deploy/cicd.md), chồng SAU các file compose khác:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml \
+#     -f docker-compose.chess.yml -f docker-compose.ghcr.yml --profile qdrant pull
+#
+# Biến:
+#   GHCR_PREFIX  tiền tố image (mặc định ghcr.io/covuaduongsinh/weknora-chess)
+#   IMAGE_TAG    tag muốn chạy (mặc định latest; CI truyền github.sha để khớp đúng bản)
+#
+# Lưu ý: image GHCR private → VPS phải `docker login ghcr.io` 1 lần (xem docs/deploy/cicd.md).
+services:
+  app:
+    image: ${GHCR_PREFIX:-ghcr.io/covuaduongsinh/weknora-chess}-app:${IMAGE_TAG:-latest}
+  frontend:
+    image: ${GHCR_PREFIX:-ghcr.io/covuaduongsinh/weknora-chess}-ui:${IMAGE_TAG:-latest}
+  docreader:
+    image: ${GHCR_PREFIX:-ghcr.io/covuaduongsinh/weknora-chess}-docreader:${IMAGE_TAG:-latest}
+  chess-engine:
+    image: ${GHCR_PREFIX:-ghcr.io/covuaduongsinh/weknora-chess}-chess-engine:${IMAGE_TAG:-latest}

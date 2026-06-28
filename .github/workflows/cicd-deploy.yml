@@ -1,0 +1,120 @@
+name: CI/CD — build chess images → GHCR → deploy VPS
+
+# Mỗi lần push lên main: build 4 image cờ vua trên runner của GitHub, đẩy lên GHCR,
+# rồi SSH vào VPS để pull + restart (KHÔNG biên dịch trên VPS).
+# Cấu hình secrets/lần đầu: xem docs/deploy/cicd.md
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # ghcr.io/<owner>/weknora-chess-<svc>:<tag>  (owner phải viết thường — covuaduongsinh OK)
+  GHCR_PREFIX: ghcr.io/${{ github.repository_owner }}/weknora-chess
+
+jobs:
+  # ---- Frontend (cần dựng dist trước rồi mới docker build) ----
+  build-ui:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend dist
+        env:
+          VITE_IS_DOCKER: "true"
+          VITE_FRONTEND_COMMIT: ${{ github.sha }}
+        run: ./scripts/build_frontend_dist.sh
+      - uses: docker/setup-buildx-action@v3
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push UI
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.GHCR_PREFIX }}-ui:latest
+            ${{ env.GHCR_PREFIX }}-ui:${{ github.sha }}
+          cache-from: type=gha,scope=ui
+          cache-to: type=gha,scope=ui,mode=max
+
+  # ---- Backend (app / docreader / chess-engine), build từ context gốc ----
+  build-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: app
+            file: docker/Dockerfile.app
+            args: |
+              COMMIT_ID_ARG=${{ github.sha }}
+          - name: docreader
+            file: docker/Dockerfile.docreader
+            args: ""
+          - name: chess-engine
+            file: docker/Dockerfile.chess-engine
+            args: |
+              ARASAN_VERSION=v25.4
+              ARASAN_BUILD=modern
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          push: true
+          build-args: ${{ matrix.args }}
+          tags: |
+            ${{ env.GHCR_PREFIX }}-${{ matrix.name }}:latest
+            ${{ env.GHCR_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  # ---- Deploy: SSH vào VPS, git pull (lấy compose/scripts mới) rồi pull image + up ----
+  deploy:
+    needs: [build-ui, build-backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/id_deploy "$VPS_USER@$VPS_HOST" \
+            "cd /opt/WeKnora_chess && git pull --ff-only && IMAGE_TAG=$IMAGE_TAG bash scripts/deploy/pull-deploy.sh"
