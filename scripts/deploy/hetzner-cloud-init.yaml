@@ -1,0 +1,74 @@
+#cloud-config
+# =====================================================================
+#  Hetzner cloud-init cho WeKnora-Chess (build-on-server)
+# ---------------------------------------------------------------------
+#  Dán TOÀN BỘ nội dung file này vào ô "Cloud config" / user-data khi
+#  tạo server trên Hetzner Console.
+#
+#  TRƯỚC KHI DÁN — sửa đúng 1 dòng trong /root/weknora-cloud-bootstrap.sh
+#  bên dưới: thay __GITHUB_PAT__ bằng GitHub fine-grained PAT của bạn
+#  (quyền Contents: Read-only, chỉ repo WeKnora_chess).
+#  (GITHUB_USER / REPO_URL đã điền sẵn cho fork covuaduongsinh/WeKnora_chess.)
+#
+#  First boot sẽ: tạo swap 4GB -> cài Docker -> clone repo -> chạy
+#  server-bootstrap.sh (build + .env + up + systemd).
+#
+#  Theo dõi tiến trình:
+#     ssh root@<IP> tail -f /var/log/weknora-bootstrap.log
+#  Lần đầu build mất ~20-40 phút (Go/CGO + docreader + Arasan C++).
+# =====================================================================
+package_update: true
+packages:
+  - git
+  - curl
+  - ca-certificates
+
+write_files:
+  - path: /root/weknora-cloud-bootstrap.sh
+    permissions: '0700'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # >>>>>>>>>>>>>>>> SỬA TRƯỚC KHI DÁN >>>>>>>>>>>>>>>>
+      GITHUB_USER="covuaduongsinh"
+      GITHUB_PAT="__GITHUB_PAT__"
+      REPO_URL="https://github.com/covuaduongsinh/WeKnora_chess.git"
+      WEKNORA_DIR="/opt/WeKnora_chess"
+      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+      echo "==== weknora cloud bootstrap @ $(date -Iseconds) ===="
+
+      # --- swap 4GB: build Go/CGO + frontend + Arasan cần thêm RAM (8GB + 4GB swap) ---
+      if ! swapon --show | grep -q '/swapfile'; then
+        fallocate -l 4G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      fi
+
+      # --- Docker + compose plugin (Hetzner ở Đức: dùng get.docker.com trực tiếp) ---
+      if ! command -v docker >/dev/null 2>&1; then
+        curl -fsSL https://get.docker.com | sh
+      fi
+      systemctl enable --now docker
+
+      # --- git credential cho repo private (PAT read-only) ---
+      git config --system credential.helper "store --file=/root/.git-credentials"
+      printf 'https://%s:%s@github.com\n' "$GITHUB_USER" "$GITHUB_PAT" > /root/.git-credentials
+      chmod 600 /root/.git-credentials
+
+      # --- clone repo (idempotent) ---
+      if [ ! -d "$WEKNORA_DIR/.git" ]; then
+        git clone "$REPO_URL" "$WEKNORA_DIR"
+      fi
+
+      # --- bootstrap: build frontend + .env + compose up + systemd ---
+      bash "$WEKNORA_DIR/scripts/deploy/server-bootstrap.sh"
+
+      echo "==== weknora cloud bootstrap DONE @ $(date -Iseconds) ===="
+
+runcmd:
+  - mkdir -p /var/log
+  - bash /root/weknora-cloud-bootstrap.sh 2>&1 | tee /var/log/weknora-bootstrap.log

@@ -39,6 +39,23 @@ func (r *chessCourseRepository) GetCourse(ctx context.Context, tenantID uint64, 
 	return &course, nil
 }
 
+func (r *chessCourseRepository) GetCourseBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessCourse, error) {
+	var course types.ChessCourse
+	if err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).
+		First(&course).Error; err != nil {
+		return nil, err
+	}
+	return &course, nil
+}
+
+func (r *chessCourseRepository) CourseSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessCourse{}).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
 func (r *chessCourseRepository) CreateCourse(ctx context.Context, course *types.ChessCourse) error {
 	return r.db.WithContext(ctx).Create(course).Error
 }
@@ -90,6 +107,23 @@ func (r *chessCourseRepository) GetLesson(ctx context.Context, tenantID uint64, 
 		return nil, err
 	}
 	return &lesson, nil
+}
+
+func (r *chessCourseRepository) GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error) {
+	var lesson types.ChessLesson
+	if err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).
+		First(&lesson).Error; err != nil {
+		return nil, err
+	}
+	return &lesson, nil
+}
+
+func (r *chessCourseRepository) LessonSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessLesson{}).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).Limit(1).Count(&count).Error
+	return count > 0, err
 }
 
 func (r *chessCourseRepository) CreateLesson(ctx context.Context, lesson *types.ChessLesson) error {

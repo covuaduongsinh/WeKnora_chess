@@ -11,6 +11,7 @@ export interface ChessCourse {
   cover_url: string;
   sort_order: number;
   lesson_count?: number;
+  slug?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -23,6 +24,7 @@ export interface ChessLesson {
   fen: string;
   pgn: string;
   sort_order: number;
+  slug?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -30,6 +32,9 @@ export interface ChessLesson {
 // ---- Khóa học ----
 export const listCourses = () => get("/api/v1/chess/courses");
 export const getCourse = (id: string) => get(`/api/v1/chess/courses/${id}`);
+// Giải mã wikilink [[course/<slug>]] → khóa học.
+export const getCourseBySlug = (slug: string) => get(`/api/v1/chess/courses/by-slug/${encodeURIComponent(slug)}`);
+export const getCourseBacklinks = (slug: string) => get(`/api/v1/chess/courses/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createCourse = (data: Partial<ChessCourse>) => post("/api/v1/chess/courses", data);
 export const updateCourse = (id: string, data: Partial<ChessCourse>) => put(`/api/v1/chess/courses/${id}`, data);
 export const deleteCourse = (id: string) => del(`/api/v1/chess/courses/${id}`);
@@ -39,6 +44,9 @@ export const listLessons = (courseId: string) => get(`/api/v1/chess/courses/${co
 export const createLesson = (courseId: string, data: Partial<ChessLesson>) =>
   post(`/api/v1/chess/courses/${courseId}/lessons`, data);
 export const getLesson = (lessonId: string) => get(`/api/v1/chess/lessons/${lessonId}`);
+// Giải mã wikilink [[lesson/<slug>]] → bài giảng.
+export const getLessonBySlug = (slug: string) => get(`/api/v1/chess/lessons/by-slug/${encodeURIComponent(slug)}`);
+export const getLessonBacklinks = (slug: string) => get(`/api/v1/chess/lessons/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const updateLesson = (lessonId: string, data: Partial<ChessLesson>) =>
   put(`/api/v1/chess/lessons/${lessonId}`, data);
 export const deleteLesson = (lessonId: string) => del(`/api/v1/chess/lessons/${lessonId}`);
@@ -49,6 +57,7 @@ export interface ChessGame {
   white: string; black: string; result: string;
   eco: string; event: string; date: string;
   pgn: string; ply_count: number;
+  slug?: string;
   created_at?: string;
 }
 function qs(params: Record<string, string>): string {
@@ -58,6 +67,9 @@ function qs(params: Record<string, string>): string {
 export const listGames = (f: Partial<{ white: string; black: string; eco: string; result: string }> = {}) =>
   get(`/api/v1/chess/games${qs(f as Record<string, string>)}`);
 export const getGame = (id: string) => get(`/api/v1/chess/games/${id}`);
+// Giải mã wikilink [[game/<slug>]] → ván cờ.
+export const getGameBySlug = (slug: string) => get(`/api/v1/chess/games/by-slug/${encodeURIComponent(slug)}`);
+export const getGameBacklinks = (slug: string) => get(`/api/v1/chess/games/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createGame = (data: Partial<ChessGame>) => post("/api/v1/chess/games", data);
 export const updateGame = (id: string, data: Partial<ChessGame>) => put(`/api/v1/chess/games/${id}`, data);
 export const deleteGame = (id: string) => del(`/api/v1/chess/games/${id}`);
@@ -68,11 +80,15 @@ export interface ChessPuzzle {
   id: string;
   title: string; fen: string; solution: string;
   theme: string; difficulty: string; source: string;
+  slug?: string;
   created_at?: string;
 }
 export const listPuzzles = (f: Partial<{ theme: string; difficulty: string }> = {}) =>
   get(`/api/v1/chess/puzzles${qs(f as Record<string, string>)}`);
 export const getPuzzle = (id: string) => get(`/api/v1/chess/puzzles/${id}`);
+// Giải mã wikilink [[puzzle/<slug>]] → thế cờ/bài tập.
+export const getPuzzleBySlug = (slug: string) => get(`/api/v1/chess/puzzles/by-slug/${encodeURIComponent(slug)}`);
+export const getPuzzleBacklinks = (slug: string) => get(`/api/v1/chess/puzzles/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createPuzzle = (data: Partial<ChessPuzzle>) => post("/api/v1/chess/puzzles", data);
 export const updatePuzzle = (id: string, data: Partial<ChessPuzzle>) => put(`/api/v1/chess/puzzles/${id}`, data);
 export const deletePuzzle = (id: string) => del(`/api/v1/chess/puzzles/${id}`);

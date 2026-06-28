@@ -9,6 +9,9 @@ type ChessCourse struct {
 	ID string `json:"id" gorm:"type:varchar(36);primaryKey"`
 	// TenantID là tenant sở hữu khóa học.
 	TenantID uint64 `json:"tenant_id" gorm:"index"`
+	// Slug là định danh thân thiện (duy nhất theo tenant) làm đích wikilink
+	// [[course/<slug>]]. Sinh ở tầng service khi tạo; ổn định sau đó.
+	Slug string `json:"slug" gorm:"column:slug;type:varchar(255)"`
 	// Title là tên khóa học.
 	Title string `json:"title" gorm:"type:varchar(255);not null"`
 	// Description là mô tả ngắn.
@@ -36,6 +39,9 @@ type ChessLesson struct {
 	ID string `json:"id" gorm:"type:varchar(36);primaryKey"`
 	// TenantID là tenant sở hữu.
 	TenantID uint64 `json:"tenant_id" gorm:"index"`
+	// Slug là định danh thân thiện (duy nhất theo tenant) làm đích wikilink
+	// [[lesson/<slug>]]. Sinh ở tầng service khi tạo; ổn định sau đó.
+	Slug string `json:"slug" gorm:"column:slug;type:varchar(255)"`
 	// CourseID là khóa học chứa bài học này.
 	CourseID string `json:"course_id" gorm:"type:varchar(36);index"`
 	// Title là tên bài học.

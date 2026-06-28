@@ -2896,6 +2896,7 @@ export default {
     },
     wikiBrowser: {
       viewInGraph: 'Открыть в графе',
+      createLesson: 'Создать урок из этой страницы',
       tabDocuments: 'Документы',
       tabWiki: 'Wiki',
       tabGraph: 'Граф',

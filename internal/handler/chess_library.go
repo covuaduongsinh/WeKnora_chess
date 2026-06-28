@@ -56,6 +56,30 @@ func (h *ChessLibraryHandler) GetGame(c *gin.Context) {
 	chessOK(c, g)
 }
 
+// GetGameBySlug GET /chess/games/by-slug/:slug — giải mã wikilink [[game/<slug>]].
+func (h *ChessLibraryHandler) GetGameBySlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	g, err := h.service.GetGameBySlug(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		chessFail(c, http.StatusNotFound, err)
+		return
+	}
+	chessOK(c, g)
+}
+
+// GetGameBacklinks GET /chess/games/by-slug/:slug/backlinks — trang wiki trỏ tới ván.
+func (h *ChessLibraryHandler) GetGameBacklinks(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	links, err := h.service.GetGameBacklinks(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, links)
+}
+
 type gameBody struct {
 	White  string `json:"white"`
 	Black  string `json:"black"`
@@ -176,6 +200,30 @@ func (h *ChessLibraryHandler) GetPuzzle(c *gin.Context) {
 		return
 	}
 	chessOK(c, p)
+}
+
+// GetPuzzleBySlug GET /chess/puzzles/by-slug/:slug — giải mã wikilink [[puzzle/<slug>]].
+func (h *ChessLibraryHandler) GetPuzzleBySlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	p, err := h.service.GetPuzzleBySlug(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		chessFail(c, http.StatusNotFound, err)
+		return
+	}
+	chessOK(c, p)
+}
+
+// GetPuzzleBacklinks GET /chess/puzzles/by-slug/:slug/backlinks — trang wiki trỏ tới thế cờ.
+func (h *ChessLibraryHandler) GetPuzzleBacklinks(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	links, err := h.service.GetPuzzleBacklinks(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, links)
 }
 
 type puzzleBody struct {

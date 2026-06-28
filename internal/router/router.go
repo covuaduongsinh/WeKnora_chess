@@ -444,6 +444,9 @@ func RegisterChessCourseRoutes(r *gin.RouterGroup, h *handler.ChessCourseHandler
 	{
 		courses.GET("", g.Viewer(), h.ListCourses)
 		courses.POST("", g.Contributor(), h.CreateCourse)
+		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[course/<slug>]]).
+		courses.GET("/by-slug/:slug", g.Viewer(), h.GetCourseBySlug)
+		courses.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetCourseBacklinks)
 		courses.GET("/:id", g.Viewer(), h.GetCourse)
 		courses.PUT("/:id", g.Contributor(), h.UpdateCourse)
 		courses.DELETE("/:id", g.Contributor(), h.DeleteCourse)
@@ -452,6 +455,9 @@ func RegisterChessCourseRoutes(r *gin.RouterGroup, h *handler.ChessCourseHandler
 	}
 	lessons := r.Group("/chess/lessons")
 	{
+		// Route tĩnh "by-slug" đặt trước param ":lesson_id" (giải mã wikilink).
+		lessons.GET("/by-slug/:slug", g.Viewer(), h.GetLessonBySlug)
+		lessons.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetLessonBacklinks)
 		lessons.GET("/:lesson_id", g.Viewer(), h.GetLesson)
 		lessons.PUT("/:lesson_id", g.Contributor(), h.UpdateLesson)
 		lessons.DELETE("/:lesson_id", g.Contributor(), h.DeleteLesson)
@@ -469,6 +475,9 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		games.GET("", g.Viewer(), h.ListGames)
 		games.POST("", g.Contributor(), h.CreateGame)
 		games.POST("/import", g.Contributor(), h.ImportGames)
+		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[game/<slug>]]).
+		games.GET("/by-slug/:slug", g.Viewer(), h.GetGameBySlug)
+		games.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetGameBacklinks)
 		games.GET("/:id", g.Viewer(), h.GetGame)
 		games.PUT("/:id", g.Contributor(), h.UpdateGame)
 		games.DELETE("/:id", g.Contributor(), h.DeleteGame)
@@ -478,6 +487,9 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		puzzles.GET("", g.Viewer(), h.ListPuzzles)
 		puzzles.POST("", g.Contributor(), h.CreatePuzzle)
 		puzzles.GET("/random", g.Viewer(), h.RandomPuzzle)
+		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[puzzle/<slug>]]).
+		puzzles.GET("/by-slug/:slug", g.Viewer(), h.GetPuzzleBySlug)
+		puzzles.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetPuzzleBacklinks)
 		puzzles.GET("/:id", g.Viewer(), h.GetPuzzle)
 		puzzles.PUT("/:id", g.Contributor(), h.UpdatePuzzle)
 		puzzles.DELETE("/:id", g.Contributor(), h.DeletePuzzle)

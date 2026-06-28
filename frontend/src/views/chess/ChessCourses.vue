@@ -20,6 +20,7 @@
           </div>
         </div>
         <div class="cc-course-actions">
+          <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyCourseWikilink(c)"><t-icon name="link" /></t-button>
           <t-button size="small" variant="text" @click.stop="openCourseDialog(c)"><t-icon name="edit" /></t-button>
           <t-button size="small" variant="text" theme="danger" @click.stop="removeCourse(c)"><t-icon name="delete" /></t-button>
         </div>
@@ -39,8 +40,9 @@
             Thêm bài học
           </t-button>
         </div>
+        <ChessBacklinks v-if="selectedCourse.slug" ref-type="course" :slug="selectedCourse.slug" />
         <div v-if="lessons.length === 0" class="cc-empty">Chưa có bài học.</div>
-        <div v-for="(l, idx) in lessons" :key="l.id" class="cc-lesson">
+        <div v-for="(l, idx) in lessons" :key="l.id" class="cc-lesson" :data-lesson-id="l.id">
           <div class="cc-lesson-head" @click="toggleLesson(l.id)">
             <span class="cc-lesson-idx">{{ idx + 1 }}.</span>
             <span class="cc-lesson-title">{{ l.title }}</span>
@@ -51,8 +53,18 @@
             </span>
           </div>
           <div v-if="expandedLessons.has(l.id)" class="cc-lesson-body">
-            <div class="cc-lesson-content" v-if="l.content">{{ l.content }}</div>
+            <!-- Nội dung markdown + bàn cờ tương tác nhúng từ khối ```chess
+                 (cùng engine với trang wiki). -->
+            <div class="cc-lesson-content" v-if="l.content" @click="onLessonContentClick">
+              <template v-for="(seg, si) in lessonSegments(l)" :key="si">
+                <ChessBoardDisplay v-if="seg.type === 'board'" :data="seg.board" />
+                <ChessRefEmbed v-else-if="seg.type === 'ref'" :ref-str="seg.refStr" />
+                <div v-else class="cc-md-segment" v-html="seg.html"></div>
+              </template>
+            </div>
+            <!-- Bàn cờ chính của bài (từ ô FEN/PGN riêng), giữ tương thích cũ. -->
             <ChessBoardDisplay v-if="l.fen || l.pgn" :data="boardData(l)" />
+            <ChessBacklinks v-if="l.slug" ref-type="lesson" :slug="l.slug" />
           </div>
         </div>
       </template>
@@ -80,9 +92,15 @@
       <div class="cc-form">
         <label>Tên bài học *</label>
         <t-input v-model="lessonDialog.title" />
-        <label>Nội dung (văn bản/markdown)</label>
-        <t-textarea v-model="lessonDialog.content" :autosize="{ minRows: 4 }"
-          placeholder="Nội dung bài giảng..." />
+        <div class="cc-content-label">
+          <label>Nội dung (văn bản/markdown)</label>
+          <t-button size="small" variant="outline" @click="openPicker">
+            <template #icon><t-icon name="chess" /></template>
+            {{ t('chess.ref.insert') }}
+          </t-button>
+        </div>
+        <t-textarea ref="lessonContentRef" v-model="lessonDialog.content" :autosize="{ minRows: 4 }"
+          placeholder="Nội dung bài giảng... Dùng [[game/<slug>]] để chèn ván/thế cờ." />
         <label>Thế cờ FEN (tùy chọn — sẽ hiện bàn cờ)</label>
         <t-input v-model="lessonDialog.fen" placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1" />
         <label>Ván minh họa PGN (tùy chọn)</label>
@@ -91,19 +109,125 @@
         <t-input-number v-model="lessonDialog.sort_order" />
       </div>
     </t-dialog>
+
+    <!-- Bộ chọn chèn tham chiếu cờ ([[game/<slug>]] hoặc ![[…]] nhúng) -->
+    <t-dialog v-model:visible="picker.visible" :header="t('chess.ref.pickerTitle')" :footer="false" width="560px">
+      <div class="cc-picker">
+        <t-tabs v-model="picker.tab">
+          <t-tab-panel value="games" :label="t('chess.ref.tabGames')" />
+          <t-tab-panel value="puzzles" :label="t('chess.ref.tabPuzzles')" />
+          <t-tab-panel value="lessons" :label="t('chess.ref.tabLessons')" />
+          <t-tab-panel value="courses" :label="t('chess.ref.tabCourses')" />
+        </t-tabs>
+        <div class="cc-picker-bar">
+          <t-input v-model="picker.search" :placeholder="t('chess.ref.searchPlaceholder')" clearable />
+          <t-checkbox v-model="picker.embed">{{ t('chess.ref.embedToggle') }}</t-checkbox>
+        </div>
+        <div class="cc-picker-list">
+          <div v-if="picker.loading" class="cc-empty">{{ t('chess.ref.loading') }}</div>
+          <div v-else-if="pickerItems.length === 0" class="cc-empty">{{ t('chess.ref.empty') }}</div>
+          <div v-for="it in pickerItems" :key="it.type + '/' + it.slug" class="cc-picker-row" @click="pickerInsert(it)">
+            <span class="cc-picker-label">{{ it.label }}</span>
+            <span class="cc-picker-slug">{{ it.type }}/{{ it.slug }}</span>
+            <t-button size="small" variant="text" theme="primary">{{ t('chess.ref.insertAction') }}</t-button>
+          </div>
+        </div>
+      </div>
+    </t-dialog>
+
+    <!-- Popup bàn cờ khi bấm chip trong nội dung bài giảng -->
+    <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed, nextTick, watch } from 'vue';
+import { marked } from 'marked';
+import { useI18n } from 'vue-i18n';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
+import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
+import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
+import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
+import { splitChessContent, renderChessChips } from '@/utils/chessBlocks';
+import { useChessWikiDraftStore } from '@/stores/chessWikiDraft';
 import {
-  listCourses, createCourse, updateCourse, deleteCourse,
-  listLessons, createLesson, updateLesson, deleteLesson,
-  type ChessCourse, type ChessLesson,
+  listCourses, createCourse, updateCourse, deleteCourse, getCourseBySlug,
+  listLessons, createLesson, updateLesson, deleteLesson, getLessonBySlug,
+  listGames, listPuzzles,
+  type ChessCourse, type ChessLesson, type ChessGame, type ChessPuzzle,
 } from '@/api/chess';
+
+const { t } = useI18n();
+
+// Deep-link "Mở trong thư viện": mở khóa học chứa bài giảng + bung bài đó (lesson),
+// hoặc chọn sẵn khóa học (course).
+const props = defineProps<{ focusLessonSlug?: string; focusCourseSlug?: string }>();
+async function focusLesson(slug?: string) {
+  if (!slug) return;
+  try {
+    const res: any = await getLessonBySlug(slug);
+    const l = res?.data;
+    if (!l) return;
+    if (courses.value.length === 0) await loadCourses();
+    const course = courses.value.find((c) => c.id === l.course_id);
+    if (!course) return;
+    await selectCourse(course);
+    expandedLessons.value = new Set([l.id]);
+    await nextTick();
+    document.querySelector(`[data-lesson-id="${l.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch { /* không tìm thấy → bỏ qua */ }
+}
+async function focusCourse(slug?: string) {
+  if (!slug) return;
+  try {
+    const res: any = await getCourseBySlug(slug);
+    const c = res?.data;
+    if (!c) return;
+    if (courses.value.length === 0) await loadCourses();
+    const course = courses.value.find((x) => x.id === c.id) || c;
+    await selectCourse(course);
+  } catch { /* không tìm thấy → bỏ qua */ }
+}
+watch(() => props.focusLessonSlug, (s) => focusLesson(s));
+watch(() => props.focusCourseSlug, (s) => focusCourse(s));
+
+const chessWikiDraft = useChessWikiDraftStore();
+
+// Render nội dung bài giảng: markdown (qua marked) + bàn cờ tương tác nhúng từ
+// khối ```chess, theo đúng thứ tự. [[slug|tên]] trong bài giảng chỉ hiển thị tên
+// (bài giảng không có ngữ cảnh KB để điều hướng wiki như trong WikiBrowser).
+function renderLessonMarkdown(md: string): string {
+  // 1) CHIP tham chiếu cờ [[game/<slug>]] → <a class="chess-ref-link"> (giữ inline).
+  let pre = renderChessChips(md || '');
+  // 2) Link wiki thường [[slug|tên]] → chỉ hiện tên (bài giảng không có ngữ cảnh KB).
+  pre = pre.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
+    const pipe = inner.indexOf('|');
+    return (pipe > 0 ? inner.slice(pipe + 1) : inner).trim();
+  });
+  return marked.parse(pre, { breaks: true, async: false }) as string;
+}
+function lessonSegments(l: ChessLesson) {
+  return splitChessContent(l.content || '').map((seg) => {
+    if (seg.type === 'board') return { type: 'board' as const, board: seg.board! };
+    if (seg.type === 'ref') return { type: 'ref' as const, refStr: seg.ref!.ref };
+    return { type: 'markdown' as const, html: renderLessonMarkdown(seg.markdown || '') };
+  });
+}
+
+// Popup hiển thị bàn cờ khi bấm chip trong nội dung bài giảng.
+const refDialog = reactive<{ visible: boolean; refStr: string }>({ visible: false, refStr: '' });
+function onLessonContentClick(e: MouseEvent) {
+  const a = (e.target as HTMLElement).closest('a.chess-ref-link') as HTMLElement | null;
+  if (!a) return;
+  e.preventDefault();
+  const ref = a.getAttribute('data-chess-ref');
+  if (ref) {
+    refDialog.refStr = ref;
+    refDialog.visible = true;
+  }
+}
 
 const courses = ref<ChessCourse[]>([]);
 const selectedCourse = ref<ChessCourse | null>(null);
@@ -177,6 +301,18 @@ async function saveCourse() {
     MessagePlugin.error('Lưu thất bại');
   }
 }
+// Sao chép wikilink [[course/<slug>]] để dán vào nội dung wiki/bài giảng.
+async function copyCourseWikilink(c: ChessCourse) {
+  if (!c.slug) { MessagePlugin.warning('Khóa học chưa có slug'); return; }
+  const link = `[[course/${c.slug}|${c.title || c.slug}]]`;
+  try {
+    await navigator.clipboard.writeText(link);
+    MessagePlugin.success(t('chess.ref.copied'));
+  } catch {
+    MessagePlugin.info(link);
+  }
+}
+
 function removeCourse(c: ChessCourse) {
   DialogPlugin.confirm({
     header: 'Xóa khóa học', body: `Xóa "${c.title}" và toàn bộ bài học?`,
@@ -236,7 +372,103 @@ function removeLesson(l: ChessLesson) {
   });
 }
 
-loadCourses();
+// ---- Bộ chọn chèn tham chiếu cờ vào nội dung bài giảng ----
+const lessonContentRef = ref<any>(null);
+const picker = reactive<{
+  visible: boolean; tab: string; search: string; embed: boolean; loading: boolean;
+  games: ChessGame[]; puzzles: ChessPuzzle[]; lessons: ChessLesson[]; courses: ChessCourse[];
+}>({ visible: false, tab: 'games', search: '', embed: false, loading: false, games: [], puzzles: [], lessons: [], courses: [] });
+
+async function openPicker() {
+  picker.visible = true;
+  picker.search = '';
+  picker.loading = true;
+  try {
+    const [g, p]: any[] = await Promise.all([listGames(), listPuzzles()]);
+    picker.games = g?.data || [];
+    picker.puzzles = p?.data || [];
+    picker.lessons = selectedCourse.value ? (await listLessons(selectedCourse.value.id) as any)?.data || [] : [];
+    picker.courses = courses.value;
+  } catch {
+    MessagePlugin.error('Tải danh sách thất bại');
+  } finally {
+    picker.loading = false;
+  }
+}
+
+const gameLabel = (g: ChessGame) =>
+  `${g.white || '?'} – ${g.black || '?'}${g.event ? ', ' + g.event : ''}${g.date ? ' ' + g.date.slice(0, 4) : ''}`;
+
+const pickerItems = computed(() => {
+  const s = picker.search.trim().toLowerCase();
+  if (picker.tab === 'games') {
+    return picker.games
+      .filter((g) => g.slug && (!s || `${g.white} ${g.black} ${g.event}`.toLowerCase().includes(s)))
+      .map((g) => ({ slug: g.slug as string, type: 'game' as const, label: gameLabel(g) }));
+  }
+  if (picker.tab === 'puzzles') {
+    return picker.puzzles
+      .filter((p) => p.slug && (!s || `${p.title} ${p.theme}`.toLowerCase().includes(s)))
+      .map((p) => ({ slug: p.slug as string, type: 'puzzle' as const, label: p.title || p.slug || '' }));
+  }
+  if (picker.tab === 'courses') {
+    return picker.courses
+      .filter((c) => c.slug && (!s || (c.title || '').toLowerCase().includes(s)))
+      .map((c) => ({ slug: c.slug as string, type: 'course' as const, label: c.title || c.slug || '' }));
+  }
+  return picker.lessons
+    .filter((l) => l.slug && (!s || (l.title || '').toLowerCase().includes(s)))
+    .map((l) => ({ slug: l.slug as string, type: 'lesson' as const, label: l.title || l.slug || '' }));
+});
+
+// Chèn văn bản tại vị trí con trỏ trong ô nội dung (fallback: nối vào cuối).
+function insertAtCursor(text: string) {
+  const root = lessonContentRef.value?.$el || lessonContentRef.value;
+  const ta = root?.querySelector?.('textarea') as HTMLTextAreaElement | undefined;
+  if (!ta) {
+    lessonDialog.content = (lessonDialog.content || '') + text;
+    return;
+  }
+  const start = ta.selectionStart ?? lessonDialog.content.length;
+  const end = ta.selectionEnd ?? start;
+  const v = lessonDialog.content || '';
+  lessonDialog.content = v.slice(0, start) + text + v.slice(end);
+  nextTick(() => {
+    ta.focus();
+    const pos = start + text.length;
+    ta.setSelectionRange(pos, pos);
+  });
+}
+
+function pickerInsert(item: { slug: string; type: string; label: string }) {
+  const ref = `${item.type}/${item.slug}`;
+  const link = picker.embed ? `\n\n![[${ref}|${item.label}]]\n` : `[[${ref}|${item.label}]]`;
+  insertAtCursor(link);
+  picker.visible = false;
+}
+
+// Nếu vừa bấm "Tạo bài giảng từ trang này" trong wiki: mở sẵn hộp thoại thêm bài
+// giảng với tiêu đề + nội dung của trang. Cần một khóa học để chứa bài giảng.
+async function initFromWikiDraft() {
+  const d = chessWikiDraft.takeDraft();
+  if (!d) return;
+  if (!selectedCourse.value && courses.value.length > 0) {
+    await selectCourse(courses.value[0]);
+  }
+  if (!selectedCourse.value) {
+    MessagePlugin.info('Hãy tạo một khóa học trước, rồi tạo lại bài giảng từ trang wiki.');
+    return;
+  }
+  openLessonDialog();
+  lessonDialog.title = d.title;
+  lessonDialog.content = `${d.content}\n\n---\n*Bài giảng tạo từ trang wiki: ${d.title}*`;
+  MessagePlugin.success(`Đã nạp nội dung từ trang wiki vào khóa "${selectedCourse.value.title}".`);
+}
+
+loadCourses().then(initFromWikiDraft).then(() => {
+  focusLesson(props.focusLessonSlug);
+  focusCourse(props.focusCourseSlug);
+});
 </script>
 
 <style lang="less" scoped>
@@ -288,5 +520,27 @@ loadCourses();
 .cc-form {
   display: flex; flex-direction: column; gap: 6px;
   label { font-size: 13px; color: var(--td-text-color-secondary); margin-top: 6px; }
+}
+.cc-content-label {
+  display: flex; align-items: center; justify-content: space-between; margin-top: 6px;
+  label { margin-top: 0; }
+}
+.cc-picker { display: flex; flex-direction: column; gap: 10px; }
+.cc-picker-bar { display: flex; align-items: center; gap: 12px; }
+.cc-picker-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cc-picker-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--td-component-stroke);
+  &:hover { background: var(--td-bg-color-container-hover); border-color: var(--td-brand-color); }
+}
+.cc-picker-label { font-weight: 600; color: var(--td-text-color-primary); flex: 1; }
+.cc-picker-slug { font-size: 12px; color: var(--td-text-color-placeholder); font-family: monospace; }
+/* Chip tham chiếu cờ inline trong nội dung bài giảng */
+.cc-lesson-content :deep(.chess-ref-link) {
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  padding: 0 6px; border-radius: 4px; text-decoration: none; font-weight: 600;
+  &::before { content: '♟ '; }
+  &:hover { text-decoration: underline; }
 }
 </style>

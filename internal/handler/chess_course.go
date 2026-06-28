@@ -53,6 +53,30 @@ func (h *ChessCourseHandler) GetCourse(c *gin.Context) {
 	ok(c, course)
 }
 
+// GetCourseBySlug GET /chess/courses/by-slug/:slug — giải mã wikilink [[course/<slug>]].
+func (h *ChessCourseHandler) GetCourseBySlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	course, err := h.service.GetCourseBySlug(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		fail(c, http.StatusNotFound, err)
+		return
+	}
+	ok(c, course)
+}
+
+// GetCourseBacklinks GET /chess/courses/by-slug/:slug/backlinks — trang/bài giảng trỏ tới khóa học.
+func (h *ChessCourseHandler) GetCourseBacklinks(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	links, err := h.service.GetCourseBacklinks(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	ok(c, links)
+}
+
 type courseBody struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -178,6 +202,30 @@ func (h *ChessCourseHandler) GetLesson(c *gin.Context) {
 		return
 	}
 	ok(c, lesson)
+}
+
+// GetLessonBySlug GET /chess/lessons/by-slug/:slug — giải mã wikilink [[lesson/<slug>]].
+func (h *ChessCourseHandler) GetLessonBySlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	lesson, err := h.service.GetLessonBySlug(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		fail(c, http.StatusNotFound, err)
+		return
+	}
+	ok(c, lesson)
+}
+
+// GetLessonBacklinks GET /chess/lessons/by-slug/:slug/backlinks — trang wiki trỏ tới bài giảng.
+func (h *ChessCourseHandler) GetLessonBacklinks(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	links, err := h.service.GetLessonBacklinks(ctx, tenantID, c.Param("slug"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	ok(c, links)
 }
 
 // UpdateLesson PUT /chess/lessons/:lesson_id

@@ -47,6 +47,21 @@ func (r *chessLibraryRepository) GetGame(ctx context.Context, tenantID uint64, i
 	return &g, nil
 }
 
+func (r *chessLibraryRepository) GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error) {
+	var g types.ChessGame
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND slug = ?", tenantID, slug).First(&g).Error; err != nil {
+		return nil, err
+	}
+	return &g, nil
+}
+
+func (r *chessLibraryRepository) GameSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessGame{}).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
 func (r *chessLibraryRepository) CreateGame(ctx context.Context, game *types.ChessGame) error {
 	return r.db.WithContext(ctx).Create(game).Error
 }
@@ -98,6 +113,21 @@ func (r *chessLibraryRepository) GetPuzzle(ctx context.Context, tenantID uint64,
 		return nil, err
 	}
 	return &p, nil
+}
+
+func (r *chessLibraryRepository) GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error) {
+	var p types.ChessPuzzle
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND slug = ?", tenantID, slug).First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (r *chessLibraryRepository) PuzzleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessPuzzle{}).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).Limit(1).Count(&count).Error
+	return count > 0, err
 }
 
 func (r *chessLibraryRepository) CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error {

@@ -11,6 +11,10 @@ type ChessCourseService interface {
 	// ---- Khóa học ----
 	ListCourses(ctx context.Context, tenantID uint64) ([]*types.ChessCourse, error)
 	GetCourse(ctx context.Context, tenantID uint64, id string) (*types.ChessCourse, error)
+	// GetCourseBySlug giải mã wikilink [[course/<slug>]] về khóa học.
+	GetCourseBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessCourse, error)
+	// GetCourseBacklinks liệt kê trang wiki/bài giảng trỏ tới khóa học này.
+	GetCourseBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreateCourse(ctx context.Context, course *types.ChessCourse) (*types.ChessCourse, error)
 	UpdateCourse(ctx context.Context, course *types.ChessCourse) (*types.ChessCourse, error)
 	DeleteCourse(ctx context.Context, tenantID uint64, id string) error
@@ -18,6 +22,10 @@ type ChessCourseService interface {
 	// ---- Bài học ----
 	ListLessons(ctx context.Context, tenantID uint64, courseID string) ([]*types.ChessLesson, error)
 	GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error)
+	// GetLessonBySlug giải mã wikilink [[lesson/<slug>]] về bài giảng.
+	GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error)
+	// GetLessonBacklinks liệt kê trang wiki/bài giảng trỏ tới bài giảng này.
+	GetLessonBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreateLesson(ctx context.Context, lesson *types.ChessLesson) (*types.ChessLesson, error)
 	UpdateLesson(ctx context.Context, lesson *types.ChessLesson) (*types.ChessLesson, error)
 	DeleteLesson(ctx context.Context, tenantID uint64, id string) error
@@ -28,6 +36,8 @@ type ChessCourseRepository interface {
 	// ---- Khóa học ----
 	ListCourses(ctx context.Context, tenantID uint64) ([]*types.ChessCourse, error)
 	GetCourse(ctx context.Context, tenantID uint64, id string) (*types.ChessCourse, error)
+	GetCourseBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessCourse, error)
+	CourseSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateCourse(ctx context.Context, course *types.ChessCourse) error
 	UpdateCourse(ctx context.Context, course *types.ChessCourse) error
 	DeleteCourse(ctx context.Context, tenantID uint64, id string) error
@@ -36,6 +46,8 @@ type ChessCourseRepository interface {
 	// ---- Bài học ----
 	ListLessons(ctx context.Context, tenantID uint64, courseID string) ([]*types.ChessLesson, error)
 	GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error)
+	GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error)
+	LessonSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateLesson(ctx context.Context, lesson *types.ChessLesson) error
 	UpdateLesson(ctx context.Context, lesson *types.ChessLesson) error
 	DeleteLesson(ctx context.Context, tenantID uint64, id string) error

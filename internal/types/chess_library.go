@@ -9,6 +9,9 @@ type ChessGame struct {
 	ID string `json:"id" gorm:"type:varchar(36);primaryKey"`
 	// TenantID là tenant sở hữu.
 	TenantID uint64 `json:"tenant_id" gorm:"index"`
+	// Slug là định danh thân thiện (duy nhất theo tenant) làm đích wikilink
+	// [[game/<slug>]]. Sinh ở tầng service khi tạo; ổn định sau đó.
+	Slug string `json:"slug" gorm:"column:slug;type:varchar(255)"`
 	// White / Black là tên hai đấu thủ.
 	White string `json:"white" gorm:"type:varchar(128)"`
 	Black string `json:"black" gorm:"type:varchar(128)"`
@@ -38,6 +41,9 @@ type ChessPuzzle struct {
 	ID string `json:"id" gorm:"type:varchar(36);primaryKey"`
 	// TenantID là tenant sở hữu.
 	TenantID uint64 `json:"tenant_id" gorm:"index"`
+	// Slug là định danh thân thiện (duy nhất theo tenant) làm đích wikilink
+	// [[puzzle/<slug>]]. Sinh ở tầng service khi tạo; ổn định sau đó.
+	Slug string `json:"slug" gorm:"column:slug;type:varchar(255)"`
 	// Title là tiêu đề bài tập.
 	Title string `json:"title" gorm:"type:varchar(255)"`
 	// FEN là thế cờ của bài tập.

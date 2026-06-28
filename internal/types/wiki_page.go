@@ -130,6 +130,31 @@ const (
 	WikiPageTypeComparison = "comparison"
 )
 
+// Loại node CỜ trong đồ thị wiki — KHÔNG phải page_type thật của wiki_pages, chỉ
+// dùng làm WikiGraphNode.PageType cho các đối tượng cờ được trang wiki tham chiếu
+// ([[game/<slug>]] …). Frontend dựa vào đây để tô màu + bấm mở bàn cờ.
+const (
+	WikiNodeTypeChessGame   = "chess_game"
+	WikiNodeTypeChessPuzzle = "chess_puzzle"
+	WikiNodeTypeChessLesson = "chess_lesson"
+	WikiNodeTypeChessCourse = "chess_course"
+)
+
+// ChessRefTypeToNodeType ánh xạ loại tham chiếu cờ → loại node đồ thị.
+func ChessRefTypeToNodeType(chessType string) string {
+	switch chessType {
+	case ChessRefTypeGame:
+		return WikiNodeTypeChessGame
+	case ChessRefTypePuzzle:
+		return WikiNodeTypeChessPuzzle
+	case ChessRefTypeLesson:
+		return WikiNodeTypeChessLesson
+	case ChessRefTypeCourse:
+		return WikiNodeTypeChessCourse
+	}
+	return ""
+}
+
 // WikiPageStatus constants
 const (
 	// WikiPageStatusDraft indicates the page is a draft

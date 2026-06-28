@@ -3396,6 +3396,7 @@ export default {
     },
     wikiBrowser: {
       viewInGraph: "그래프에서 보기",
+      createLesson: "이 페이지로 강의 만들기",
       tabDocuments: "문서",
       tabWiki: "Wiki",
       tabGraph: "그래프",

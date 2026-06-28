@@ -485,6 +485,11 @@
                     <template #prefixIcon><t-icon name="chart-bubble" /></template>
                     {{ $t('knowledgeEditor.wikiBrowser.viewInGraph') }}
                   </t-link>
+                  <t-link theme="primary" hover="color" class="wiki-reader-graph-link"
+                    @click="createLessonFromPage">
+                    <template #prefixIcon><t-icon name="books" /></template>
+                    {{ $t('knowledgeEditor.wikiBrowser.createLesson') }}
+                  </t-link>
                 </div>
               </div>
 
@@ -498,8 +503,16 @@
                   @click.prevent="navigateToSlug(link)">{{ slugDisplayName(link) }}</a>
               </div>
 
-              <!-- Content -->
-              <div ref="readerBodyRef" class="wiki-reader-body" v-html="renderedContent" @click="handleContentClick">
+              <!-- Content. Render theo đoạn để nhúng bàn cờ tương tác ngay tại
+                   vị trí khối ```chess; các đoạn văn bản vẫn nằm trong cùng một
+                   readerBodyRef nên hydrate ảnh + click [[liên kết]] hoạt động
+                   như cũ. -->
+              <div ref="readerBodyRef" class="wiki-reader-body" @click="handleContentClick">
+                <template v-for="(seg, si) in renderedContentSegments" :key="si">
+                  <ChessBoardDisplay v-if="seg.type === 'board'" :data="seg.board" />
+                  <ChessRefEmbed v-else-if="seg.type === 'ref'" :ref-str="seg.refStr" />
+                  <div v-else class="wiki-reader-md-segment" v-html="seg.html"></div>
+                </template>
               </div>
 
               <!-- Source refs -->
@@ -607,6 +620,9 @@
         @closePreImg="closeImagePreview" />
     </Teleport>
 
+    <!-- Popup bàn cờ khi bấm chip tham chiếu cờ [[game/<slug>]] -->
+    <ChessRefDialog v-model:visible="chessRefVisible" :ref-str="chessRefStr" />
+
     <!-- Global Issues Drawer -->
     <t-drawer v-model:visible="showGlobalIssuesDrawer" :header="$t('knowledgeEditor.wikiBrowser.globalIssuesTitle')"
       size="480px" :footer="false" class="wiki-global-issues-drawer">
@@ -702,6 +718,11 @@ import { RecycleScroller } from 'vue-virtual-scroller'
 import { hydrateProtectedFileImages } from '@/utils/security'
 import picturePreview from '@/components/picture-preview.vue'
 import WikiFolderActions from './WikiFolderActions.vue'
+import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue'
+import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue'
+import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue'
+import { splitChessContent, renderChessChips } from '@/utils/chessBlocks'
+import { useChessWikiDraftStore } from '@/stores/chessWikiDraft'
 import { createSessions } from '@/api/chat'
 import ChatView from '@/views/chat/index.vue'
 import {
@@ -731,6 +752,22 @@ import {
 
 const router = useRouter()
 const route = useRoute()
+const chessWikiDraft = useChessWikiDraftStore()
+
+// Tạo bài giảng từ trang wiki đang xem: lưu bản nháp (tiêu đề + nội dung markdown,
+// gồm cả khối ```chess) rồi sang trang Quản lý cờ vua mở sẵn hộp thoại thêm bài
+// giảng. Không đổi backend; nguồn gốc trang wiki được ghi kèm trong bản nháp.
+function createLessonFromPage() {
+  const page = selectedPage.value
+  if (!page) return
+  chessWikiDraft.setDraft({
+    title: page.title || page.slug,
+    content: page.content || '',
+    sourceKbId: props.knowledgeBaseId,
+    sourceSlug: page.slug,
+  })
+  router.push({ name: 'chessCourses' })
+}
 const menuStore = useMenuStore()
 const settingsStore = useSettingsStore()
 
@@ -1390,8 +1427,11 @@ watch(graphDrawerContent, async () => {
 })
 
 function renderMarkdown(content: string): string {
+  // CHIP tham chiếu cờ [[game/<slug>]] → <a class="chess-ref-link"> (xử lý TRƯỚC
+  // khi thay [[wiki-slug]] để không bị nhầm thành link trang wiki).
+  let preprocessed = renderChessChips(content)
   // Pre-process wiki links [[slug|name]] to custom HTML tags
-  let preprocessed = content.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
+  preprocessed = preprocessed.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
     const pipeIdx = inner.indexOf('|')
     const slug = pipeIdx > 0 ? inner.substring(0, pipeIdx).trim() : inner.trim()
     const display = pipeIdx > 0 ? inner.substring(pipeIdx + 1).trim() : slugDisplayName(slug)
@@ -1414,6 +1454,13 @@ async function openGraphDrawer(slug: string) {
 
 function handleGraphDrawerClick(e: MouseEvent) {
   const target = e.target as HTMLElement
+  const chessRefEl = target.closest('a.chess-ref-link') as HTMLElement | null
+  if (chessRefEl) {
+    e.preventDefault()
+    const ref = chessRefEl.getAttribute('data-chess-ref')
+    if (ref) openChessRef(ref)
+    return
+  }
   if (target.classList.contains('wiki-content-link')) {
     e.preventDefault()
     const slug = target.getAttribute('data-slug')
@@ -1860,6 +1907,19 @@ const renderedContent = computed(() => {
   return renderMarkdown(selectedPage.value.content)
 })
 
+// Tách nội dung trang thành các đoạn theo thứ tự: văn bản (markdown đã render)
+// và bàn cờ tương tác (từ khối ```chess). Nhờ vậy bàn cờ hiện ngay tại vị trí
+// trong bài viết. renderedContent ở trên vẫn giữ để watcher hydrate ảnh + chốt
+// điều kiện chạy được như cũ.
+const renderedContentSegments = computed<Array<{ type: 'markdown'; html: string } | { type: 'board'; board: any } | { type: 'ref'; refStr: string }>>(() => {
+  if (!selectedPage.value) return []
+  return splitChessContent(selectedPage.value.content).map((seg) => {
+    if (seg.type === 'board') return { type: 'board' as const, board: seg.board }
+    if (seg.type === 'ref') return { type: 'ref' as const, refStr: seg.ref!.ref }
+    return { type: 'markdown' as const, html: renderMarkdown(seg.markdown || '') }
+  })
+})
+
 // Label shown next to the back arrow on page headers. Prefers the
 // nearest page-history entry when available so the user sees where
 // they'll land; falls back to the Index/Log label when the current
@@ -1912,6 +1972,13 @@ watch(renderedIndexMarkdown, async () => {
 
 function handleContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement
+  const chessRefEl = target.closest('a.chess-ref-link') as HTMLElement | null
+  if (chessRefEl) {
+    e.preventDefault()
+    const ref = chessRefEl.getAttribute('data-chess-ref')
+    if (ref) openChessRef(ref)
+    return
+  }
   if (target.classList.contains('wiki-content-link')) {
     e.preventDefault()
     const slug = target.getAttribute('data-slug')
@@ -1923,6 +1990,14 @@ function handleContentClick(e: MouseEvent) {
       imagePreviewVisible.value = true
     }
   }
+}
+
+// Popup bàn cờ khi bấm CHIP tham chiếu cờ [[game/<slug>]] trong nội dung wiki.
+const chessRefVisible = ref(false)
+const chessRefStr = ref('')
+function openChessRef(refStr: string) {
+  chessRefStr.value = refStr
+  chessRefVisible.value = true
 }
 
 // WIKI_SIDEBAR_PAGE_SIZE is the per-type fetch batch. Small enough that
@@ -3189,6 +3264,12 @@ async function selectPage(page: WikiPage) {
 }
 
 async function navigateToSlug(slug: string) {
+  // Phòng vệ: slug tham chiếu cờ (game/puzzle/lesson/...) → mở popup bàn cờ thay
+  // vì gọi getWikiPage (sẽ 404 vì không phải trang wiki).
+  if (/^(game|puzzle|lesson|course)\//.test(slug)) {
+    openChessRef(slug)
+    return
+  }
   try {
     if (selectedPage.value && selectedPage.value.slug !== slug) {
       navHistory.value.push(selectedPage.value)
@@ -3374,6 +3455,13 @@ const graphSelectedSlug = ref<string | null>(null)
 const nodeColorMap: Record<string, string> = {
   summary: '#0052d9', entity: '#2ba471', concept: '#e37318',
   synthesis: '#0594fa', comparison: '#d54941', index: '#8c8c8c', log: '#8c8c8c',
+  // Node CỜ (ván/thế cờ/bài giảng/khóa học) được trang wiki tham chiếu.
+  chess_game: '#834ec2', chess_puzzle: '#b5328a', chess_lesson: '#0a7d6f', chess_course: '#c2700a',
+}
+
+// isChessNodeType nhận diện node cờ trong đồ thị (slug dạng "game/<slug>").
+function isChessNodeType(type: string): boolean {
+  return type === 'chess_game' || type === 'chess_puzzle' || type === 'chess_lesson' || type === 'chess_course'
 }
 
 // RenderGraphOpts tweaks how renderGraph initializes node positions when
@@ -3832,8 +3920,13 @@ function renderGraph(opts: RenderGraphOpts = {}) {
           }
         }
 
-        // Open drawer (it will handle drawer visibility and fetching content)
-        openGraphDrawer(n.slug)
+        // Node cờ: mở popup bàn cờ thay vì drawer trang wiki (slug = "game/<slug>").
+        if (isChessNodeType(n.type)) {
+          openChessRef(n.slug)
+        } else {
+          // Open drawer (it will handle drawer visibility and fetching content)
+          openGraphDrawer(n.slug)
+        }
       }, 220)
     })
 
@@ -5281,6 +5374,20 @@ onUnmounted(() => {
       border-bottom-style: solid;
       text-decoration: none !important;
     }
+  }
+
+  // Chip tham chiếu cờ [[game/<slug>]] — hiển thị inline trong dòng chữ.
+  :deep(a.chess-ref-link) {
+    color: var(--td-brand-color);
+    background: var(--td-brand-color-light);
+    padding: 0 6px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+
+    &::before { content: '♟ '; }
+    &:hover { text-decoration: underline; }
   }
 
   // ── Markdown tables (GFM) ──

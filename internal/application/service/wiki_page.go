@@ -27,6 +27,7 @@ type wikiPageService struct {
 	chunkRepo       interfaces.ChunkRepository
 	kbService       interfaces.KnowledgeBaseService
 	taskPendingRepo interfaces.TaskPendingOpsRepository
+	chessRefRepo    interfaces.WikiChessRefRepository
 	redisClient     *redis.Client
 }
 
@@ -36,6 +37,7 @@ func NewWikiPageService(
 	chunkRepo interfaces.ChunkRepository,
 	kbService interfaces.KnowledgeBaseService,
 	taskPendingRepo interfaces.TaskPendingOpsRepository,
+	chessRefRepo interfaces.WikiChessRefRepository,
 	redisClient *redis.Client,
 ) interfaces.WikiPageService {
 	return &wikiPageService{
@@ -43,6 +45,7 @@ func NewWikiPageService(
 		chunkRepo:       chunkRepo,
 		kbService:       kbService,
 		taskPendingRepo: taskPendingRepo,
+		chessRefRepo:    chessRefRepo,
 		redisClient:     redisClient,
 	}
 }
@@ -82,6 +85,8 @@ func (s *wikiPageService) CreatePage(ctx context.Context, page *types.WikiPage) 
 
 	// Update inbound links on target pages
 	s.updateInLinks(ctx, page.KnowledgeBaseID, page.Slug, page.OutLinks)
+	// Sync tham chiếu wiki -> đối tượng cờ (backlink + đồ thị).
+	s.syncChessRefs(ctx, page)
 
 	return page, nil
 }
@@ -159,6 +164,8 @@ func (s *wikiPageService) UpdatePage(ctx context.Context, page *types.WikiPage) 
 	// oldOutLinks == existing.OutLinks and these calls are effectively no-ops.
 	s.removeInLinks(ctx, existing.KnowledgeBaseID, existing.Slug, oldOutLinks)
 	s.updateInLinks(ctx, existing.KnowledgeBaseID, existing.Slug, existing.OutLinks)
+	// ReplaceForPage tự xử lý thêm/bớt nên không cần remove riêng.
+	s.syncChessRefs(ctx, existing)
 
 	return existing, nil
 }
@@ -193,6 +200,7 @@ func (s *wikiPageService) UpdateAutoLinkedContent(ctx context.Context, page *typ
 
 	s.removeInLinks(ctx, existing.KnowledgeBaseID, existing.Slug, oldOutLinks)
 	s.updateInLinks(ctx, existing.KnowledgeBaseID, existing.Slug, existing.OutLinks)
+	s.syncChessRefs(ctx, existing)
 
 	return nil
 }
@@ -248,6 +256,12 @@ func (s *wikiPageService) DeletePage(ctx context.Context, kbID string, slug stri
 
 	// Remove inbound link references from pages this page links to
 	s.removeInLinks(ctx, kbID, slug, page.OutLinks)
+	// Xóa tham chiếu cờ của trang này.
+	if s.chessRefRepo != nil {
+		if err := s.chessRefRepo.DeleteForPage(ctx, kbID, slug); err != nil {
+			logger.Warnf(ctx, "wiki: delete chess refs for %s failed: %v", slug, err)
+		}
+	}
 
 	// Delete the page
 	if err := s.repo.Delete(ctx, kbID, slug); err != nil {
@@ -440,7 +454,47 @@ func (s *wikiPageService) GetGraph(ctx context.Context, req *types.WikiGraphRequ
 	if err != nil {
 		return nil, err
 	}
+	// Thêm node CỜ (ván/thế cờ/bài giảng) được trang trong KB tham chiếu, để
+	// chess tham gia đồ thị wiki. Các cạnh page->game/<slug> đã có sẵn trong
+	// OutLinks của trang nên chỉ cần node đích tồn tại.
+	if chessNodes := s.buildChessGraphNodes(ctx, req.KnowledgeBaseID); len(chessNodes) > 0 {
+		pages = append(pages, chessNodes...)
+	}
 	return computeGraphSubset(pages, req)
+}
+
+// buildChessGraphNodes tổng hợp các đối tượng cờ được tham chiếu trong KB thành
+// các "trang tổng hợp" (slug = "game/<slug>", PageType = chess_*, InLinks = các
+// trang trỏ tới). Nhồi vào danh sách pages để computeGraphSubset xử lý như node
+// thường (không cần sửa hàm thuần đó). Tiêu đề dùng slug đã nhân hóa (chip/embed
+// đã hiển thị tiêu đề thật khi mở).
+func (s *wikiPageService) buildChessGraphNodes(ctx context.Context, kbID string) []*types.WikiPage {
+	if s.chessRefRepo == nil {
+		return nil
+	}
+	refs, err := s.chessRefRepo.ListByKB(ctx, kbID)
+	if err != nil || len(refs) == 0 {
+		return nil
+	}
+	inLinks := make(map[string][]string)
+	nodeType := make(map[string]string)
+	for _, r := range refs {
+		key := r.ChessType + "/" + r.ChessSlug
+		inLinks[key] = append(inLinks[key], r.PageSlug)
+		nodeType[key] = types.ChessRefTypeToNodeType(r.ChessType)
+	}
+	out := make([]*types.WikiPage, 0, len(inLinks))
+	for key, ins := range inLinks {
+		i := strings.IndexByte(key, '/')
+		title := strings.ReplaceAll(key[i+1:], "-", " ")
+		out = append(out, &types.WikiPage{
+			Slug:     key,
+			Title:    title,
+			PageType: nodeType[key],
+			InLinks:  types.StringArray(ins),
+		})
+	}
+	return out
 }
 
 // computeGraphSubset is the pure I/O-free core of GetGraph. It takes the
@@ -759,6 +813,8 @@ func (s *wikiPageService) RebuildLinks(ctx context.Context, kbID string) error {
 		if err := s.repo.UpdateMeta(ctx, p); err != nil {
 			logger.Warnf(ctx, "wiki: failed to update links for page %s: %v", p.Slug, err)
 		}
+		// Dựng lại tham chiếu cờ cho từng trang.
+		s.syncChessRefs(ctx, p)
 	}
 
 	return nil
@@ -885,6 +941,56 @@ func normalizeSlug(slug string) string {
 	slug = strings.ToLower(strings.TrimSpace(slug))
 	slug = strings.ReplaceAll(slug, " ", "-")
 	return slug
+}
+
+// chessRefPrefixes là các tiền tố slug nhận diện tham chiếu cờ (vs trang wiki).
+var chessRefPrefixes = map[string]bool{
+	types.ChessRefTypeGame:   true,
+	types.ChessRefTypePuzzle: true,
+	types.ChessRefTypeLesson: true,
+	types.ChessRefTypeCourse: true,
+}
+
+// splitChessRef tách "game/<slug>" → ("game", "<slug>", true). Trả false nếu
+// không phải tham chiếu cờ (vd "entity/acme" → là link trang wiki bình thường).
+func splitChessRef(slug string) (string, string, bool) {
+	i := strings.IndexByte(slug, '/')
+	if i <= 0 {
+		return "", "", false
+	}
+	head := slug[:i]
+	rest := strings.TrimSpace(slug[i+1:])
+	if rest == "" || !chessRefPrefixes[head] {
+		return "", "", false
+	}
+	return head, rest, true
+}
+
+// syncChessRefs đồng bộ bảng wiki_chess_refs theo out-link cờ của trang. Chạy
+// SONG SONG với updateInLinks (slug cờ vốn miss GetBySlug nên vô hại ở đó). Tha
+// lỗi (chỉ warn) như cơ chế in-link để không chặn việc lưu trang.
+func (s *wikiPageService) syncChessRefs(ctx context.Context, page *types.WikiPage) {
+	if s.chessRefRepo == nil {
+		return
+	}
+	var refs []types.WikiChessRef
+	for _, link := range page.OutLinks {
+		t, sl, ok := splitChessRef(link)
+		if !ok {
+			continue
+		}
+		refs = append(refs, types.WikiChessRef{
+			ID:        uuid.New().String(),
+			TenantID:  page.TenantID,
+			KBID:      page.KnowledgeBaseID,
+			PageSlug:  page.Slug,
+			ChessType: t,
+			ChessSlug: sl,
+		})
+	}
+	if err := s.chessRefRepo.ReplaceForPage(ctx, page.TenantID, page.KnowledgeBaseID, page.Slug, refs); err != nil {
+		logger.Warnf(ctx, "wiki: sync chess refs for %s failed: %v", page.Slug, err)
+	}
 }
 
 // updateInLinks adds the source slug to the in_links of target pages

@@ -11,6 +11,10 @@ type ChessLibraryService interface {
 	// ---- Ván đấu ----
 	ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error)
 	GetGame(ctx context.Context, tenantID uint64, id string) (*types.ChessGame, error)
+	// GetGameBySlug giải mã wikilink [[game/<slug>]] về ván cờ.
+	GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error)
+	// GetGameBacklinks liệt kê trang wiki/bài giảng trỏ tới ván cờ này.
+	GetGameBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreateGame(ctx context.Context, game *types.ChessGame) (*types.ChessGame, error)
 	UpdateGame(ctx context.Context, game *types.ChessGame) (*types.ChessGame, error)
 	DeleteGame(ctx context.Context, tenantID uint64, id string) error
@@ -20,6 +24,10 @@ type ChessLibraryService interface {
 	// ---- Bài tập ----
 	ListPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]*types.ChessPuzzle, error)
 	GetPuzzle(ctx context.Context, tenantID uint64, id string) (*types.ChessPuzzle, error)
+	// GetPuzzleBySlug giải mã wikilink [[puzzle/<slug>]] về thế cờ/bài tập.
+	GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error)
+	// GetPuzzleBacklinks liệt kê trang wiki/bài giảng trỏ tới thế cờ này.
+	GetPuzzleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error)
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error)
 	DeletePuzzle(ctx context.Context, tenantID uint64, id string) error
@@ -31,6 +39,8 @@ type ChessLibraryRepository interface {
 	// ---- Ván đấu ----
 	ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error)
 	GetGame(ctx context.Context, tenantID uint64, id string) (*types.ChessGame, error)
+	GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error)
+	GameSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateGame(ctx context.Context, game *types.ChessGame) error
 	CreateGames(ctx context.Context, games []*types.ChessGame) error
 	UpdateGame(ctx context.Context, game *types.ChessGame) error
@@ -39,6 +49,8 @@ type ChessLibraryRepository interface {
 	// ---- Bài tập ----
 	ListPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]*types.ChessPuzzle, error)
 	GetPuzzle(ctx context.Context, tenantID uint64, id string) (*types.ChessPuzzle, error)
+	GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error)
+	PuzzleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error
 	DeletePuzzle(ctx context.Context, tenantID uint64, id string) error

@@ -27,11 +27,19 @@
               <span>{{ g.ply_count }} nửa-nước</span>
             </div>
           </div>
-          <t-button size="small" variant="text" theme="danger" @click.stop="remove(g)"><t-icon name="delete" /></t-button>
+          <span class="gl-row-actions">
+            <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyWikilink(g)">
+              <t-icon name="link" />
+            </t-button>
+            <t-button size="small" variant="text" theme="danger" @click.stop="remove(g)"><t-icon name="delete" /></t-button>
+          </span>
         </div>
       </div>
       <div class="gl-viewer">
-        <ChessBoardDisplay v-if="selected" :key="selected.id" :data="viewerData" />
+        <template v-if="selected">
+          <ChessBacklinks v-if="selected.slug" ref-type="game" :slug="selected.slug" class="gl-backlinks" />
+          <ChessBoardDisplay :key="selected.id" :data="viewerData" />
+        </template>
         <div v-else class="gl-empty gl-empty--big">Chọn một ván để xem lại (lật từng nước).</div>
       </div>
     </div>
@@ -47,11 +55,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
+import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
-import { listGames, deleteGame, importGames, type ChessGame } from '@/api/chess';
+import { listGames, getGameBySlug, deleteGame, importGames, type ChessGame } from '@/api/chess';
+
+const { t } = useI18n();
+
+// Deep-link "Mở trong thư viện": chọn sẵn ván theo slug (từ wikilink [[game/<slug>]]).
+const props = defineProps<{ focusSlug?: string }>();
+async function focusBySlug(slug?: string) {
+  if (!slug) return;
+  try {
+    const res: any = await getGameBySlug(slug);
+    if (res?.data) selected.value = res.data;
+  } catch { /* không tìm thấy → bỏ qua */ }
+}
+onMounted(() => focusBySlug(props.focusSlug));
+watch(() => props.focusSlug, (s) => focusBySlug(s));
+
+// Sao chép wikilink [[game/<slug>]] để dán vào nội dung wiki/bài giảng.
+async function copyWikilink(g: ChessGame) {
+  if (!g.slug) { MessagePlugin.warning('Ván chưa có slug'); return; }
+  const link = `[[game/${g.slug}|${g.white || '?'} – ${g.black || '?'}]]`;
+  try {
+    await navigator.clipboard.writeText(link);
+    MessagePlugin.success(t('chess.ref.copied'));
+  } catch {
+    MessagePlugin.info(link);
+  }
+}
 
 const STARTFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const resultOptions = [
@@ -113,11 +149,13 @@ load();
 .gl-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
 .gl-list { width: 380px; flex: 0 0 380px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 12px; }
 .gl-viewer { flex: 1; overflow-y: auto; }
+.gl-backlinks { margin: 0 0 12px; }
 .gl-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
 .gl-empty--big { text-align: center; padding-top: 80px; }
 .gl-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--td-component-stroke); border-radius: 8px; margin-bottom: 6px; cursor: pointer;
   &:hover { background: var(--td-bg-color-container-hover); }
   &.active { background: var(--td-bg-color-secondarycontainer); border-color: var(--td-brand-color); } }
+.gl-row-actions { display: flex; align-items: center; }
 .gl-players { font-size: 14px; color: var(--td-text-color-primary); }
 .gl-result { margin-left: 6px; color: var(--td-text-color-secondary); font-weight: 600; }
 .gl-meta { display: flex; gap: 8px; margin-top: 3px; font-size: 12px; color: var(--td-text-color-secondary); }

@@ -3422,6 +3422,7 @@ export default {
     },
     wikiBrowser: {
       viewInGraph: 'Xem trong đồ thị',
+      createLesson: 'Tạo bài giảng từ trang này',
       tabDocuments: "Tài liệu",
       tabWiki: "Wiki",
       tabGraph: "Đồ thị",
@@ -5803,5 +5804,33 @@ export default {
     toolExplainMove: "Giải thích nước đi",
     toolLookupOpening: "Tra khai cuộc",
     toolGeneratePuzzle: "Ra bài tập cờ",
+    // Wikilink tham chiếu cờ: [[game/<slug>]] (chip) và ![[game/<slug>]] (nhúng).
+    ref: {
+      loading: "Đang tải…",
+      notFound: "Không tìm thấy tham chiếu cờ: {ref}",
+      noBoard: "Tham chiếu không có thế cờ để hiển thị.",
+      openInLibrary: "Mở trong thư viện",
+      backlinks: "Được liên kết bởi",
+      openBacklink: "Mở nguồn liên kết",
+      dialogTitle: "Tham chiếu cờ",
+      type_game: "Ván cờ",
+      type_puzzle: "Thế cờ",
+      type_lesson: "Bài giảng",
+      type_course: "Khóa học",
+      // Bộ chọn chèn link trong trình soạn bài giảng.
+      insert: "Chèn ván/thế cờ",
+      pickerTitle: "Chèn tham chiếu cờ",
+      tabGames: "Ván cờ",
+      tabPuzzles: "Thế cờ / Bài tập",
+      tabLessons: "Bài giảng",
+      tabCourses: "Khóa học",
+      searchPlaceholder: "Tìm theo tên…",
+      empty: "Không có mục nào.",
+      embedToggle: "Nhúng bàn cờ inline (![[…]])",
+      insertAction: "Chèn",
+      // Sao chép wikilink ở danh sách kho ván/bài tập.
+      copyLink: "Sao chép wikilink",
+      copied: "Đã sao chép wikilink",
+    },
   },
 };

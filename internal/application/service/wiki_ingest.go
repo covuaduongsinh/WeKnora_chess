@@ -1066,6 +1066,10 @@ func (s *wikiIngestService) cleanDeadLinks(ctx context.Context, kbID string, aff
 		for outSlug, alive := range liveMap {
 			if alive {
 				liveSlugs[outSlug] = struct{}{}
+			} else if _, _, isChess := splitChessRef(outSlug); isChess {
+				// Tham chiếu cờ [[game/<slug>]] không phải trang wiki nên
+				// ExistsSlugs trả false — KHÔNG coi là dead, giữ nguyên link.
+				continue
 			} else {
 				deadSlugs[outSlug] = struct{}{}
 			}

@@ -1,0 +1,19 @@
+[Unit]
+Description=WeKnora-Chess (docker compose: 3-file overlay + qdrant profile)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+# oneshot + RemainAfterExit: `compose up -d` trả về ngay; coi là "active" sau khi
+# các container đã được khởi (compose lo restart từng container qua restart policy).
+# @PROJECT_ROOT@ được server-bootstrap.sh thay bằng đường dẫn thật (vd /opt/WeKnora_chess).
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=@PROJECT_ROOT@
+ExecStart=/bin/bash @PROJECT_ROOT@/scripts/deploy/dc.sh up -d
+ExecStop=/bin/bash @PROJECT_ROOT@/scripts/deploy/dc.sh down
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

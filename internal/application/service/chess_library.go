@@ -14,12 +14,24 @@ import (
 
 // chessLibraryService triển khai nghiệp vụ kho ván đấu & ngân hàng bài tập.
 type chessLibraryService struct {
-	repo interfaces.ChessLibraryRepository
+	repo         interfaces.ChessLibraryRepository
+	chessRefRepo interfaces.WikiChessRefRepository
 }
 
 // NewChessLibraryService tạo service kho ván & bài tập cờ vua.
-func NewChessLibraryService(repo interfaces.ChessLibraryRepository) interfaces.ChessLibraryService {
-	return &chessLibraryService{repo: repo}
+func NewChessLibraryService(
+	repo interfaces.ChessLibraryRepository,
+	chessRefRepo interfaces.WikiChessRefRepository,
+) interfaces.ChessLibraryService {
+	return &chessLibraryService{repo: repo, chessRefRepo: chessRefRepo}
+}
+
+// pruneChessRefs xóa các backlink wiki trỏ tới đối tượng cờ vừa bị xóa (best-effort).
+func (s *chessLibraryService) pruneChessRefs(ctx context.Context, tenantID uint64, chessType, slug string) {
+	if s.chessRefRepo == nil || slug == "" {
+		return
+	}
+	_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, chessType, slug)
 }
 
 // ---- Ván đấu ----
@@ -32,8 +44,24 @@ func (s *chessLibraryService) GetGame(ctx context.Context, tenantID uint64, id s
 	return s.repo.GetGame(ctx, tenantID, id)
 }
 
+func (s *chessLibraryService) GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error) {
+	return s.repo.GetGameBySlug(ctx, tenantID, slug)
+}
+
+func (s *chessLibraryService) GetGameBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error) {
+	if s.chessRefRepo == nil {
+		return nil, nil
+	}
+	return s.chessRefRepo.ListBacklinks(ctx, tenantID, types.ChessRefTypeGame, slug)
+}
+
 func (s *chessLibraryService) CreateGame(ctx context.Context, game *types.ChessGame) (*types.ChessGame, error) {
 	game.ID = uuid.New().String()
+	slug, err := ensureUniqueChessSlug(ctx, game.TenantID, gameSlugBase(game), game.ID, s.repo.GameSlugExists)
+	if err != nil {
+		return nil, err
+	}
+	game.Slug = slug
 	if err := s.repo.CreateGame(ctx, game); err != nil {
 		return nil, err
 	}
@@ -51,7 +79,14 @@ func (s *chessLibraryService) UpdateGame(ctx context.Context, game *types.ChessG
 }
 
 func (s *chessLibraryService) DeleteGame(ctx context.Context, tenantID uint64, id string) error {
-	return s.repo.DeleteGame(ctx, tenantID, id)
+	g, _ := s.repo.GetGame(ctx, tenantID, id)
+	if err := s.repo.DeleteGame(ctx, tenantID, id); err != nil {
+		return err
+	}
+	if g != nil {
+		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeGame, g.Slug)
+	}
+	return nil
 }
 
 // ImportGames tách PGN nhiều ván → tạo nhiều ChessGame, trả số ván đã thêm.
@@ -68,9 +103,13 @@ func (s *chessLibraryService) ImportGames(ctx context.Context, tenantID uint64, 
 	}
 	games := make([]*types.ChessGame, 0, len(imported))
 	for _, ig := range imported {
+		id := uuid.New().String()
 		games = append(games, &types.ChessGame{
-			ID:       uuid.New().String(),
+			ID:       id,
 			TenantID: tenantID,
+			// Import hàng loạt: gán slug xác định "g-<id8>" để tránh N lần dò
+			// trùng. Có thể humanize sau bằng backfill; link vẫn hoạt động.
+			Slug:     "g-" + id8(id),
 			White:    ig.TagOr("White", "?"),
 			Black:    ig.TagOr("Black", "?"),
 			Result:   ig.TagOr("Result", ig.Outcome),
@@ -97,6 +136,17 @@ func (s *chessLibraryService) GetPuzzle(ctx context.Context, tenantID uint64, id
 	return s.repo.GetPuzzle(ctx, tenantID, id)
 }
 
+func (s *chessLibraryService) GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error) {
+	return s.repo.GetPuzzleBySlug(ctx, tenantID, slug)
+}
+
+func (s *chessLibraryService) GetPuzzleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error) {
+	if s.chessRefRepo == nil {
+		return nil, nil
+	}
+	return s.chessRefRepo.ListBacklinks(ctx, tenantID, types.ChessRefTypePuzzle, slug)
+}
+
 func (s *chessLibraryService) CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error) {
 	if strings.TrimSpace(puzzle.FEN) == "" {
 		return nil, fmt.Errorf("thiếu thế cờ FEN")
@@ -105,6 +155,11 @@ func (s *chessLibraryService) CreatePuzzle(ctx context.Context, puzzle *types.Ch
 		return nil, fmt.Errorf("FEN không hợp lệ: %v", err)
 	}
 	puzzle.ID = uuid.New().String()
+	slug, err := ensureUniqueChessSlug(ctx, puzzle.TenantID, puzzleSlugBase(puzzle), puzzle.ID, s.repo.PuzzleSlugExists)
+	if err != nil {
+		return nil, err
+	}
+	puzzle.Slug = slug
 	if err := s.repo.CreatePuzzle(ctx, puzzle); err != nil {
 		return nil, err
 	}
@@ -127,7 +182,14 @@ func (s *chessLibraryService) UpdatePuzzle(ctx context.Context, puzzle *types.Ch
 }
 
 func (s *chessLibraryService) DeletePuzzle(ctx context.Context, tenantID uint64, id string) error {
-	return s.repo.DeletePuzzle(ctx, tenantID, id)
+	p, _ := s.repo.GetPuzzle(ctx, tenantID, id)
+	if err := s.repo.DeletePuzzle(ctx, tenantID, id); err != nil {
+		return err
+	}
+	if p != nil {
+		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypePuzzle, p.Slug)
+	}
+	return nil
 }
 
 func (s *chessLibraryService) RandomPuzzle(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (*types.ChessPuzzle, error) {

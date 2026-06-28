@@ -2518,6 +2518,7 @@ export default {
     },
     wikiBrowser: {
       viewInGraph: 'View in Graph',
+      createLesson: 'Create lesson from this page',
       tabDocuments: 'Documents',
       tabWiki: 'Wiki',
       tabGraph: 'Graph',

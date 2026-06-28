@@ -165,6 +165,11 @@ func (s *WikiLintService) RunLint(ctx context.Context, kbID string) (*WikiLintRe
 			// Check 2: Broken links — outlinks pointing at slugs that
 			// don't exist in the live set.
 			for _, outLink := range page.OutLinks {
+				// Tham chiếu cờ [[game/<slug>]] không phải trang wiki — bỏ qua,
+				// không báo "broken link".
+				if _, _, isChess := splitChessRef(outLink); isChess {
+					continue
+				}
 				if !slugSet[outLink] {
 					issues = append(issues, WikiLintIssue{
 						Type:        LintIssueBrokenLink,

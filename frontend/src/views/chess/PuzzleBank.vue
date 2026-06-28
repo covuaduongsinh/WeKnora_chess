@@ -27,6 +27,9 @@
             </div>
           </div>
           <span class="pb-actions">
+            <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyWikilink(p)">
+              <t-icon name="link" />
+            </t-button>
             <t-button size="small" variant="text" @click.stop="openDialog(p)"><t-icon name="edit" /></t-button>
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(p)"><t-icon name="delete" /></t-button>
           </span>
@@ -34,6 +37,7 @@
       </div>
       <div class="pb-viewer">
         <template v-if="selected">
+          <ChessBacklinks v-if="selected.slug" ref-type="puzzle" :slug="selected.slug" class="pb-backlinks" />
           <ChessBoardDisplay :key="selected.id + revealKey" :data="viewerData" />
           <div class="pb-solution">
             <t-button v-if="!revealed" size="small" variant="outline" @click="revealed = true">Hiện đáp án</t-button>
@@ -65,13 +69,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
+import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
-  listPuzzles, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle, type ChessPuzzle,
+  listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle, type ChessPuzzle,
 } from '@/api/chess';
+
+const { t } = useI18n();
+
+// Deep-link "Mở trong thư viện": chọn sẵn thế cờ theo slug (từ [[puzzle/<slug>]]).
+const props = defineProps<{ focusSlug?: string }>();
+async function focusBySlug(slug?: string) {
+  if (!slug) return;
+  try {
+    const res: any = await getPuzzleBySlug(slug);
+    if (res?.data) { selected.value = res.data; revealed.value = false; revealKey.value++; }
+  } catch { /* không tìm thấy → bỏ qua */ }
+}
+onMounted(() => focusBySlug(props.focusSlug));
+watch(() => props.focusSlug, (s) => focusBySlug(s));
+
+// Sao chép wikilink [[puzzle/<slug>]] để dán vào nội dung wiki/bài giảng.
+async function copyWikilink(p: ChessPuzzle) {
+  if (!p.slug) { MessagePlugin.warning('Bài tập chưa có slug'); return; }
+  const link = `[[puzzle/${p.slug}|${p.title || p.slug}]]`;
+  try {
+    await navigator.clipboard.writeText(link);
+    MessagePlugin.success(t('chess.ref.copied'));
+  } catch {
+    MessagePlugin.info(link);
+  }
+}
 
 const themeOptions = [
   { label: 'Chiếu hết', value: 'chiếu hết' }, { label: 'Chiến thuật', value: 'chiến thuật' },
@@ -158,6 +190,7 @@ load();
 .pb-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
 .pb-list { width: 340px; flex: 0 0 340px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 12px; }
 .pb-viewer { flex: 1; overflow-y: auto; }
+.pb-backlinks { margin: 0 0 12px; }
 .pb-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
 .pb-empty--big { text-align: center; padding-top: 80px; }
 .pb-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--td-component-stroke); border-radius: 8px; margin-bottom: 6px; cursor: pointer;
