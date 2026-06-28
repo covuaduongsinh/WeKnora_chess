@@ -1,0 +1,13 @@
+# Caddy tự xin & gia hạn chứng chỉ Let's Encrypt, reverse-proxy về frontend (nginx).
+# Tên miền lấy từ biến môi trường $DOMAIN (đặt trong .env trên VPS).
+
+{
+	# Email đăng ký Let's Encrypt (nhận cảnh báo sắp hết hạn).
+	email duongsinhchess@gmail.com
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	# frontend là tên service trong docker-compose (nginx phục vụ UI + proxy /api → app).
+	reverse_proxy frontend:80
+}

@@ -1,0 +1,39 @@
+# Overlay HTTPS: thêm Caddy reverse-proxy + tự động Let's Encrypt cho {$DOMAIN}.
+#
+# YÊU CẦU trước khi bật:
+#   1) DNS: A record của DOMAIN trỏ về IP công khai VPS (65.109.129.242).
+#   2) Hetzner Cloud Firewall: mở thêm cổng 443 (TCP; UDP 443 tùy chọn cho HTTP/3).
+#   3) .env trên VPS: đặt DOMAIN=ten-mien.com
+#
+# Bật (chồng SAU các file khác — xem docs/deploy/https.md):
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml \
+#     -f docker-compose.chess.yml -f docker-compose.ghcr.yml \
+#     -f docker-compose.caddy.yml --profile qdrant up -d
+services:
+  caddy:
+    image: caddy:2
+    container_name: WeKnora-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    networks:
+      - WeKnora-network
+
+  frontend:
+    # Nhường cổng 80 cho Caddy: frontend chỉ phục vụ trong mạng nội bộ (caddy → frontend:80).
+    # !reset xóa mapping "80:80" kế thừa từ docker-compose.yml (cần Compose v2.24+; VPS có v5.x).
+    ports: !reset []
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -15,12 +15,25 @@ export IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 cd "${PROJECT_ROOT}"
 
+
+# Đọc DOMAIN từ .env nếu chưa có trong môi trường
+if [[ -z "${DOMAIN:-}" && -f .env ]]; then
+  DOMAIN=$(grep -E '^DOMAIN=' .env | cut -d= -f2- | tr -d '"'"'" | head -1)
+fi
+
+# Tự động thêm Caddy overlay khi DOMAIN được đặt
+CADDY_FLAG=()
+if [[ -n "${DOMAIN:-}" && -f docker-compose.caddy.yml ]]; then
+  CADDY_FLAG=(-f docker-compose.caddy.yml)
+fi
+
 dc() {
   docker compose \
     -f docker-compose.yml \
     -f docker-compose.override.yml \
     -f docker-compose.chess.yml \
     -f docker-compose.ghcr.yml \
+    "${CADDY_FLAG[@]}" \
     --profile qdrant "$@"
 }
 
