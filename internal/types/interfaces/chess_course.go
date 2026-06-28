@@ -21,6 +21,8 @@ type ChessCourseService interface {
 
 	// ---- Bài học ----
 	ListLessons(ctx context.Context, tenantID uint64, courseID string) ([]*types.ChessLesson, error)
+	// SearchLessons tìm bài học theo keyword (slug/title) toàn tenant — autocomplete wikilink.
+	SearchLessons(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessLesson, error)
 	GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error)
 	// GetLessonBySlug giải mã wikilink [[lesson/<slug>]] về bài giảng.
 	GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error)
@@ -43,6 +45,8 @@ type ChessCourseRepository interface {
 	ListCourses(ctx context.Context, tenantID uint64) ([]*types.ChessCourse, error)
 	GetCourse(ctx context.Context, tenantID uint64, id string) (*types.ChessCourse, error)
 	GetCourseBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessCourse, error)
+	// CourseSlugs trả mọi slug khóa sống của tenant (pool fuzzy-resolve).
+	CourseSlugs(ctx context.Context, tenantID uint64) ([]string, error)
 	CourseSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateCourse(ctx context.Context, course *types.ChessCourse) error
 	UpdateCourse(ctx context.Context, course *types.ChessCourse) error
@@ -51,8 +55,11 @@ type ChessCourseRepository interface {
 
 	// ---- Bài học ----
 	ListLessons(ctx context.Context, tenantID uint64, courseID string) ([]*types.ChessLesson, error)
+	SearchLessons(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessLesson, error)
 	GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error)
 	GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error)
+	// LessonSlugs trả mọi slug bài sống của tenant (pool fuzzy-resolve).
+	LessonSlugs(ctx context.Context, tenantID uint64) ([]string, error)
 	LessonSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateLesson(ctx context.Context, lesson *types.ChessLesson) error
 	UpdateLesson(ctx context.Context, lesson *types.ChessLesson) error

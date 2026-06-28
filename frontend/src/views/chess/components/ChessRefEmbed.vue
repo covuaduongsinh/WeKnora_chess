@@ -1,9 +1,7 @@
 <template>
   <div class="chess-ref-embed">
     <div v-if="loading" class="cre-state">{{ t('chess.ref.loading') }}</div>
-    <div v-else-if="!resolved || !resolved.found" class="cre-state cre-missing">
-      {{ t('chess.ref.notFound', { ref: refStr }) }}
-    </div>
+    <ChessRefMissing v-else-if="!resolved || !resolved.found" :ref-str="activeRef" @choose="onChoose" />
     <template v-else>
       <div class="cre-head">
         <t-icon :name="iconName" />
@@ -23,6 +21,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from './ChessBacklinks.vue';
+import ChessRefMissing from './ChessRefMissing.vue';
 import { resolveChessRef, type ResolvedChessRef, type ChessRefType } from '@/utils/chessRef';
 
 // Nhúng bàn cờ tương tác inline từ ![[game/<slug>]] trong nội dung wiki/bài giảng.
@@ -32,6 +31,9 @@ const router = useRouter();
 
 const loading = ref(true);
 const resolved = ref<ResolvedChessRef | null>(null);
+// Cho phép chọn gợi ý "Ý bạn là…?" để đổi tham chiếu hiển thị tại chỗ.
+const overrideRef = ref('');
+const activeRef = computed(() => overrideRef.value || props.refStr);
 
 const iconMap: Record<ChessRefType, string> = { game: 'play-circle', puzzle: 'help-circle', lesson: 'books', course: 'folder' };
 const iconName = computed(() => (resolved.value ? iconMap[resolved.value.type] : 'chess'));
@@ -40,7 +42,7 @@ const typeLabel = computed(() => (resolved.value ? t(`chess.ref.type_${resolved.
 async function load() {
   loading.value = true;
   try {
-    resolved.value = await resolveChessRef(props.refStr);
+    resolved.value = await resolveChessRef(activeRef.value);
   } catch {
     resolved.value = null;
   } finally {
@@ -48,12 +50,20 @@ async function load() {
   }
 }
 
+function onChoose(ref: string) {
+  overrideRef.value = ref;
+  load();
+}
+
 function openInLibrary() {
-  router.push({ name: 'chessCourses', query: { ref: props.refStr } });
+  router.push({ name: 'chessCourses', query: { ref: activeRef.value } });
 }
 
 onMounted(load);
-watch(() => props.refStr, load);
+watch(() => props.refStr, () => {
+  overrideRef.value = '';
+  load();
+});
 </script>
 
 <style lang="less" scoped>

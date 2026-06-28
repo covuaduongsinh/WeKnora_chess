@@ -75,6 +75,7 @@ type RouterParams struct {
 	TagHandler                   *handler.TagHandler
 	ChessCourseHandler           *handler.ChessCourseHandler
 	ChessLibraryHandler          *handler.ChessLibraryHandler
+	ChessRefHandler              *handler.ChessRefHandler
 	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
 	SkillHandler                 *handler.SkillHandler
@@ -209,6 +210,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterChessCourseRoutes(v1, params.ChessCourseHandler, rbacGuards)
 		RegisterChessLibraryRoutes(v1, params.ChessLibraryHandler, rbacGuards)
+		RegisterChessRefRoutes(v1, params.ChessRefHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
@@ -464,6 +466,18 @@ func RegisterChessCourseRoutes(r *gin.RouterGroup, h *handler.ChessCourseHandler
 		lessons.GET("/:lesson_id", g.Viewer(), h.GetLesson)
 		lessons.PUT("/:lesson_id", g.Contributor(), h.UpdateLesson)
 		lessons.DELETE("/:lesson_id", g.Contributor(), h.DeleteLesson)
+	}
+}
+
+// RegisterChessRefRoutes đăng ký API tìm kiếm hợp nhất tham chiếu cờ
+// (autocomplete wikilink khi gõ "[["). Chỉ đọc → cần Viewer.
+func RegisterChessRefRoutes(r *gin.RouterGroup, h *handler.ChessRefHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	refs := r.Group("/chess/refs")
+	{
+		refs.GET("/search", g.Viewer(), h.SearchRefs)
 	}
 }
 

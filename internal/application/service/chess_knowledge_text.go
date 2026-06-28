@@ -1,0 +1,144 @@
+package service
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/Tencent/WeKnora/internal/types"
+)
+
+// ===== Part A: expand wikilink khi embed (giữ raw cho hiển thị) =====
+
+// chessLinkExpandRe khớp cả CHIP [[...]] lẫn NHÚNG ![[...]] (dấu ! tùy chọn).
+var chessLinkExpandRe = regexp.MustCompile(`!?\[\[([^\]]+)\]\]`)
+
+// expandChessWikilinks thay [[type/slug|nhãn]] / ![[...]] bằng VĂN BẢN CÓ NGHĨA
+// để nội dung đưa đi embed không bị nhiễu cú pháp wikilink:
+//   - có nhãn sau "|"          → dùng nhãn,
+//   - không nhãn               → bỏ tiền tố "type/" (nếu là ref cờ) và đổi "-" → khoảng trắng.
+//
+// Hàm THUẦN, không đụng DB — dùng khi sinh text cho embedding (KHÔNG sửa nội dung gốc).
+func expandChessWikilinks(content string) string {
+	if !strings.Contains(content, "[[") {
+		return content
+	}
+	return chessLinkExpandRe.ReplaceAllStringFunc(content, func(m string) string {
+		open := strings.Index(m, "[[")
+		inner := m[open+2 : len(m)-2]
+		if i := strings.IndexByte(inner, '|'); i >= 0 {
+			if label := strings.TrimSpace(inner[i+1:]); label != "" {
+				return label
+			}
+			inner = inner[:i]
+		}
+		inner = strings.TrimSpace(inner)
+		if j := strings.IndexByte(inner, '/'); j > 0 && chessRefPrefixes[inner[:j]] {
+			inner = inner[j+1:]
+		}
+		return strings.ReplaceAll(inner, "-", " ")
+	})
+}
+
+// ===== Builder văn bản tri thức cho từng đối tượng cờ (để index vào KB) =====
+
+// gameKnowledgeTitle tạo tiêu đề "Trắng – Đen, Sự kiện Năm".
+func gameKnowledgeTitle(g *types.ChessGame) string {
+	white := strings.TrimSpace(g.White)
+	if white == "" {
+		white = "?"
+	}
+	black := strings.TrimSpace(g.Black)
+	if black == "" {
+		black = "?"
+	}
+	t := white + " – " + black
+	if g.Event != "" {
+		t += ", " + g.Event
+	}
+	if len(g.Date) >= 4 {
+		y := g.Date[:4]
+		if y >= "0000" && y <= "9999" {
+			t += " " + y
+		}
+	}
+	return t
+}
+
+// buildGameKnowledgeText sinh (tiêu đề, nội dung markdown) cho một ván cờ.
+func buildGameKnowledgeText(g *types.ChessGame) (string, string) {
+	title := "Ván cờ: " + gameKnowledgeTitle(g)
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	fmt.Fprintf(&b, "- Trắng: %s\n- Đen: %s\n", firstNonEmptyStr(g.White, "?"), firstNonEmptyStr(g.Black, "?"))
+	if g.Result != "" {
+		fmt.Fprintf(&b, "- Kết quả: %s\n", g.Result)
+	}
+	if g.ECO != "" {
+		fmt.Fprintf(&b, "- Mã khai cuộc (ECO): %s\n", g.ECO)
+	}
+	if g.Event != "" {
+		fmt.Fprintf(&b, "- Sự kiện: %s\n", g.Event)
+	}
+	if g.Date != "" {
+		fmt.Fprintf(&b, "- Ngày: %s\n", g.Date)
+	}
+	if g.PlyCount > 0 {
+		fmt.Fprintf(&b, "- Số nửa-nước: %d\n", g.PlyCount)
+	}
+	if strings.TrimSpace(g.PGN) != "" {
+		fmt.Fprintf(&b, "\n## Biên bản (PGN)\n\n```\n%s\n```\n", strings.TrimSpace(g.PGN))
+	}
+	return title, b.String()
+}
+
+// buildPuzzleKnowledgeText sinh (tiêu đề, nội dung) cho một thế cờ/bài tập.
+func buildPuzzleKnowledgeText(p *types.ChessPuzzle) (string, string) {
+	name := firstNonEmptyStr(p.Title, p.Slug)
+	title := "Thế cờ: " + name
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	if p.Theme != "" {
+		fmt.Fprintf(&b, "- Chủ đề: %s\n", p.Theme)
+	}
+	if p.Difficulty != "" {
+		fmt.Fprintf(&b, "- Độ khó: %s\n", p.Difficulty)
+	}
+	if p.FEN != "" {
+		fmt.Fprintf(&b, "- Thế cờ (FEN): `%s`\n", p.FEN)
+	}
+	if p.Solution != "" {
+		fmt.Fprintf(&b, "- Lời giải: %s\n", p.Solution)
+	}
+	if p.Source != "" {
+		fmt.Fprintf(&b, "- Nguồn: %s\n", p.Source)
+	}
+	return title, b.String()
+}
+
+// buildLessonKnowledgeText sinh (tiêu đề, nội dung) cho một bài giảng. Nội dung
+// bài giảng do người dùng viết (có thể chứa wikilink cờ) → expand để embed sạch.
+func buildLessonKnowledgeText(l *types.ChessLesson) (string, string) {
+	name := firstNonEmptyStr(l.Title, l.Slug)
+	title := "Bài giảng: " + name
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	if body := strings.TrimSpace(expandChessWikilinks(l.Content)); body != "" {
+		b.WriteString(body)
+		b.WriteString("\n")
+	}
+	if l.FEN != "" {
+		fmt.Fprintf(&b, "\n- Thế cờ (FEN): `%s`\n", l.FEN)
+	}
+	if strings.TrimSpace(l.PGN) != "" {
+		fmt.Fprintf(&b, "\n## Ván minh họa (PGN)\n\n```\n%s\n```\n", strings.TrimSpace(l.PGN))
+	}
+	return title, b.String()
+}
+
+func firstNonEmptyStr(a, b string) string {
+	if strings.TrimSpace(a) != "" {
+		return a
+	}
+	return b
+}

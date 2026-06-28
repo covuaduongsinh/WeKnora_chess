@@ -108,7 +108,8 @@
           </t-button>
         </div>
         <t-textarea ref="lessonContentRef" v-model="lessonDialog.content" :autosize="{ minRows: 4 }"
-          placeholder="Nội dung bài giảng... Dùng [[game/<slug>]] để chèn ván/thế cờ." />
+          placeholder="Nội dung bài giảng... Gõ [[ để gợi ý ván/thế cờ/bài/khóa." />
+        <ChessWikiLinkSuggest :textarea="lessonTextareaEl" v-model="lessonDialog.content" />
         <label>Thế cờ FEN (tùy chọn — sẽ hiện bàn cờ)</label>
         <t-input v-model="lessonDialog.fen" placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1" />
         <label>Ván minh họa PGN (tùy chọn)</label>
@@ -119,7 +120,7 @@
     </t-dialog>
 
     <!-- Bộ chọn chèn tham chiếu cờ ([[game/<slug>]] hoặc ![[…]] nhúng) -->
-    <t-dialog v-model:visible="picker.visible" :header="t('chess.ref.pickerTitle')" :footer="false" width="560px">
+    <t-dialog v-model:visible="picker.visible" :header="t('chess.ref.pickerTitle')" :footer="false" width="820px">
       <div class="cc-picker">
         <t-tabs v-model="picker.tab">
           <t-tab-panel value="games" :label="t('chess.ref.tabGames')" />
@@ -131,13 +132,26 @@
           <t-input v-model="picker.search" :placeholder="t('chess.ref.searchPlaceholder')" clearable />
           <t-checkbox v-model="picker.embed">{{ t('chess.ref.embedToggle') }}</t-checkbox>
         </div>
-        <div class="cc-picker-list">
-          <div v-if="picker.loading" class="cc-empty">{{ t('chess.ref.loading') }}</div>
-          <div v-else-if="pickerItems.length === 0" class="cc-empty">{{ t('chess.ref.empty') }}</div>
-          <div v-for="it in pickerItems" :key="it.type + '/' + it.slug" class="cc-picker-row" @click="pickerInsert(it)">
-            <span class="cc-picker-label">{{ it.label }}</span>
-            <span class="cc-picker-slug">{{ it.type }}/{{ it.slug }}</span>
-            <t-button size="small" variant="text" theme="primary">{{ t('chess.ref.insertAction') }}</t-button>
+        <div class="cc-picker-body">
+          <div class="cc-picker-list">
+            <div v-if="picker.loading" class="cc-empty">{{ t('chess.ref.loading') }}</div>
+            <div v-else-if="pickerItems.length === 0" class="cc-empty">{{ t('chess.ref.empty') }}</div>
+            <div v-for="it in pickerItems" :key="it.type + '/' + it.slug" class="cc-picker-row"
+              :class="{ active: picker.previewRef === it.type + '/' + it.slug }"
+              @mouseenter="previewItem(it)" @click="pickerInsert(it)">
+              <span class="cc-picker-label">{{ it.label }}</span>
+              <span class="cc-picker-slug">{{ it.type }}/{{ it.slug }}</span>
+              <t-button size="small" variant="text" theme="primary">{{ t('chess.ref.insertAction') }}</t-button>
+            </div>
+          </div>
+          <div class="cc-picker-preview">
+            <div v-if="picker.previewLoading" class="cc-empty">{{ t('chess.ref.loading') }}</div>
+            <template v-else-if="picker.previewRef">
+              <div class="cc-preview-title">{{ picker.previewTitle }}</div>
+              <ChessBoardDisplay v-if="picker.previewBoard" :key="picker.previewRef" :data="picker.previewBoard" />
+              <div v-else class="cc-empty">{{ t('chess.ref.noBoard') }}</div>
+            </template>
+            <div v-else class="cc-empty">{{ t('chess.ref.previewHint') }}</div>
           </div>
         </div>
       </div>
@@ -157,8 +171,10 @@ import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDi
 import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
+import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessContent, renderChessChips } from '@/utils/chessBlocks';
+import { resolveChessRef } from '@/utils/chessRef';
 import { useChessWikiDraftStore } from '@/stores/chessWikiDraft';
 import {
   listCourses, createCourse, updateCourse, deleteCourse, getCourseBySlug,
@@ -406,10 +422,45 @@ function removeLesson(l: ChessLesson) {
 
 // ---- Bộ chọn chèn tham chiếu cờ vào nội dung bài giảng ----
 const lessonContentRef = ref<any>(null);
+// Phần tử <textarea> native (lấy từ t-textarea) để gắn autocomplete "[[".
+const lessonTextareaEl = ref<HTMLTextAreaElement | null>(null);
+watch(() => lessonDialog.visible, async (open) => {
+  if (!open) { lessonTextareaEl.value = null; return; }
+  await nextTick();
+  const root = lessonContentRef.value?.$el || lessonContentRef.value;
+  lessonTextareaEl.value = (root?.querySelector?.('textarea') as HTMLTextAreaElement) || null;
+});
 const picker = reactive<{
   visible: boolean; tab: string; search: string; embed: boolean; loading: boolean;
   games: ChessGame[]; puzzles: ChessPuzzle[]; lessons: ChessLesson[]; courses: ChessCourse[];
-}>({ visible: false, tab: 'games', search: '', embed: false, loading: false, games: [], puzzles: [], lessons: [], courses: [] });
+  previewRef: string; previewTitle: string; previewBoard: ChessBoardData | null; previewLoading: boolean;
+}>({
+  visible: false, tab: 'games', search: '', embed: false, loading: false,
+  games: [], puzzles: [], lessons: [], courses: [],
+  previewRef: '', previewTitle: '', previewBoard: null, previewLoading: false,
+});
+
+// Xem trước bàn cờ của mục đang trỏ trong picker (tái dùng resolveChessRef + cache).
+let previewSeq = 0;
+async function previewItem(it: { slug: string; type: string; label: string }) {
+  const ref = `${it.type}/${it.slug}`;
+  if (picker.previewRef === ref) return;
+  picker.previewRef = ref;
+  picker.previewTitle = it.label;
+  picker.previewBoard = null;
+  picker.previewLoading = true;
+  const seq = ++previewSeq;
+  try {
+    const r = await resolveChessRef(ref);
+    if (seq !== previewSeq) return;
+    picker.previewTitle = r.title || it.label;
+    picker.previewBoard = r.board;
+  } catch {
+    if (seq === previewSeq) picker.previewBoard = null;
+  } finally {
+    if (seq === previewSeq) picker.previewLoading = false;
+  }
+}
 
 async function openPicker() {
   picker.visible = true;
@@ -560,11 +611,18 @@ loadCourses().then(initFromWikiDraft).then(() => {
 }
 .cc-picker { display: flex; flex-direction: column; gap: 10px; }
 .cc-picker-bar { display: flex; align-items: center; gap: 12px; }
-.cc-picker-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cc-picker-body { display: flex; gap: 12px; align-items: stretch; }
+.cc-picker-list { flex: 1 1 0; min-width: 0; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cc-picker-preview {
+  flex: 0 0 320px; max-width: 320px; max-height: 360px; overflow-y: auto;
+  border-left: 1px solid var(--td-component-stroke); padding-left: 12px;
+}
+.cc-preview-title { font-weight: 600; margin-bottom: 8px; color: var(--td-text-color-primary); }
 .cc-picker-row {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer;
   border: 1px solid var(--td-component-stroke);
   &:hover { background: var(--td-bg-color-container-hover); border-color: var(--td-brand-color); }
+  &.active { background: var(--td-bg-color-secondarycontainer); border-color: var(--td-brand-color); }
 }
 .cc-picker-label { font-weight: 600; color: var(--td-text-color-primary); flex: 1; }
 .cc-picker-slug { font-size: 12px; color: var(--td-text-color-placeholder); font-family: monospace; }

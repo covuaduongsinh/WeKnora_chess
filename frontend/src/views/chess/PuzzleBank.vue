@@ -43,7 +43,7 @@
       </div>
       <div class="pb-viewer">
         <template v-if="selected">
-          <ChessBacklinks v-if="selected.slug" ref-type="puzzle" :slug="selected.slug" class="pb-backlinks" />
+          <ChessBacklinks v-if="selected.slug" ref-type="puzzle" :slug="selected.slug" show-empty class="pb-backlinks" />
           <ChessBoardDisplay :key="selected.id + revealKey" :data="viewerData" />
           <div class="pb-solution">
             <t-button v-if="!revealed" size="small" variant="outline" @click="revealed = true">Hiện đáp án</t-button>

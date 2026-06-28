@@ -9,9 +9,7 @@
   >
     <div class="crd-body">
       <div v-if="loading" class="crd-state">{{ t('chess.ref.loading') }}</div>
-      <div v-else-if="!resolved || !resolved.found" class="crd-state crd-missing">
-        {{ t('chess.ref.notFound', { ref: refStr }) }}
-      </div>
+      <ChessRefMissing v-else-if="!resolved || !resolved.found" :ref-str="activeRef" @choose="onChoose" />
       <template v-else>
         <ChessBoardDisplay v-if="resolved.board" :data="resolved.board" />
         <div v-else class="crd-state">{{ t('chess.ref.noBoard') }}</div>
@@ -27,11 +25,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from './ChessBacklinks.vue';
+import ChessRefMissing from './ChessRefMissing.vue';
 import { resolveChessRef, type ResolvedChessRef } from '@/utils/chessRef';
 
 // Popup hiển thị bàn cờ khi bấm CHIP [[game/<slug>]]. Host điều khiển qua
@@ -43,17 +42,20 @@ const router = useRouter();
 
 const loading = ref(false);
 const resolved = ref<ResolvedChessRef | null>(null);
+// Khi chọn gợi ý "Ý bạn là…?", đổi tham chiếu đang xem mà không cần host can thiệp.
+const overrideRef = ref('');
+const activeRef = computed(() => overrideRef.value || props.refStr);
 
 function close() {
   emit('update:visible', false);
 }
 
 async function load() {
-  if (!props.refStr) return;
+  if (!activeRef.value) return;
   loading.value = true;
   resolved.value = null;
   try {
-    resolved.value = await resolveChessRef(props.refStr);
+    resolved.value = await resolveChessRef(activeRef.value);
   } catch {
     resolved.value = null;
   } finally {
@@ -61,16 +63,24 @@ async function load() {
   }
 }
 
+function onChoose(ref: string) {
+  overrideRef.value = ref;
+  load();
+}
+
 function openInLibrary() {
-  router.push({ name: 'chessCourses', query: { ref: props.refStr } });
+  router.push({ name: 'chessCourses', query: { ref: activeRef.value } });
   close();
 }
 
-// Nạp lại mỗi khi mở popup hoặc đổi tham chiếu.
+// Nạp lại mỗi khi mở popup hoặc đổi tham chiếu (reset override khi đổi ref gốc).
 watch(
   () => [props.visible, props.refStr] as const,
   ([vis]) => {
-    if (vis) load();
+    if (vis) {
+      overrideRef.value = '';
+      load();
+    }
   },
   { immediate: true },
 );

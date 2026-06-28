@@ -16,14 +16,18 @@ import (
 type chessLibraryService struct {
 	repo         interfaces.ChessLibraryRepository
 	chessRefRepo interfaces.WikiChessRefRepository
+	aliasRepo    interfaces.ChessSlugAliasRepository
+	indexer      *ChessKnowledgeIndexer
 }
 
 // NewChessLibraryService tạo service kho ván & bài tập cờ vua.
 func NewChessLibraryService(
 	repo interfaces.ChessLibraryRepository,
 	chessRefRepo interfaces.WikiChessRefRepository,
+	aliasRepo interfaces.ChessSlugAliasRepository,
+	indexer *ChessKnowledgeIndexer,
 ) interfaces.ChessLibraryService {
-	return &chessLibraryService{repo: repo, chessRefRepo: chessRefRepo}
+	return &chessLibraryService{repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo, indexer: indexer}
 }
 
 // pruneChessRefs xóa các backlink wiki trỏ tới đối tượng cờ vừa bị xóa (best-effort).
@@ -45,7 +49,33 @@ func (s *chessLibraryService) GetGame(ctx context.Context, tenantID uint64, id s
 }
 
 func (s *chessLibraryService) GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error) {
-	return s.repo.GetGameBySlug(ctx, tenantID, slug)
+	g, err := s.repo.GetGameBySlug(ctx, tenantID, slug)
+	if err == nil {
+		return g, nil
+	}
+	// Không khớp chính xác → thử alias rồi fuzzy (giữ wikilink cũ/sai nhẹ sống).
+	if resolved, ok := s.resolveAliasOrFuzzy(ctx, tenantID, types.ChessRefTypeGame, slug, s.repo.GameSlugs); ok {
+		return s.repo.GetGameBySlug(ctx, tenantID, resolved)
+	}
+	return nil, err
+}
+
+// resolveAliasOrFuzzy nắn một slug "chết" về slug sống: ưu tiên alias (đổi tên/
+// re-import), sau đó fuzzy trên pool slug do listSlugs cung cấp.
+func (s *chessLibraryService) resolveAliasOrFuzzy(
+	ctx context.Context, tenantID uint64, chessType, slug string,
+	listSlugs func(context.Context, uint64) ([]string, error),
+) (string, bool) {
+	if s.aliasRepo != nil {
+		if ns, ok, _ := s.aliasRepo.ResolveAlias(ctx, tenantID, chessType, slug); ok {
+			return ns, true
+		}
+	}
+	slugs, err := listSlugs(ctx, tenantID)
+	if err != nil {
+		return "", false
+	}
+	return resolveChessSlugFuzzy(slug, slugs)
 }
 
 func (s *chessLibraryService) GetGameBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error) {
@@ -65,6 +95,9 @@ func (s *chessLibraryService) CreateGame(ctx context.Context, game *types.ChessG
 	if err := s.repo.CreateGame(ctx, game); err != nil {
 		return nil, err
 	}
+	if s.indexer != nil {
+		s.indexer.IndexGame(ctx, game)
+	}
 	return game, nil
 }
 
@@ -75,7 +108,11 @@ func (s *chessLibraryService) UpdateGame(ctx context.Context, game *types.ChessG
 	if err := s.repo.UpdateGame(ctx, game); err != nil {
 		return nil, err
 	}
-	return s.repo.GetGame(ctx, game.TenantID, game.ID)
+	updated, err := s.repo.GetGame(ctx, game.TenantID, game.ID)
+	if err == nil && updated != nil && s.indexer != nil {
+		s.indexer.IndexGame(ctx, updated)
+	}
+	return updated, err
 }
 
 func (s *chessLibraryService) DeleteGame(ctx context.Context, tenantID uint64, id string) error {
@@ -85,6 +122,9 @@ func (s *chessLibraryService) DeleteGame(ctx context.Context, tenantID uint64, i
 	}
 	if g != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeGame, g.Slug)
+		if s.indexer != nil {
+			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeGame, g.Slug)
+		}
 	}
 	return nil
 }
@@ -137,7 +177,14 @@ func (s *chessLibraryService) GetPuzzle(ctx context.Context, tenantID uint64, id
 }
 
 func (s *chessLibraryService) GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error) {
-	return s.repo.GetPuzzleBySlug(ctx, tenantID, slug)
+	p, err := s.repo.GetPuzzleBySlug(ctx, tenantID, slug)
+	if err == nil {
+		return p, nil
+	}
+	if resolved, ok := s.resolveAliasOrFuzzy(ctx, tenantID, types.ChessRefTypePuzzle, slug, s.repo.PuzzleSlugs); ok {
+		return s.repo.GetPuzzleBySlug(ctx, tenantID, resolved)
+	}
+	return nil, err
 }
 
 func (s *chessLibraryService) GetPuzzleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error) {
@@ -163,6 +210,9 @@ func (s *chessLibraryService) CreatePuzzle(ctx context.Context, puzzle *types.Ch
 	if err := s.repo.CreatePuzzle(ctx, puzzle); err != nil {
 		return nil, err
 	}
+	if s.indexer != nil {
+		s.indexer.IndexPuzzle(ctx, puzzle)
+	}
 	return puzzle, nil
 }
 
@@ -178,7 +228,11 @@ func (s *chessLibraryService) UpdatePuzzle(ctx context.Context, puzzle *types.Ch
 	if err := s.repo.UpdatePuzzle(ctx, puzzle); err != nil {
 		return nil, err
 	}
-	return s.repo.GetPuzzle(ctx, puzzle.TenantID, puzzle.ID)
+	updated, err := s.repo.GetPuzzle(ctx, puzzle.TenantID, puzzle.ID)
+	if err == nil && updated != nil && s.indexer != nil {
+		s.indexer.IndexPuzzle(ctx, updated)
+	}
+	return updated, err
 }
 
 func (s *chessLibraryService) DeletePuzzle(ctx context.Context, tenantID uint64, id string) error {
@@ -188,6 +242,9 @@ func (s *chessLibraryService) DeletePuzzle(ctx context.Context, tenantID uint64,
 	}
 	if p != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypePuzzle, p.Slug)
+		if s.indexer != nil {
+			s.indexer.Remove(ctx, tenantID, types.ChessRefTypePuzzle, p.Slug)
+		}
 	}
 	return nil
 }

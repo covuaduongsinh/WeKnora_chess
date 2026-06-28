@@ -40,7 +40,7 @@
       </div>
       <div class="gl-viewer">
         <template v-if="selected">
-          <ChessBacklinks v-if="selected.slug" ref-type="game" :slug="selected.slug" class="gl-backlinks" />
+          <ChessBacklinks v-if="selected.slug" ref-type="game" :slug="selected.slug" show-empty class="gl-backlinks" />
           <ChessBoardDisplay :key="selected.id" :data="viewerData" />
         </template>
         <div v-else class="gl-empty gl-empty--big">Chọn một ván để xem lại (lật từng nước).</div>

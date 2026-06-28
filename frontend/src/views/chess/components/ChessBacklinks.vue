@@ -14,6 +14,10 @@
       {{ b.page_title || b.page_slug }}
     </a>
   </div>
+  <div v-else-if="showEmpty && loaded" class="chess-backlinks">
+    <div class="cbl-title">{{ t('chess.ref.backlinks') }}</div>
+    <div class="cbl-empty">{{ t('chess.ref.noBacklinks') }}</div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -24,17 +28,20 @@ import { resolveChessBacklinks, type ChessBacklink, type ChessRefType } from '@/
 
 // Hiển thị "Được liên kết bởi" cho một đối tượng cờ + bấm để về nguồn.
 // Nguồn 'lesson' → mở bài giảng trong Khóa học; 'wiki' → mở trang wiki trong KB.
-const props = defineProps<{ refType: ChessRefType; slug?: string }>();
+const props = defineProps<{ refType: ChessRefType; slug?: string; showEmpty?: boolean }>();
 const emit = defineEmits<{ (e: 'navigate'): void }>();
 const { t } = useI18n();
 const router = useRouter();
 
 const links = ref<ChessBacklink[]>([]);
+const loaded = ref(false);
 
 async function load() {
   links.value = [];
+  loaded.value = false;
   if (!props.slug) return;
   links.value = await resolveChessBacklinks(`${props.refType}/${props.slug}`);
+  loaded.value = true;
 }
 
 function open(b: ChessBacklink) {
@@ -59,4 +66,5 @@ watch(() => [props.refType, props.slug] as const, load, { immediate: true });
   background: var(--td-bg-color-secondarycontainer); color: var(--td-text-color-primary);
   &:hover { background: var(--td-bg-color-container-hover); color: var(--td-brand-color); }
 }
+.cbl-empty { font-size: 12px; color: var(--td-text-color-placeholder); }
 </style>

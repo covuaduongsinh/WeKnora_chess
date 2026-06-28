@@ -34,6 +34,10 @@ func (r *chessLibraryRepository) ListGames(ctx context.Context, tenantID uint64,
 	if f.Result != "" {
 		q = q.Where("result = ?", f.Result)
 	}
+	if f.Keyword != "" {
+		kw := "%" + f.Keyword + "%"
+		q = q.Where("slug ILIKE ? OR white ILIKE ? OR black ILIKE ? OR event ILIKE ?", kw, kw, kw, kw)
+	}
 	var games []*types.ChessGame
 	err := q.Order("created_at DESC").Limit(500).Find(&games).Error
 	return games, err
@@ -53,6 +57,15 @@ func (r *chessLibraryRepository) GetGameBySlug(ctx context.Context, tenantID uin
 		return nil, err
 	}
 	return &g, nil
+}
+
+// GameSlugs trả toàn bộ slug ván "sống" của tenant — pool ứng viên fuzzy-resolve.
+func (r *chessLibraryRepository) GameSlugs(ctx context.Context, tenantID uint64) ([]string, error) {
+	var slugs []string
+	err := r.db.WithContext(ctx).Model(&types.ChessGame{}).
+		Where("tenant_id = ? AND slug <> ''", tenantID).
+		Pluck("slug", &slugs).Error
+	return slugs, err
 }
 
 func (r *chessLibraryRepository) GameSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
@@ -98,6 +111,10 @@ func (r *chessLibraryRepository) puzzleQuery(ctx context.Context, tenantID uint6
 	if f.Difficulty != "" {
 		q = q.Where("difficulty = ?", f.Difficulty)
 	}
+	if f.Keyword != "" {
+		kw := "%" + f.Keyword + "%"
+		q = q.Where("slug ILIKE ? OR title ILIKE ? OR theme ILIKE ?", kw, kw, kw)
+	}
 	return q
 }
 
@@ -121,6 +138,15 @@ func (r *chessLibraryRepository) GetPuzzleBySlug(ctx context.Context, tenantID u
 		return nil, err
 	}
 	return &p, nil
+}
+
+// PuzzleSlugs trả toàn bộ slug bài tập "sống" của tenant — pool ứng viên fuzzy-resolve.
+func (r *chessLibraryRepository) PuzzleSlugs(ctx context.Context, tenantID uint64) ([]string, error) {
+	var slugs []string
+	err := r.db.WithContext(ctx).Model(&types.ChessPuzzle{}).
+		Where("tenant_id = ? AND slug <> ''", tenantID).
+		Pluck("slug", &slugs).Error
+	return slugs, err
 }
 
 func (r *chessLibraryRepository) PuzzleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {

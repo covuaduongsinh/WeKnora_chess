@@ -29,6 +29,26 @@ export interface ChessLesson {
   updated_at?: string;
 }
 
+// ---- Tìm kiếm hợp nhất tham chiếu cờ (autocomplete wikilink khi gõ "[[") ----
+export interface ChessRefSearchItem {
+  type: "game" | "puzzle" | "lesson" | "course";
+  slug: string;
+  ref: string; // "<type>/<slug>"
+  title: string;
+  subtitle: string;
+}
+// Tìm gợi ý tham chiếu cờ theo từ khóa. type rỗng = mọi loại; limit = số mục mỗi loại.
+export const searchChessRefs = (
+  q: string,
+  opts: Partial<{ type: string; limit: number }> = {},
+) => {
+  const params: Record<string, string> = {};
+  if (q) params.q = q;
+  if (opts.type) params.type = opts.type;
+  if (opts.limit) params.limit = String(opts.limit);
+  return get(`/api/v1/chess/refs/search${qs(params)}`);
+};
+
 // ---- Khóa học ----
 export const listCourses = () => get("/api/v1/chess/courses");
 export const getCourse = (id: string) => get(`/api/v1/chess/courses/${id}`);

@@ -16,14 +16,35 @@ import (
 type chessCourseService struct {
 	repo         interfaces.ChessCourseRepository
 	chessRefRepo interfaces.WikiChessRefRepository
+	aliasRepo    interfaces.ChessSlugAliasRepository
+	indexer      *ChessKnowledgeIndexer
 }
 
 // NewChessCourseService tạo service khóa học cờ vua.
 func NewChessCourseService(
 	repo interfaces.ChessCourseRepository,
 	chessRefRepo interfaces.WikiChessRefRepository,
+	aliasRepo interfaces.ChessSlugAliasRepository,
+	indexer *ChessKnowledgeIndexer,
 ) interfaces.ChessCourseService {
-	return &chessCourseService{repo: repo, chessRefRepo: chessRefRepo}
+	return &chessCourseService{repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo, indexer: indexer}
+}
+
+// resolveAliasOrFuzzy nắn một slug "chết" về slug sống: alias trước, rồi fuzzy.
+func (s *chessCourseService) resolveAliasOrFuzzy(
+	ctx context.Context, tenantID uint64, chessType, slug string,
+	listSlugs func(context.Context, uint64) ([]string, error),
+) (string, bool) {
+	if s.aliasRepo != nil {
+		if ns, ok, _ := s.aliasRepo.ResolveAlias(ctx, tenantID, chessType, slug); ok {
+			return ns, true
+		}
+	}
+	slugs, err := listSlugs(ctx, tenantID)
+	if err != nil {
+		return "", false
+	}
+	return resolveChessSlugFuzzy(slug, slugs)
 }
 
 // ---- Khóa học ----
@@ -56,7 +77,14 @@ func (s *chessCourseService) GetCourse(ctx context.Context, tenantID uint64, id 
 func (s *chessCourseService) GetCourseBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessCourse, error) {
 	course, err := s.repo.GetCourseBySlug(ctx, tenantID, slug)
 	if err != nil {
-		return nil, err
+		resolved, ok := s.resolveAliasOrFuzzy(ctx, tenantID, types.ChessRefTypeCourse, slug, s.repo.CourseSlugs)
+		if !ok {
+			return nil, err
+		}
+		course, err = s.repo.GetCourseBySlug(ctx, tenantID, resolved)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if n, err := s.repo.CountLessons(ctx, tenantID, course.ID); err == nil {
 		course.LessonCount = n
@@ -108,16 +136,19 @@ func (s *chessCourseService) DeleteCourse(ctx context.Context, tenantID uint64, 
 	if err := s.repo.DeleteCourse(ctx, tenantID, id); err != nil {
 		return err
 	}
-	if s.chessRefRepo != nil {
-		if course != nil && course.Slug != "" {
-			_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeCourse, course.Slug)
+	if s.chessRefRepo != nil && course != nil && course.Slug != "" {
+		_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeCourse, course.Slug)
+	}
+	for _, l := range lessons {
+		if l.Slug == "" {
+			continue
 		}
-		for _, l := range lessons {
-			if l.Slug == "" {
-				continue
-			}
+		if s.chessRefRepo != nil {
 			_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeLesson, l.Slug) // ref TRỎ TỚI bài
 			_ = s.chessRefRepo.DeleteForLesson(ctx, tenantID, l.Slug)                          // ref TỪ nội dung bài
+		}
+		if s.indexer != nil {
+			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeLesson, l.Slug)
 		}
 	}
 	return nil
@@ -129,12 +160,23 @@ func (s *chessCourseService) ListLessons(ctx context.Context, tenantID uint64, c
 	return s.repo.ListLessons(ctx, tenantID, courseID)
 }
 
+func (s *chessCourseService) SearchLessons(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessLesson, error) {
+	return s.repo.SearchLessons(ctx, tenantID, keyword, limit)
+}
+
 func (s *chessCourseService) GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error) {
 	return s.repo.GetLesson(ctx, tenantID, id)
 }
 
 func (s *chessCourseService) GetLessonBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessLesson, error) {
-	return s.repo.GetLessonBySlug(ctx, tenantID, slug)
+	l, err := s.repo.GetLessonBySlug(ctx, tenantID, slug)
+	if err == nil {
+		return l, nil
+	}
+	if resolved, ok := s.resolveAliasOrFuzzy(ctx, tenantID, types.ChessRefTypeLesson, slug, s.repo.LessonSlugs); ok {
+		return s.repo.GetLessonBySlug(ctx, tenantID, resolved)
+	}
+	return nil, err
 }
 
 func (s *chessCourseService) GetLessonBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error) {
@@ -165,6 +207,9 @@ func (s *chessCourseService) CreateLesson(ctx context.Context, lesson *types.Che
 		return nil, err
 	}
 	s.syncLessonChessRefs(ctx, lesson)
+	if s.indexer != nil {
+		s.indexer.IndexLesson(ctx, lesson)
+	}
 	return lesson, nil
 }
 
@@ -180,6 +225,9 @@ func (s *chessCourseService) UpdateLesson(ctx context.Context, lesson *types.Che
 		return nil, err
 	}
 	s.syncLessonChessRefs(ctx, updated)
+	if s.indexer != nil {
+		s.indexer.IndexLesson(ctx, updated)
+	}
 	return updated, nil
 }
 
@@ -188,9 +236,14 @@ func (s *chessCourseService) DeleteLesson(ctx context.Context, tenantID uint64, 
 	if err := s.repo.DeleteLesson(ctx, tenantID, id); err != nil {
 		return err
 	}
-	if l != nil && s.chessRefRepo != nil && l.Slug != "" {
-		_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeLesson, l.Slug) // ref TRỎ TỚI bài
-		_ = s.chessRefRepo.DeleteForLesson(ctx, tenantID, l.Slug)                          // ref TỪ nội dung bài
+	if l != nil && l.Slug != "" {
+		if s.chessRefRepo != nil {
+			_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeLesson, l.Slug) // ref TRỎ TỚI bài
+			_ = s.chessRefRepo.DeleteForLesson(ctx, tenantID, l.Slug)                          // ref TỪ nội dung bài
+		}
+		if s.indexer != nil {
+			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeLesson, l.Slug)
+		}
 	}
 	return nil
 }

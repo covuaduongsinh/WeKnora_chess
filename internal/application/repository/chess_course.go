@@ -49,6 +49,15 @@ func (r *chessCourseRepository) GetCourseBySlug(ctx context.Context, tenantID ui
 	return &course, nil
 }
 
+// CourseSlugs trả toàn bộ slug khóa "sống" của tenant — pool ứng viên fuzzy-resolve.
+func (r *chessCourseRepository) CourseSlugs(ctx context.Context, tenantID uint64) ([]string, error) {
+	var slugs []string
+	err := r.db.WithContext(ctx).Model(&types.ChessCourse{}).
+		Where("tenant_id = ? AND slug <> ''", tenantID).
+		Pluck("slug", &slugs).Error
+	return slugs, err
+}
+
 func (r *chessCourseRepository) CourseSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&types.ChessCourse{}).
@@ -99,6 +108,24 @@ func (r *chessCourseRepository) ListLessons(ctx context.Context, tenantID uint64
 	return lessons, err
 }
 
+// SearchLessons tìm bài học theo keyword (slug/title) trên toàn tenant — phục vụ
+// autocomplete wikilink. Chỉ chọn cột nhẹ (không tải Content/PGN) để tiết kiệm.
+func (r *chessCourseRepository) SearchLessons(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessLesson, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	q := r.db.WithContext(ctx).Model(&types.ChessLesson{}).
+		Select("id", "tenant_id", "course_id", "slug", "title", "created_at").
+		Where("tenant_id = ?", tenantID)
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		q = q.Where("slug ILIKE ? OR title ILIKE ?", kw, kw)
+	}
+	var lessons []*types.ChessLesson
+	err := q.Order("created_at DESC").Limit(limit).Find(&lessons).Error
+	return lessons, err
+}
+
 func (r *chessCourseRepository) GetLesson(ctx context.Context, tenantID uint64, id string) (*types.ChessLesson, error) {
 	var lesson types.ChessLesson
 	if err := r.db.WithContext(ctx).
@@ -117,6 +144,15 @@ func (r *chessCourseRepository) GetLessonBySlug(ctx context.Context, tenantID ui
 		return nil, err
 	}
 	return &lesson, nil
+}
+
+// LessonSlugs trả toàn bộ slug bài "sống" của tenant — pool ứng viên fuzzy-resolve.
+func (r *chessCourseRepository) LessonSlugs(ctx context.Context, tenantID uint64) ([]string, error) {
+	var slugs []string
+	err := r.db.WithContext(ctx).Model(&types.ChessLesson{}).
+		Where("tenant_id = ? AND slug <> ''", tenantID).
+		Pluck("slug", &slugs).Error
+	return slugs, err
 }
 
 func (r *chessCourseRepository) LessonSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {

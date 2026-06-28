@@ -48,6 +48,8 @@ type ChessLibraryRepository interface {
 	ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error)
 	GetGame(ctx context.Context, tenantID uint64, id string) (*types.ChessGame, error)
 	GetGameBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessGame, error)
+	// GameSlugs trả mọi slug ván sống của tenant (pool fuzzy-resolve).
+	GameSlugs(ctx context.Context, tenantID uint64) ([]string, error)
 	GameSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreateGame(ctx context.Context, game *types.ChessGame) error
 	CreateGames(ctx context.Context, games []*types.ChessGame) error
@@ -58,6 +60,8 @@ type ChessLibraryRepository interface {
 	ListPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]*types.ChessPuzzle, error)
 	GetPuzzle(ctx context.Context, tenantID uint64, id string) (*types.ChessPuzzle, error)
 	GetPuzzleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessPuzzle, error)
+	// PuzzleSlugs trả mọi slug bài tập sống của tenant (pool fuzzy-resolve).
+	PuzzleSlugs(ctx context.Context, tenantID uint64) ([]string, error)
 	PuzzleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error

@@ -1871,6 +1871,7 @@ function getTypeTheme(type: string): string {
   const map: Record<string, string> = {
     summary: 'primary', entity: 'success', concept: 'warning',
     synthesis: 'primary', comparison: 'danger', index: 'default', log: 'default',
+    chess_game: 'primary', chess_puzzle: 'danger', chess_lesson: 'success', chess_course: 'warning',
   }
   return map[type] || 'default'
 }
@@ -1885,6 +1886,10 @@ function getTypeLabel(type: string): string {
     comparison: t('knowledgeEditor.wikiBrowser.filterComparison'),
     index: 'Index',
     log: 'Log',
+    chess_game: t('chess.ref.type_game'),
+    chess_puzzle: t('chess.ref.type_puzzle'),
+    chess_lesson: t('chess.ref.type_lesson'),
+    chess_course: t('chess.ref.type_course'),
   }
   return map[type] || type
 }

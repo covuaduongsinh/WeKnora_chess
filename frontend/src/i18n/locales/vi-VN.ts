@@ -5808,9 +5808,12 @@ export default {
     ref: {
       loading: "Đang tải…",
       notFound: "Không tìm thấy tham chiếu cờ: {ref}",
+      didYouMean: "Ý bạn là…?",
+      createNew: "Tạo mới",
       noBoard: "Tham chiếu không có thế cờ để hiển thị.",
       openInLibrary: "Mở trong thư viện",
       backlinks: "Được liên kết bởi",
+      noBacklinks: "Chưa có trang/bài giảng nào tham chiếu.",
       openBacklink: "Mở nguồn liên kết",
       dialogTitle: "Tham chiếu cờ",
       type_game: "Ván cờ",
@@ -5828,6 +5831,7 @@ export default {
       empty: "Không có mục nào.",
       embedToggle: "Nhúng bàn cờ inline (![[…]])",
       insertAction: "Chèn",
+      previewHint: "Di chuột vào một mục để xem trước bàn cờ.",
       // Sao chép wikilink ở danh sách kho ván/bài tập.
       copyLink: "Sao chép wikilink",
       copied: "Đã sao chép wikilink",

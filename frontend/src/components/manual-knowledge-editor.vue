@@ -16,6 +16,7 @@ import { useOrganizationStore } from '@/stores/organization'
 import type { KnowledgeProcessOverrides } from '@/types/knowledgeProcess'
 import { sanitizeHTML, safeMarkdownToHTML } from '@/utils/security'
 import { useI18n } from 'vue-i18n'
+import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue'
 
 interface KnowledgeBaseOption {
   label: string
@@ -845,6 +846,11 @@ onBeforeUnmount(() => {
               v-model="form.content"
               :placeholder="$t('manualEditor.form.contentPlaceholder')"
               class="editor-textarea"
+            />
+            <ChessWikiLinkSuggest
+              v-if="!contentLoading"
+              :textarea="textareaElement"
+              v-model="form.content"
             />
             <div v-else class="loading-placeholder">
               <t-loading size="small" :text="$t('manualEditor.loading.content')" />

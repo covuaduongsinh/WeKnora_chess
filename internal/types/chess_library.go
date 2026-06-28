@@ -70,12 +70,33 @@ type ChessGameFilter struct {
 	Black  string
 	ECO    string
 	Result string
+	// Keyword là tìm kiếm tự do (ILIKE trên slug/white/black/event) — dùng cho
+	// autocomplete wikilink. Rỗng = không lọc.
+	Keyword string
 }
 
 // ChessPuzzleFilter là bộ lọc khi liệt kê bài tập.
 type ChessPuzzleFilter struct {
 	Theme      string
 	Difficulty string
+	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/theme) — dùng cho
+	// autocomplete wikilink. Rỗng = không lọc.
+	Keyword string
+}
+
+// ChessRefSearchItem là một mục gợi ý khi tìm tham chiếu cờ cho autocomplete
+// wikilink (gõ "[["). Gộp chung mọi loại đối tượng cờ.
+type ChessRefSearchItem struct {
+	// Type là loại đối tượng: "game" | "puzzle" | "lesson" | "course".
+	Type string `json:"type"`
+	// Slug là slug trần (không tiền tố).
+	Slug string `json:"slug"`
+	// Ref là chuỗi tham chiếu đầy đủ "<type>/<slug>" để chèn vào [[...]].
+	Ref string `json:"ref"`
+	// Title là nhãn hiển thị thân thiện.
+	Title string `json:"title"`
+	// Subtitle là thông tin phụ (ECO/sự kiện, theme/độ khó, trình độ...).
+	Subtitle string `json:"subtitle"`
 }
 
 // ChessPuzzleBundle là gói export/import 1 bài tập (không kèm ID/slug/tenant để khi
