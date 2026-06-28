@@ -61,3 +61,24 @@ type ChessLesson struct {
 
 // TableName ánh xạ tới bảng chess_lessons.
 func (ChessLesson) TableName() string { return "chess_lessons" }
+
+// ChessLessonBundle là gói export/import 1 bài học (chỉ nội dung, KHÔNG kèm ID/slug
+// để khi import luôn tạo mới trong tenant đích).
+type ChessLessonBundle struct {
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	FEN       string `json:"fen"`
+	PGN       string `json:"pgn"`
+	SortOrder int    `json:"sort_order"`
+}
+
+// ChessCourseBundle là gói export/import 1 khóa học kèm bài học. Dùng cho cả xuất
+// (sao lưu/chia sẻ) lẫn nhập (tạo mới). Không chứa ID/slug/tenant.
+type ChessCourseBundle struct {
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	Level       string              `json:"level"`
+	CoverURL    string              `json:"cover_url"`
+	SortOrder   int                 `json:"sort_order"`
+	Lessons     []ChessLessonBundle `json:"lessons"`
+}

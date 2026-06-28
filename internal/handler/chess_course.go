@@ -134,6 +134,37 @@ func (h *ChessCourseHandler) UpdateCourse(c *gin.Context) {
 	ok(c, course)
 }
 
+// ExportCourses GET /chess/courses/export — xuất toàn bộ khóa học kèm bài học (JSON).
+func (h *ChessCourseHandler) ExportCourses(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	bundles, err := h.service.ExportCourses(ctx, tenantID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, err)
+		return
+	}
+	ok(c, bundles)
+}
+
+// ImportCourses POST /chess/courses/import {courses:[...]} — tạo mới; trả số đã thêm.
+func (h *ChessCourseHandler) ImportCourses(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	var b struct {
+		Courses []types.ChessCourseBundle `json:"courses"`
+	}
+	if err := c.ShouldBindJSON(&b); err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+	count, err := h.service.ImportCourses(ctx, tenantID, b.Courses)
+	if err != nil {
+		fail(c, http.StatusBadRequest, err)
+		return
+	}
+	ok(c, gin.H{"imported": count})
+}
+
 // DeleteCourse DELETE /chess/courses/:id
 func (h *ChessCourseHandler) DeleteCourse(c *gin.Context) {
 	ctx := c.Request.Context()

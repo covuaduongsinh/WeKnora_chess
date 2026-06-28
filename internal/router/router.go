@@ -444,6 +444,9 @@ func RegisterChessCourseRoutes(r *gin.RouterGroup, h *handler.ChessCourseHandler
 	{
 		courses.GET("", g.Viewer(), h.ListCourses)
 		courses.POST("", g.Contributor(), h.CreateCourse)
+		// Export/Import (route tĩnh đặt trước param ":id").
+		courses.GET("/export", g.Viewer(), h.ExportCourses)
+		courses.POST("/import", g.Contributor(), h.ImportCourses)
 		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[course/<slug>]]).
 		courses.GET("/by-slug/:slug", g.Viewer(), h.GetCourseBySlug)
 		courses.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetCourseBacklinks)
@@ -475,6 +478,7 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		games.GET("", g.Viewer(), h.ListGames)
 		games.POST("", g.Contributor(), h.CreateGame)
 		games.POST("/import", g.Contributor(), h.ImportGames)
+		games.GET("/export", g.Viewer(), h.ExportGames)
 		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[game/<slug>]]).
 		games.GET("/by-slug/:slug", g.Viewer(), h.GetGameBySlug)
 		games.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetGameBacklinks)
@@ -486,6 +490,8 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 	{
 		puzzles.GET("", g.Viewer(), h.ListPuzzles)
 		puzzles.POST("", g.Contributor(), h.CreatePuzzle)
+		puzzles.GET("/export", g.Viewer(), h.ExportPuzzles)
+		puzzles.POST("/import", g.Contributor(), h.ImportPuzzles)
 		puzzles.GET("/random", g.Viewer(), h.RandomPuzzle)
 		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[puzzle/<slug>]]).
 		puzzles.GET("/by-slug/:slug", g.Viewer(), h.GetPuzzleBySlug)

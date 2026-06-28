@@ -29,6 +29,12 @@ type ChessCourseService interface {
 	CreateLesson(ctx context.Context, lesson *types.ChessLesson) (*types.ChessLesson, error)
 	UpdateLesson(ctx context.Context, lesson *types.ChessLesson) (*types.ChessLesson, error)
 	DeleteLesson(ctx context.Context, tenantID uint64, id string) error
+
+	// ---- Export / Import ----
+	// ExportCourses xuất toàn bộ khóa học (kèm bài học) của tenant để sao lưu/chia sẻ.
+	ExportCourses(ctx context.Context, tenantID uint64) ([]types.ChessCourseBundle, error)
+	// ImportCourses nhập danh sách khóa học (kèm bài học), luôn tạo mới; trả số khóa đã thêm.
+	ImportCourses(ctx context.Context, tenantID uint64, bundles []types.ChessCourseBundle) (int, error)
 }
 
 // ChessCourseRepository định nghĩa thao tác lưu trữ khóa học & bài học.

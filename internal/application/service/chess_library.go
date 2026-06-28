@@ -195,3 +195,62 @@ func (s *chessLibraryService) DeletePuzzle(ctx context.Context, tenantID uint64,
 func (s *chessLibraryService) RandomPuzzle(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (*types.ChessPuzzle, error) {
 	return s.repo.RandomPuzzle(ctx, tenantID, f)
 }
+
+// ---- Export / Import (sao lưu & chia sẻ) ----
+
+// ExportGamesPGN xuất các ván (theo filter) thành một chuỗi PGN nhiều ván.
+func (s *chessLibraryService) ExportGamesPGN(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (string, error) {
+	games, err := s.repo.ListGames(ctx, tenantID, f)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, 0, len(games))
+	for _, g := range games {
+		if strings.TrimSpace(g.PGN) == "" {
+			continue
+		}
+		parts = append(parts, strings.TrimSpace(g.PGN))
+	}
+	return strings.Join(parts, "\n\n"), nil
+}
+
+// ExportPuzzles xuất các bài tập (theo filter) để sao lưu/chia sẻ.
+func (s *chessLibraryService) ExportPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]types.ChessPuzzleBundle, error) {
+	puzzles, err := s.repo.ListPuzzles(ctx, tenantID, f)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]types.ChessPuzzleBundle, 0, len(puzzles))
+	for _, p := range puzzles {
+		out = append(out, types.ChessPuzzleBundle{
+			Title: p.Title, FEN: p.FEN, Solution: p.Solution,
+			Theme: p.Theme, Difficulty: p.Difficulty, Source: p.Source,
+		})
+	}
+	return out, nil
+}
+
+// ImportPuzzles nhập danh sách bài tập, LUÔN tạo mới trong tenant hiện tại (tái dùng
+// CreatePuzzle để validate FEN + sinh ID/slug). Trả số bài đã thêm; bỏ qua bài FEN
+// lỗi để không chặn cả lô.
+func (s *chessLibraryService) ImportPuzzles(ctx context.Context, tenantID uint64, items []types.ChessPuzzleBundle) (int, error) {
+	created := 0
+	for i := range items {
+		it := items[i]
+		if strings.TrimSpace(it.FEN) == "" {
+			continue
+		}
+		_, err := s.CreatePuzzle(ctx, &types.ChessPuzzle{
+			TenantID: tenantID, Title: it.Title, FEN: it.FEN, Solution: it.Solution,
+			Theme: it.Theme, Difficulty: it.Difficulty, Source: it.Source,
+		})
+		if err != nil {
+			continue
+		}
+		created++
+	}
+	if created == 0 && len(items) > 0 {
+		return 0, fmt.Errorf("không nhập được bài tập nào (kiểm tra FEN/định dạng JSON)")
+	}
+	return created, nil
+}

@@ -160,7 +160,55 @@ func (h *ChessLibraryHandler) ImportGames(c *gin.Context) {
 	chessOK(c, gin.H{"imported": count})
 }
 
+// ExportGames GET /chess/games/export?white=&black=&eco=&result= — trả PGN nhiều ván.
+func (h *ChessLibraryHandler) ExportGames(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	pgn, err := h.service.ExportGamesPGN(ctx, tenantID, types.ChessGameFilter{
+		White: c.Query("white"), Black: c.Query("black"),
+		ECO: c.Query("eco"), Result: c.Query("result"),
+	})
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, gin.H{"pgn": pgn})
+}
+
 // ---- Bài tập ----
+
+// ExportPuzzles GET /chess/puzzles/export?theme=&difficulty= — danh sách bài tập (JSON).
+func (h *ChessLibraryHandler) ExportPuzzles(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	items, err := h.service.ExportPuzzles(ctx, tenantID, types.ChessPuzzleFilter{
+		Theme: c.Query("theme"), Difficulty: c.Query("difficulty"),
+	})
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, items)
+}
+
+// ImportPuzzles POST /chess/puzzles/import {puzzles:[...]} — tạo mới; trả số đã thêm.
+func (h *ChessLibraryHandler) ImportPuzzles(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	var b struct {
+		Puzzles []types.ChessPuzzleBundle `json:"puzzles"`
+	}
+	if err := c.ShouldBindJSON(&b); err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	count, err := h.service.ImportPuzzles(ctx, tenantID, b.Puzzles)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, gin.H{"imported": count})
+}
 
 // ListPuzzles GET /chess/puzzles?theme=&difficulty=
 func (h *ChessLibraryHandler) ListPuzzles(c *gin.Context) {

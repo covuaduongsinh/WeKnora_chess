@@ -32,6 +32,14 @@ type ChessLibraryService interface {
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error)
 	DeletePuzzle(ctx context.Context, tenantID uint64, id string) error
 	RandomPuzzle(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (*types.ChessPuzzle, error)
+
+	// ---- Export / Import ----
+	// ExportGamesPGN xuất các ván (theo filter) thành một PGN nhiều ván.
+	ExportGamesPGN(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (string, error)
+	// ExportPuzzles xuất các bài tập (theo filter) để sao lưu/chia sẻ.
+	ExportPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]types.ChessPuzzleBundle, error)
+	// ImportPuzzles nhập danh sách bài tập (luôn tạo mới); trả số bài đã thêm.
+	ImportPuzzles(ctx context.Context, tenantID uint64, items []types.ChessPuzzleBundle) (int, error)
 }
 
 // ChessLibraryRepository định nghĩa thao tác lưu trữ kho ván & bài tập.

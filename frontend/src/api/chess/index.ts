@@ -38,6 +38,9 @@ export const getCourseBacklinks = (slug: string) => get(`/api/v1/chess/courses/b
 export const createCourse = (data: Partial<ChessCourse>) => post("/api/v1/chess/courses", data);
 export const updateCourse = (id: string, data: Partial<ChessCourse>) => put(`/api/v1/chess/courses/${id}`, data);
 export const deleteCourse = (id: string) => del(`/api/v1/chess/courses/${id}`);
+// Export/Import khóa học (kèm bài học) dạng JSON — sao lưu/chia sẻ. Import luôn tạo mới.
+export const exportCourses = () => get("/api/v1/chess/courses/export");
+export const importCourses = (courses: any[]) => post("/api/v1/chess/courses/import", { courses });
 
 // ---- Bài học ----
 export const listLessons = (courseId: string) => get(`/api/v1/chess/courses/${courseId}/lessons`);
@@ -74,6 +77,9 @@ export const createGame = (data: Partial<ChessGame>) => post("/api/v1/chess/game
 export const updateGame = (id: string, data: Partial<ChessGame>) => put(`/api/v1/chess/games/${id}`, data);
 export const deleteGame = (id: string) => del(`/api/v1/chess/games/${id}`);
 export const importGames = (pgn: string) => post("/api/v1/chess/games/import", { pgn });
+// Export ván đấu (theo bộ lọc) thành PGN nhiều ván.
+export const exportGamesPGN = (f: Partial<{ white: string; black: string; eco: string; result: string }> = {}) =>
+  get(`/api/v1/chess/games/export${qs(f as Record<string, string>)}`);
 
 // ---- Ngân hàng bài tập ----
 export interface ChessPuzzle {
@@ -94,3 +100,7 @@ export const updatePuzzle = (id: string, data: Partial<ChessPuzzle>) => put(`/ap
 export const deletePuzzle = (id: string) => del(`/api/v1/chess/puzzles/${id}`);
 export const randomPuzzle = (f: Partial<{ theme: string; difficulty: string }> = {}) =>
   get(`/api/v1/chess/puzzles/random${qs(f as Record<string, string>)}`);
+// Export/Import bài tập dạng JSON — sao lưu/chia sẻ. Import luôn tạo mới.
+export const exportPuzzles = (f: Partial<{ theme: string; difficulty: string }> = {}) =>
+  get(`/api/v1/chess/puzzles/export${qs(f as Record<string, string>)}`);
+export const importPuzzles = (puzzles: any[]) => post("/api/v1/chess/puzzles/import", { puzzles });

@@ -57,3 +57,7 @@ fix-docker.sh
 
 # WeChat Mini Program local/private configuration
 miniprogram/project.private.config.json
+
+# Gói backup/restore WeKnora (chứa toàn bộ dữ liệu + khóa mã hóa — KHÔNG commit)
+weknora-backup-*.tar.gz
+pre-restore-*.sql.gz

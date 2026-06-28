@@ -4,10 +4,18 @@
     <div class="cc-left">
       <div class="cc-header">
         <h2>Khóa học cờ vua</h2>
-        <t-button theme="primary" size="small" @click="openCourseDialog()">
-          <template #icon><t-icon name="add" /></template>
-          Tạo khóa học
-        </t-button>
+        <div class="cc-header-actions">
+          <t-button variant="outline" size="small" @click="doExport">
+            <template #icon><t-icon name="download" /></template>Export
+          </t-button>
+          <t-button variant="outline" size="small" @click="doImport">
+            <template #icon><t-icon name="upload" /></template>Import
+          </t-button>
+          <t-button theme="primary" size="small" @click="openCourseDialog()">
+            <template #icon><t-icon name="add" /></template>
+            Tạo khóa học
+          </t-button>
+        </div>
       </div>
       <div v-if="courses.length === 0" class="cc-empty">Chưa có khóa học. Nhấn "Tạo khóa học".</div>
       <div v-for="c in courses" :key="c.id" class="cc-course-row"
@@ -155,9 +163,10 @@ import { useChessWikiDraftStore } from '@/stores/chessWikiDraft';
 import {
   listCourses, createCourse, updateCourse, deleteCourse, getCourseBySlug,
   listLessons, createLesson, updateLesson, deleteLesson, getLessonBySlug,
-  listGames, listPuzzles,
+  listGames, listPuzzles, exportCourses, importCourses,
   type ChessCourse, type ChessLesson, type ChessGame, type ChessPuzzle,
 } from '@/api/chess';
+import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 
 const { t } = useI18n();
 
@@ -328,6 +337,29 @@ function removeCourse(c: ChessCourse) {
   });
 }
 
+// ---- Export / Import khóa học (kèm bài học) ----
+async function doExport() {
+  try {
+    const res: any = await exportCourses();
+    const items = res?.data || [];
+    if (!items.length) { MessagePlugin.info('Không có khóa học để xuất'); return; }
+    downloadText(`khoahoc-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(items, null, 2), 'application/json');
+    MessagePlugin.success(`Đã xuất ${items.length} khóa học`);
+  } catch { MessagePlugin.error('Xuất thất bại'); }
+}
+async function doImport() {
+  const text = await pickTextFile('.json,application/json');
+  if (text == null) return;
+  let arr: any;
+  try { arr = JSON.parse(text); } catch { MessagePlugin.error('File JSON không hợp lệ'); return; }
+  if (!Array.isArray(arr)) { MessagePlugin.error('File phải là một mảng JSON khóa học'); return; }
+  try {
+    const res: any = await importCourses(arr);
+    await loadCourses();
+    MessagePlugin.success(`Đã nhập ${res?.data?.imported || 0} khóa học`);
+  } catch (e: any) { MessagePlugin.error(e?.error || e?.message || 'Import thất bại'); }
+}
+
 // ---- Lesson dialog ----
 const lessonDialog = reactive<any>({ visible: false, id: '', title: '', content: '', fen: '', pgn: '', sort_order: 0 });
 function openLessonDialog(l?: ChessLesson) {
@@ -492,6 +524,7 @@ loadCourses().then(initFromWikiDraft).then(() => {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
   h2 { font-size: 18px; margin: 0; color: var(--td-text-color-primary); }
 }
+.cc-header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .cc-desc { font-size: 13px; color: var(--td-text-color-secondary); margin-top: 2px; }
 .cc-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
 .cc-empty--big { text-align: center; padding-top: 80px; }

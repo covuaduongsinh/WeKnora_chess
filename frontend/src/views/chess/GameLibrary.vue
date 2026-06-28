@@ -7,6 +7,9 @@
       <t-select v-model="filter.result" :options="resultOptions" placeholder="Kết quả" clearable
         style="width:120px" @change="load" />
       <div style="flex:1"></div>
+      <t-button variant="outline" size="small" @click="doExport">
+        <template #icon><t-icon name="download" /></template>Export PGN
+      </t-button>
       <t-button theme="primary" size="small" @click="importDialog.visible = true">
         <template #icon><t-icon name="upload" /></template>Import PGN
       </t-button>
@@ -61,7 +64,8 @@ import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
-import { listGames, getGameBySlug, deleteGame, importGames, type ChessGame } from '@/api/chess';
+import { listGames, getGameBySlug, deleteGame, importGames, exportGamesPGN, type ChessGame } from '@/api/chess';
+import { downloadText } from '@/utils/fileTransfer';
 
 const { t } = useI18n();
 
@@ -127,6 +131,15 @@ function remove(g: ChessGame) {
       } catch { MessagePlugin.error('Xóa thất bại'); }
     },
   });
+}
+async function doExport() {
+  try {
+    const res: any = await exportGamesPGN(filter);
+    const pgn = (res?.data?.pgn || '').trim();
+    if (!pgn) { MessagePlugin.info('Không có ván nào để xuất'); return; }
+    downloadText(`vandau-${new Date().toISOString().slice(0, 10)}.pgn`, pgn, 'application/x-chess-pgn');
+    MessagePlugin.success('Đã xuất PGN');
+  } catch { MessagePlugin.error('Xuất thất bại'); }
 }
 async function doImport() {
   if (!importDialog.pgn.trim()) { MessagePlugin.warning('Dán PGN'); return; }

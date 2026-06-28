@@ -9,6 +9,12 @@
       <t-button variant="outline" size="small" @click="practice">
         <template #icon><t-icon name="play-circle" /></template>Luyện ngẫu nhiên
       </t-button>
+      <t-button variant="outline" size="small" @click="doExport">
+        <template #icon><t-icon name="download" /></template>Export
+      </t-button>
+      <t-button variant="outline" size="small" @click="doImport">
+        <template #icon><t-icon name="upload" /></template>Import
+      </t-button>
       <t-button theme="primary" size="small" @click="openDialog()">
         <template #icon><t-icon name="add" /></template>Tạo bài tập
       </t-button>
@@ -76,8 +82,10 @@ import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDi
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
-  listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle, type ChessPuzzle,
+  listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle,
+  exportPuzzles, importPuzzles, type ChessPuzzle,
 } from '@/api/chess';
+import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 
 const { t } = useI18n();
 
@@ -139,6 +147,28 @@ async function practice() {
     if (res?.data) { selected.value = res.data; revealed.value = false; revealKey.value++; }
     else MessagePlugin.info('Chưa có bài tập phù hợp');
   } catch { MessagePlugin.info('Chưa có bài tập phù hợp bộ lọc'); }
+}
+
+async function doExport() {
+  try {
+    const res: any = await exportPuzzles(filter);
+    const items = res?.data || [];
+    if (!items.length) { MessagePlugin.info('Không có bài tập để xuất'); return; }
+    downloadText(`baitap-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(items, null, 2), 'application/json');
+    MessagePlugin.success(`Đã xuất ${items.length} bài tập`);
+  } catch { MessagePlugin.error('Xuất thất bại'); }
+}
+async function doImport() {
+  const text = await pickTextFile('.json,application/json');
+  if (text == null) return;
+  let arr: any;
+  try { arr = JSON.parse(text); } catch { MessagePlugin.error('File JSON không hợp lệ'); return; }
+  if (!Array.isArray(arr)) { MessagePlugin.error('File phải là một mảng JSON bài tập'); return; }
+  try {
+    const res: any = await importPuzzles(arr);
+    await load();
+    MessagePlugin.success(`Đã nhập ${res?.data?.imported || 0} bài tập`);
+  } catch (e: any) { MessagePlugin.error(e?.error || e?.message || 'Import thất bại'); }
 }
 
 const dialog = reactive<any>({ visible: false, id: '', title: '', fen: '', solution: '', theme: '', difficulty: '' });

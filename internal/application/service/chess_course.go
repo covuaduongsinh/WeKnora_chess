@@ -195,6 +195,70 @@ func (s *chessCourseService) DeleteLesson(ctx context.Context, tenantID uint64, 
 	return nil
 }
 
+// ---- Export / Import (sao lưu & chia sẻ) ----
+
+// ExportCourses xuất toàn bộ khóa học kèm bài học của tenant. Không kèm ID/slug để
+// import luôn tạo mới trong tenant đích.
+func (s *chessCourseService) ExportCourses(ctx context.Context, tenantID uint64) ([]types.ChessCourseBundle, error) {
+	courses, err := s.repo.ListCourses(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]types.ChessCourseBundle, 0, len(courses))
+	for _, c := range courses {
+		lessons, err := s.repo.ListLessons(ctx, tenantID, c.ID)
+		if err != nil {
+			return nil, err
+		}
+		b := types.ChessCourseBundle{
+			Title: c.Title, Description: c.Description, Level: c.Level,
+			CoverURL: c.CoverURL, SortOrder: c.SortOrder,
+		}
+		for _, l := range lessons {
+			b.Lessons = append(b.Lessons, types.ChessLessonBundle{
+				Title: l.Title, Content: l.Content, FEN: l.FEN, PGN: l.PGN, SortOrder: l.SortOrder,
+			})
+		}
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+// ImportCourses nhập danh sách khóa học (kèm bài học), LUÔN tạo mới trong tenant hiện
+// tại (tái dùng CreateCourse/CreateLesson để sinh ID/slug/đồng bộ ref). Trả số khóa
+// đã thêm; bỏ qua khóa lỗi để 1 bản xấu không chặn cả lô.
+func (s *chessCourseService) ImportCourses(ctx context.Context, tenantID uint64, bundles []types.ChessCourseBundle) (int, error) {
+	created := 0
+	for i := range bundles {
+		b := bundles[i]
+		if strings.TrimSpace(b.Title) == "" {
+			continue
+		}
+		course, err := s.CreateCourse(ctx, &types.ChessCourse{
+			TenantID: tenantID, Title: b.Title, Description: b.Description,
+			Level: b.Level, CoverURL: b.CoverURL, SortOrder: b.SortOrder,
+		})
+		if err != nil {
+			continue
+		}
+		for j := range b.Lessons {
+			l := b.Lessons[j]
+			if strings.TrimSpace(l.Title) == "" {
+				continue
+			}
+			_, _ = s.CreateLesson(ctx, &types.ChessLesson{
+				TenantID: tenantID, CourseID: course.ID, Title: l.Title,
+				Content: l.Content, FEN: l.FEN, PGN: l.PGN, SortOrder: l.SortOrder,
+			})
+		}
+		created++
+	}
+	if created == 0 && len(bundles) > 0 {
+		return 0, fmt.Errorf("không nhập được khóa học nào (kiểm tra định dạng JSON)")
+	}
+	return created, nil
+}
+
 // parseChessRefSlugs bóc tham chiếu cờ ([[game/x]], ![[puzzle/y|nhãn]], …) từ nội
 // dung bài giảng — TÁI DÙNG wikiLinkRegex + splitChessRef + normalizeSlug ở
 // wiki_page.go (cùng package). Trả WikiChessRef chỉ với ChessType/ChessSlug.

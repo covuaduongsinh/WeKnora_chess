@@ -77,3 +77,14 @@ type ChessPuzzleFilter struct {
 	Theme      string
 	Difficulty string
 }
+
+// ChessPuzzleBundle là gói export/import 1 bài tập (không kèm ID/slug/tenant để khi
+// import luôn tạo mới trong tenant đích).
+type ChessPuzzleBundle struct {
+	Title      string `json:"title"`
+	FEN        string `json:"fen"`
+	Solution   string `json:"solution"`
+	Theme      string `json:"theme"`
+	Difficulty string `json:"difficulty"`
+	Source     string `json:"source"`
+}
