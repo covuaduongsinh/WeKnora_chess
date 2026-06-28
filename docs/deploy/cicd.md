@@ -8,6 +8,10 @@ Thay vì build trên VPS (chậm 15–20'), giờ mỗi lần `git push` lên `m
 Workflow: [.github/workflows/cicd-deploy.yml](../../.github/workflows/cicd-deploy.yml).
 Build-on-VPS cũ (`redeploy.sh`) vẫn giữ làm phương án dự phòng.
 
+> ⚠ **Trước khi push, hãy test ở LOCAL** (`git push` = deploy VPS/production). Xem
+> quy trình local-first + `make local-deploy` / `make local-status` ở
+> [dev-workflow.md](dev-workflow.md) để tránh "VPS mới hơn local".
+
 ---
 
 ## Cấu hình MỘT LẦN (làm trước khi push)

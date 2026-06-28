@@ -1,4 +1,4 @@
-.PHONY: help build run test clean docker-build-app docker-build-docreader docker-build-frontend docker-build-all docker-run migrate-up migrate-down docker-restart docker-stop start-all stop-all start-ollama stop-ollama build-images build-images-app build-images-docreader build-images-frontend clean-images check-env list-containers pull-images show-platform dev-start dev-stop dev-restart dev-logs dev-status dev-app dev-frontend docs install-swagger build-lite run-lite package-lite
+.PHONY: help build run test clean docker-build-app docker-build-docreader docker-build-frontend docker-build-all docker-run migrate-up migrate-down docker-restart docker-stop start-all stop-all start-ollama stop-ollama build-images build-images-app build-images-docreader build-images-frontend clean-images check-env list-containers pull-images show-platform dev-start dev-stop dev-restart dev-logs dev-status dev-app dev-frontend local-deploy local-status docs install-swagger build-lite run-lite package-lite
 
 # Show help
 help:
@@ -331,5 +331,15 @@ dev-app:
 
 dev-frontend:
 	./scripts/dev.sh frontend
+
+# Cập nhật stack LOCAL về đúng working tree (build từ nguồn). Dùng:
+#   make local-deploy            # build app+frontend từ nguồn rồi recreate
+#   make local-deploy ARGS=--ghcr   # nhanh: pull image CI từ GHCR thay vì build
+local-deploy:
+	./scripts/dev/local-deploy.sh $(ARGS)
+
+# Báo "lệch" giữa app local đang chạy và git HEAD (phát hiện local cũ hơn nguồn).
+local-status:
+	./scripts/dev/local-status.sh
 
 

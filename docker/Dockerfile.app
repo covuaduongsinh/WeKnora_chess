@@ -50,6 +50,7 @@ RUN --mount=type=cache,target=/go/pkg/mod cp -r /go/pkg/mod/github.com/yanyiwu/ 
 # Final stage
 FROM debian:12.12-slim
 
+
 WORKDIR /app
 
 ARG APK_MIRROR_ARG
@@ -107,6 +108,12 @@ COPY --from=builder /app/scripts/docker-entrypoint.sh ./scripts/docker-entrypoin
 
 # Make scripts executable
 RUN chmod +x ./scripts/*.sh
+
+# Nhãn commit đặt CUỐI final stage: đổi commit chỉ rebuild layer nhãn nhỏ,
+# KHÔNG bust cache các layer apt/pip/npm nặng ở trên → build sau nhanh.
+# scripts/dev/local-status.sh đọc nhãn này qua docker inspect (không cần auth).
+ARG COMMIT_ID_ARG
+LABEL org.opencontainers.image.revision="${COMMIT_ID_ARG}"
 
 # Expose ports
 EXPOSE 8080

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# pre-push (CẢNH BÁO MỀM) — nhắc khi bạn sắp push một bản mà stack LOCAL chưa
+# build/test (push lên main sẽ kích hoạt CI deploy VPS).
+#
+# KÍCH HOẠT (one-time, hook tracked trong repo — không cần copy vào .git/hooks):
+#   git config core.hooksPath scripts/dev/githooks
+#
+# Mặc định CHỈ cảnh báo (vẫn cho push). Đặt WEKNORA_STRICT_PREPUSH=1 để CHẶN.
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+status_sh="$ROOT/scripts/dev/local-status.sh"
+[ -x "$status_sh" ] || [ -f "$status_sh" ] || exit 0
+
+out="$(bash "$status_sh" --porcelain 2>/dev/null)"; code=$?
+# code: 0=SYNC, 3=BEHIND, 2=DOWN/UNKNOWN. Chỉ cảnh báo khi BEHIND (chắc chắn lệch).
+if [ "$code" = 3 ]; then
+  running="$(echo "$out" | awk '{print $2}')"
+  source="$(echo "$out" | awk '{print $3}')"
+  echo "──────────────────────────────────────────────────────────────"
+  echo "⚠  [WeKnora] Stack LOCAL đang chạy '$running' nhưng bạn sắp push '$source'."
+  echo "   Push lên main → CI sẽ DEPLOY VPS (production) bản chưa test ở local."
+  echo "   → Cân nhắc:  make local-deploy   (build + test ở http://localhost trước)"
+  if [ "${WEKNORA_STRICT_PREPUSH:-0}" = "1" ]; then
+    echo "   (WEKNORA_STRICT_PREPUSH=1 → CHẶN push. Bỏ biến này để chỉ cảnh báo.)"
+    echo "──────────────────────────────────────────────────────────────"
+    exit 1
+  fi
+  echo "   (Chỉ cảnh báo — push vẫn tiếp tục. Đặt WEKNORA_STRICT_PREPUSH=1 để chặn.)"
+  echo "──────────────────────────────────────────────────────────────"
+fi
+exit 0
