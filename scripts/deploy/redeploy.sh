@@ -24,6 +24,7 @@ COMMIT_ID="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 docker run --rm \
   -e VITE_IS_DOCKER=true \
   -e VITE_FRONTEND_COMMIT="${COMMIT_ID}" \
+  -e NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB:-4096}" \
   -v "${PROJECT_ROOT}/frontend":/app \
   -w /app \
   "${FRONTEND_NODE_IMAGE}" \

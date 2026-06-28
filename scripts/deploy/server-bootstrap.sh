@@ -15,6 +15,8 @@
 #
 # Biến môi trường tùy chọn:
 #   FRONTEND_NODE_IMAGE   image node để build dist (mặc định node:22-bookworm)
+#   NODE_HEAP_MB          giới hạn heap Node khi build frontend, MB (mặc định 4096).
+#                         Tăng nếu build frontend bị "Aborted (core dumped)" / hết RAM.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +42,7 @@ COMMIT_ID="$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo
 docker run --rm \
   -e VITE_IS_DOCKER=true \
   -e VITE_FRONTEND_COMMIT="${COMMIT_ID}" \
+  -e NODE_OPTIONS="--max-old-space-size=${NODE_HEAP_MB:-4096}" \
   -v "${PROJECT_ROOT}/frontend":/app \
   -w /app \
   "${FRONTEND_NODE_IMAGE}" \

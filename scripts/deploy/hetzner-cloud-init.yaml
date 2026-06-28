@@ -39,9 +39,9 @@ write_files:
 
       echo "==== weknora cloud bootstrap @ $(date -Iseconds) ===="
 
-      # --- swap 4GB: build Go/CGO + frontend + Arasan cần thêm RAM (8GB + 4GB swap) ---
+      # --- swap 6GB: build Go/CGO + frontend(Vite) + Arasan cần thêm RAM (8GB + 6GB swap) ---
       if ! swapon --show | grep -q '/swapfile'; then
-        fallocate -l 4G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
+        fallocate -l 6G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=6144
         chmod 600 /swapfile
         mkswap /swapfile
         swapon /swapfile
