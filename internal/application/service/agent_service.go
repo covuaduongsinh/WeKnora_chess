@@ -114,6 +114,28 @@ func (s *agentService) chessDefaultDepth() int {
 	return chess.DefaultDepth
 }
 
+// Các getter dưới đây trả 0 nếu chưa cấu hình → tool tự áp giá trị mặc định.
+func (s *agentService) chessEvalDepth() int {
+	if s.cfg.Chess != nil {
+		return s.cfg.Chess.EvaluateDepth
+	}
+	return 0
+}
+
+func (s *agentService) chessEvalMaxPlies() int {
+	if s.cfg.Chess != nil {
+		return s.cfg.Chess.EvaluateMaxPlies
+	}
+	return 0
+}
+
+func (s *agentService) chessLookupLimit() int {
+	if s.cfg.Chess != nil {
+		return s.cfg.Chess.LookupOpeningLimit
+	}
+	return 0
+}
+
 // NewAgentService creates a new agent service
 func NewAgentService(
 	cfg *config.Config,
@@ -636,7 +658,7 @@ func (s *agentService) registerTools(
 		// Chess tools — không cần KB. lookup_opening & generate_puzzle chỉ dùng
 		// luật cờ/thế cờ nhúng; còn lại cần engine.
 		case tools.ToolChessLookupOpening:
-			toolToRegister = tools.NewChessLookupOpeningTool()
+			toolToRegister = tools.NewChessLookupOpeningTool(s.chessLookupLimit())
 		case tools.ToolChessGeneratePuzzle:
 			toolToRegister = tools.NewChessGeneratePuzzleTool(s.chessLibraryService)
 		case tools.ToolChessAnalyzePosition:
@@ -653,7 +675,7 @@ func (s *agentService) registerTools(
 			}
 		case tools.ToolChessEvaluateGame:
 			if eng := s.getChessEngine(ctx); eng != nil {
-				toolToRegister = tools.NewChessEvaluateGameTool(eng)
+				toolToRegister = tools.NewChessEvaluateGameTool(eng, s.chessEvalMaxPlies(), s.chessEvalDepth())
 			} else {
 				logger.Warnf(ctx, "Bỏ qua %s: engine cờ vua chưa sẵn sàng", toolName)
 			}

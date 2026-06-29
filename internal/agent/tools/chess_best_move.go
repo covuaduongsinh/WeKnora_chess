@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/Tencent/WeKnora/internal/chess"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -55,13 +54,11 @@ func (t *ChessBestMoveTool) Execute(ctx context.Context, args json.RawMessage) (
 	if err := json.Unmarshal(args, &input); err != nil {
 		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Không đọc được tham số: %v", err)}, err
 	}
-	input.FEN = strings.TrimSpace(input.FEN)
-	if input.FEN == "" {
-		return &types.ToolResult{Success: false, Error: "Thiếu tham số fen"}, nil
+	fen, bad := validateFENArg(input.FEN)
+	if bad != nil {
+		return bad, nil
 	}
-	if err := chess.ValidateFEN(input.FEN); err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("FEN không hợp lệ: %v", err)}, nil
-	}
+	input.FEN = fen
 
 	depth := input.Depth
 	if depth <= 0 {

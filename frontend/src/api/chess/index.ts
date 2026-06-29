@@ -95,6 +95,8 @@ export const getGameBySlug = (slug: string) => get(`/api/v1/chess/games/by-slug/
 export const getGameBacklinks = (slug: string) => get(`/api/v1/chess/games/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createGame = (data: Partial<ChessGame>) => post("/api/v1/chess/games", data);
 export const updateGame = (id: string, data: Partial<ChessGame>) => put(`/api/v1/chess/games/${id}`, data);
+// Đổi slug ván (giữ link cũ qua alias). slug sẽ được chuẩn hóa ở backend.
+export const renameGameSlug = (id: string, slug: string) => put(`/api/v1/chess/games/${id}/slug`, { slug });
 export const deleteGame = (id: string) => del(`/api/v1/chess/games/${id}`);
 export const importGames = (pgn: string) => post("/api/v1/chess/games/import", { pgn });
 // Export ván đấu (theo bộ lọc) thành PGN nhiều ván.
@@ -117,6 +119,8 @@ export const getPuzzleBySlug = (slug: string) => get(`/api/v1/chess/puzzles/by-s
 export const getPuzzleBacklinks = (slug: string) => get(`/api/v1/chess/puzzles/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createPuzzle = (data: Partial<ChessPuzzle>) => post("/api/v1/chess/puzzles", data);
 export const updatePuzzle = (id: string, data: Partial<ChessPuzzle>) => put(`/api/v1/chess/puzzles/${id}`, data);
+// Đổi slug bài tập (giữ link cũ qua alias).
+export const renamePuzzleSlug = (id: string, slug: string) => put(`/api/v1/chess/puzzles/${id}/slug`, { slug });
 export const deletePuzzle = (id: string) => del(`/api/v1/chess/puzzles/${id}`);
 export const randomPuzzle = (f: Partial<{ theme: string; difficulty: string }> = {}) =>
   get(`/api/v1/chess/puzzles/random${qs(f as Record<string, string>)}`);

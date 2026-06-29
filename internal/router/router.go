@@ -75,6 +75,7 @@ type RouterParams struct {
 	TagHandler                   *handler.TagHandler
 	ChessCourseHandler           *handler.ChessCourseHandler
 	ChessLibraryHandler          *handler.ChessLibraryHandler
+	ChessEngineHandler           *handler.ChessEngineHandler
 	ChessRefHandler              *handler.ChessRefHandler
 	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
@@ -210,6 +211,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterChessCourseRoutes(v1, params.ChessCourseHandler, rbacGuards)
 		RegisterChessLibraryRoutes(v1, params.ChessLibraryHandler, rbacGuards)
+		RegisterChessEngineRoutes(v1, params.ChessEngineHandler, rbacGuards)
 		RegisterChessRefRoutes(v1, params.ChessRefHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
@@ -481,6 +483,18 @@ func RegisterChessRefRoutes(r *gin.RouterGroup, h *handler.ChessRefHandler, g *r
 	}
 }
 
+// RegisterChessEngineRoutes đăng ký API trạng thái engine cờ (vận hành/monitor).
+// Chỉ đọc → cần Viewer.
+func RegisterChessEngineRoutes(r *gin.RouterGroup, h *handler.ChessEngineHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	engine := r.Group("/chess/engine")
+	{
+		engine.GET("/health", g.Viewer(), h.Health)
+	}
+}
+
 // RegisterChessLibraryRoutes đăng ký API kho ván đấu & ngân hàng bài tập cờ vua.
 // Tài nguyên cấp tenant: đọc cần Viewer, ghi cần Contributor.
 func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandler, g *rbacGuards) {
@@ -498,6 +512,7 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		games.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetGameBacklinks)
 		games.GET("/:id", g.Viewer(), h.GetGame)
 		games.PUT("/:id", g.Contributor(), h.UpdateGame)
+		games.PUT("/:id/slug", g.Contributor(), h.RenameGameSlug)
 		games.DELETE("/:id", g.Contributor(), h.DeleteGame)
 	}
 	puzzles := r.Group("/chess/puzzles")
@@ -512,6 +527,7 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		puzzles.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetPuzzleBacklinks)
 		puzzles.GET("/:id", g.Viewer(), h.GetPuzzle)
 		puzzles.PUT("/:id", g.Contributor(), h.UpdatePuzzle)
+		puzzles.PUT("/:id/slug", g.Contributor(), h.RenamePuzzleSlug)
 		puzzles.DELETE("/:id", g.Contributor(), h.DeletePuzzle)
 	}
 	// Bảo trì KB tri thức cờ (đẩy lại index sau khi bật CHESS_KB_INDEX). Nặng →

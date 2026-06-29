@@ -6,7 +6,22 @@ import (
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/chess"
+	"github.com/Tencent/WeKnora/internal/types"
 )
+
+// validateFENArg chuẩn hóa và kiểm tra tham số FEN dùng chung cho các tool cờ
+// (analyze/best_move/explain_move). Trả về FEN đã trim; nếu không hợp lệ trả kèm
+// một *types.ToolResult lỗi sẵn sàng để tool trả về (giá trị thứ hai != nil).
+func validateFENArg(fen string) (string, *types.ToolResult) {
+	fen = strings.TrimSpace(fen)
+	if fen == "" {
+		return "", &types.ToolResult{Success: false, Error: "Thiếu tham số fen"}
+	}
+	if err := chess.ValidateFEN(fen); err != nil {
+		return "", &types.ToolResult{Success: false, Error: fmt.Sprintf("FEN không hợp lệ: %v", err)}
+	}
+	return fen, nil
+}
 
 // friendlyEngineError dịch lỗi từ engine sang thông báo thân thiện (tiếng Việt) cho
 // người học/HLV, thay vì lỗi kỹ thuật thô. Dùng chung cho các tool gọi engine để

@@ -63,7 +63,16 @@ watch(
 </script>
 
 <style lang="less" scoped>
-.chess-manage { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 12px 20px 0; overflow: hidden; }
+.chess-manage {
+  display: flex; flex-direction: column; height: 100%; box-sizing: border-box;
+  padding: 12px 20px 0; overflow: hidden;
+  /* Họa tiết ô cờ (checkerboard) rất nhạt — nhận diện Dương Sinh, không cản đọc. */
+  background-image:
+    linear-gradient(45deg, rgba(43, 57, 144, 0.025) 25%, transparent 25%, transparent 75%, rgba(43, 57, 144, 0.025) 75%),
+    linear-gradient(45deg, rgba(43, 57, 144, 0.025) 25%, transparent 25%, transparent 75%, rgba(43, 57, 144, 0.025) 75%);
+  background-size: 44px 44px;
+  background-position: 0 0, 22px 22px;
+}
 .cm-title { font-size: 20px; margin: 0 0 8px; color: var(--td-text-color-primary); }
 .cm-tabs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cm-tabs :deep(.t-tabs__content) { flex: 1; min-height: 0; }

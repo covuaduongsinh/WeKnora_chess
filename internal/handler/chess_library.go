@@ -130,6 +130,44 @@ func (h *ChessLibraryHandler) UpdateGame(c *gin.Context) {
 	chessOK(c, g)
 }
 
+type slugBody struct {
+	Slug string `json:"slug"`
+}
+
+// RenameGameSlug PUT /chess/games/:id/slug {slug} — đổi slug ván, giữ link cũ qua alias.
+func (h *ChessLibraryHandler) RenameGameSlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	var b slugBody
+	if err := c.ShouldBindJSON(&b); err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	g, err := h.service.RenameGameSlug(ctx, tenantID, c.Param("id"), b.Slug)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, g)
+}
+
+// RenamePuzzleSlug PUT /chess/puzzles/:id/slug {slug} — đổi slug bài tập, giữ link cũ.
+func (h *ChessLibraryHandler) RenamePuzzleSlug(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	var b slugBody
+	if err := c.ShouldBindJSON(&b); err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	p, err := h.service.RenamePuzzleSlug(ctx, tenantID, c.Param("id"), b.Slug)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, p)
+}
+
 // DeleteGame DELETE /chess/games/:id
 func (h *ChessLibraryHandler) DeleteGame(c *gin.Context) {
 	ctx := c.Request.Context()

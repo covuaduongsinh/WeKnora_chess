@@ -100,9 +100,27 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
+  # ---- Test gate: chặn deploy nếu test/vet lớp cờ hỏng ----
+  # Phạm vi Go giới hạn ở package lớp cờ (thuần Go, không cần CGO/sqlite) để gate
+  # nhanh & ổn định; mở rộng dần khi cần. (Frontend đã được dựng ở job build-ui
+  # qua `vite build`; KHÔNG gate `vue-tsc` vì codebase còn lỗi type tồn đọng ở
+  # phần upstream — sẽ chặn deploy oan. Bật lại khi đã dọn sạch type.)
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: go.sum
+      - name: go vet (chess)
+        run: go vet ./internal/chess/... ./internal/agent/tools/... ./internal/config/...
+      - name: go test (chess)
+        run: go test ./internal/chess/... ./internal/agent/tools/...
+
   # ---- Deploy: SSH vào VPS, git pull (lấy compose/scripts mới) rồi pull image + up ----
   deploy:
-    needs: [build-ui, build-backend]
+    needs: [build-ui, build-backend, test]
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VPS over SSH

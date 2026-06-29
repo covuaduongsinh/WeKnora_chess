@@ -7,6 +7,28 @@ import type { ChessBoardData } from '@/types/tool-results';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
+/**
+ * Kiểm tra nhanh tính hợp lệ CẤU TRÚC của một chuỗi FEN (8 hàng, mỗi hàng đủ 8 ô,
+ * ký tự quân hợp lệ, lượt đi w/b nếu có). KHÔNG kiểm tra hợp lệ luật cờ đầy đủ —
+ * backend làm việc đó. Mục đích: chặn lỗi gõ sai ở ô nhập trước khi lưu để báo lỗi
+ * rõ ràng thay vì "Lưu thất bại". Hàm thuần, không import thư viện nặng (chess.js).
+ */
+export function isValidFEN(fen: string): boolean {
+  const s = (fen || '').trim();
+  if (!s) return false;
+  const parts = s.split(/\s+/);
+  const ranks = parts[0].split('/');
+  if (ranks.length !== 8) return false;
+  for (const rank of ranks) {
+    if (!/^[pnbrqkPNBRQK1-8]+$/.test(rank)) return false;
+    let count = 0;
+    for (const ch of rank) count += /[1-8]/.test(ch) ? Number(ch) : 1;
+    if (count !== 8) return false;
+  }
+  if (parts.length >= 2 && parts[1] !== 'w' && parts[1] !== 'b') return false;
+  return true;
+}
+
 // Khớp một khối mã fenced ```chess ... ``` (đã đóng).
 const CHESS_BLOCK_RE = /```[ \t]*chess[^\n]*\n([\s\S]*?)```/gi;
 

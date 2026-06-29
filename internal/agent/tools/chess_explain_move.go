@@ -54,13 +54,14 @@ func (t *ChessExplainMoveTool) Execute(ctx context.Context, args json.RawMessage
 	if err := json.Unmarshal(args, &input); err != nil {
 		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Không đọc được tham số: %v", err)}, err
 	}
-	input.FEN = strings.TrimSpace(input.FEN)
 	input.Move = strings.TrimSpace(input.Move)
-	if input.FEN == "" || input.Move == "" {
-		return &types.ToolResult{Success: false, Error: "Cần cả fen và move"}, nil
+	fen, bad := validateFENArg(input.FEN)
+	if bad != nil {
+		return bad, nil
 	}
-	if err := chess.ValidateFEN(input.FEN); err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("FEN không hợp lệ: %v", err)}, nil
+	input.FEN = fen
+	if input.Move == "" {
+		return &types.ToolResult{Success: false, Error: "Cần cả fen và move"}, nil
 	}
 
 	// Chuẩn hóa nước đi: chấp nhận cả SAN lẫn UCI.

@@ -97,6 +97,13 @@ func (r *chessLibraryRepository) UpdateGame(ctx context.Context, game *types.Che
 		}).Error
 }
 
+func (r *chessLibraryRepository) UpdateGameSlug(ctx context.Context, tenantID uint64, id, slug string) error {
+	return r.db.WithContext(ctx).
+		Model(&types.ChessGame{}).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Update("slug", slug).Error
+}
+
 func (r *chessLibraryRepository) DeleteGame(ctx context.Context, tenantID uint64, id string) error {
 	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.ChessGame{}).Error
 }
@@ -168,6 +175,13 @@ func (r *chessLibraryRepository) UpdatePuzzle(ctx context.Context, puzzle *types
 			"title": puzzle.Title, "fen": puzzle.FEN, "solution": puzzle.Solution,
 			"theme": puzzle.Theme, "difficulty": puzzle.Difficulty, "source": puzzle.Source,
 		}).Error
+}
+
+func (r *chessLibraryRepository) UpdatePuzzleSlug(ctx context.Context, tenantID uint64, id, slug string) error {
+	return r.db.WithContext(ctx).
+		Model(&types.ChessPuzzle{}).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Update("slug", slug).Error
 }
 
 func (r *chessLibraryRepository) DeletePuzzle(ctx context.Context, tenantID uint64, id string) error {

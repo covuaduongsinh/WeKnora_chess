@@ -108,8 +108,32 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 - [x] **WS4b** — thông báo lỗi engine thân thiện (`friendlyEngineError` trong `chess_common.go`, áp cho analyze/best_move/explain_move); `httpEngine.Health()` probe + cảnh báo sớm lúc init trong `getChessEngine` (agent_service.go C1). Test: `chess_engine_error_test.go`. (Resolve fuzzy đã có test sẵn `chess_resolve_test.go`.) *Còn nợ:* endpoint `/chess/engine/health` (cần refactor engine thành service DI) — để sau.
 - [x] **WS4a** — áp thương hiệu Dương Sinh: file đè `frontend/src/assets/theme/duongsinh-brand.css` (thang `--td-brand-color-*` → navy #2B3990, light+dark) import sau theme.css ở `main.ts`/`embed-main.ts` (C3 frontend); `index.html` đổi title + favicon SVG + meta; logo `frontend/public/duongsinh-{symbol,logo}.svg` (từ `@ds/brand`). Build frontend OK. *Lưu ý:* brand thật là navy + xanh, KHÔNG cam/gold (đã đính chính `01-du-an-duongsinh.md`).
 
+### Đợt củng cố sau audit (2026-06-29) — nhánh `feat/chess-audit-hardening`
+Rà soát toàn dự án (3 agent: backend/frontend/hạ tầng) → triển khai 4 nhóm A–D.
+- [x] **WS-A (vận hành & an toàn):**
+  - Thêm `migrations/versioned/000068_*.down.sql` + `000069_*.down.sql` (trước đó thiếu cặp `.down` → không rollback được). Mục B nhật ký.
+  - `docker-compose.chess.yml` (file cờ riêng): thêm `healthcheck` cho `chess-engine` (probe `/health`) + `app.depends_on` đổi sang `condition: service_healthy`.
+  - `.gitignore`: thêm `data/*.bak*`; `git rm --cached data/weknora.db.bak-131441` (gỡ khỏi track, giữ file local).
+  - `.github/workflows/cicd-deploy.yml` (file CI riêng, C5): thêm job `test` (go vet+test package cờ, frontend type-check) làm gate trước `deploy`.
+- [x] **WS-B (củng cố backend):**
+  - Test 4 tool: thêm `chess_analyze_position_test.go`, `chess_best_move_test.go`, `chess_explain_move_test.go`, `chess_evaluate_game_test.go` (tái dùng `stubEngine`/`errEngine`, thêm `emptyMoveEngine`).
+  - Gom trùng lặp: `validateFENArg` trong `chess_common.go` (áp analyze/best_move/explain_move); gộp `chessSideToMove`→`fenSide` (xóa bản trùng ở demo test); lookup dùng `fenSide`.
+  - Config hóa: thêm `EvaluateDepth`/`EvaluateMaxPlies`/`LookupOpeningLimit` vào `ChessConfig` (`config.go` C1) + env `CHESS_EVALUATE_DEPTH`/`CHESS_EVALUATE_MAX_PLIES`/`CHESS_LOOKUP_OPENING_LIMIT` (`.env.example`); constructor tool nhận tham số; `agent_service.go` (C1) thêm getter + truyền vào `NewChessEvaluateGameTool`/`NewChessLookupOpeningTool`.
+  - Endpoint `GET /chess/engine/health`: file MỚI `internal/application/service/chess_engine.go` + `internal/handler/chess_engine.go` + `internal/types/interfaces/chess_engine.go`; wiring `container.go` (C1, +2 Provide) + route `router.go` (C1, `RegisterChessEngineRoutes`, Viewer). **Quyết định:** làm service ENGINE ĐỘC LẬP (không sửa `NewAgentService`) để giữ file xung đột cao nhất tối thiểu — engine http là wrapper rẻ nên chấp nhận init lười riêng. Trả `{enabled, healthy, detail}`.
+- [x] **WS-C (frontend/brand):**
+  - Font Roboto self-host (Apache-2.0): 9 file woff2 (latin/latin-ext/vietnamese × 400/500/700) ở `frontend/public/fonts/` + `@font-face` trong `duongsinh-brand.css`. Build OK, dist copy đủ.
+  - Họa tiết ô cờ (checkerboard rất nhạt) cho `.chess-manage` (scoped, không đụng global).
+  - Validate FEN khi nhập: `isValidFEN()` trong `utils/chessBlocks.ts` (validator cấu trúc, không import chess.js để khỏi phình bundle chat); áp ở `PuzzleBank.vue` + `ChessCourses.vue` (FEN bài học, chỉ khi nhập).
+  - Type-safe: `PuzzleDialogState`/`CourseDialogState`/`LessonDialogState` thay `reactive<any>`; fix viewer PuzzleBank cập nhật sau khi sửa (revealKey++).
+  - a11y: `menu.vue` (C3 shared) thêm `alt="Cờ vua Dương Sinh"` cho logo.
+  - **CI đính chính:** `npm run type-check` (vue-tsc) ĐANG đỏ do lỗi type tồn đọng ở phần upstream (KnowledgeBase/ApiInfo/GraphSettings…) → ĐÃ BỎ khỏi gate `cicd-deploy.yml` (giữ gate Go; frontend vẫn dựng qua `vite build` ở build-ui). Bật lại type-check khi dọn sạch type upstream.
+  - **HOÃN C3** (tách `ChessCourses.vue` 637 dòng): refactor thuần nội bộ, không thêm giá trị; picker gắn chặt template-ref `<textarea>` nên tách "mù" (không chạy được app để test runtime tại đây) dễ hồi quy → để lại backlog, làm khi chạy app kiểm thử được.
+- [x] **WS-D (tính năng nợ):**
+  - **D1 — RAG cờ:** runbook `docs/chess-rag-enable.md` đã khớp code; thêm mục **3b Production** turn-key (backup DB trước → set `CHESS_KB_INDEX=true` → redeploy → reindex prod URL → sửa agent YAML → nghiệm thu). KHÔNG commit đổi `builtin_agents.yaml` (toggle vận hành; flip sớm sẽ đổi hành vi HLV + `kb_selection_mode:all` kéo mọi KB trước khi KB cờ sẵn sàng) — Thầy bật theo runbook. Bật production là thao tác trên server (ngoài tầm tác động của agent ở đây).
+  - **D2 — đổi tên slug:** thêm repo `UpdateGameSlug`/`UpdatePuzzleSlug` (tách riêng vì `UpdateGame`/`UpdatePuzzle` cố tình KHÔNG đụng cột slug); service `RenameGameSlug`/`RenamePuzzleSlug` (chuẩn hóa qua `slugifyChess` + `ensureUniqueChessSlug` + ghi `chess_slug_aliases` old→new); handler + route `PUT /chess/{games,puzzles}/:id/slug` (router.go C1, Contributor); frontend api `renameGameSlug`/`renamePuzzleSlug` + nút "Đổi slug" (prompt) ở `GameLibrary.vue`/`PuzzleBank.vue`. Bảng `chess_slug_aliases` (000068) nay được dùng → resolve `exact→alias→fuzzy` có dữ liệu. *Còn lại:* rename cho course/lesson (service khác) — backlog.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.
-- [ ] Nút "đổi tên slug" để dùng `chess_slug_aliases` (bảng đang trống).
+- [x] Nút "đổi tên slug" dùng `chess_slug_aliases` — xong WS-D2 cho game+puzzle (course/lesson còn lại).
 - [ ] Khi merge upstream lần tới: ưu tiên rà C1 (móc lõi) + C4 (i18n/prompt) + C6 (migration sqlite).

@@ -173,7 +173,7 @@ import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import type { ChessBoardData } from '@/types/tool-results';
-import { splitChessContent, renderChessChips } from '@/utils/chessBlocks';
+import { splitChessContent, renderChessChips, isValidFEN } from '@/utils/chessBlocks';
 import { resolveChessRef } from '@/utils/chessRef';
 import { useChessWikiDraftStore } from '@/stores/chessWikiDraft';
 import {
@@ -301,7 +301,15 @@ function toggleLesson(id: string) {
 }
 
 // ---- Course dialog ----
-const courseDialog = reactive<any>({ visible: false, id: '', title: '', description: '', level: '', sort_order: 0 });
+interface CourseDialogState {
+  visible: boolean;
+  id: string;
+  title: string;
+  description: string;
+  level: string;
+  sort_order: number;
+}
+const courseDialog = reactive<CourseDialogState>({ visible: false, id: '', title: '', description: '', level: '', sort_order: 0 });
 function openCourseDialog(c?: ChessCourse) {
   courseDialog.visible = true;
   courseDialog.id = c?.id || '';
@@ -377,7 +385,16 @@ async function doImport() {
 }
 
 // ---- Lesson dialog ----
-const lessonDialog = reactive<any>({ visible: false, id: '', title: '', content: '', fen: '', pgn: '', sort_order: 0 });
+interface LessonDialogState {
+  visible: boolean;
+  id: string;
+  title: string;
+  content: string;
+  fen: string;
+  pgn: string;
+  sort_order: number;
+}
+const lessonDialog = reactive<LessonDialogState>({ visible: false, id: '', title: '', content: '', fen: '', pgn: '', sort_order: 0 });
 function openLessonDialog(l?: ChessLesson) {
   lessonDialog.visible = true;
   lessonDialog.id = l?.id || '';
@@ -390,6 +407,10 @@ function openLessonDialog(l?: ChessLesson) {
 async function saveLesson() {
   if (!selectedCourse.value) return;
   if (!lessonDialog.title.trim()) { MessagePlugin.warning('Nhập tên bài học'); return; }
+  if (lessonDialog.fen.trim() && !isValidFEN(lessonDialog.fen)) {
+    MessagePlugin.warning('Thế cờ FEN không hợp lệ — kiểm tra lại hoặc để trống.');
+    return;
+  }
   const payload = {
     title: lessonDialog.title, content: lessonDialog.content,
     fen: lessonDialog.fen, pgn: lessonDialog.pgn, sort_order: lessonDialog.sort_order,
