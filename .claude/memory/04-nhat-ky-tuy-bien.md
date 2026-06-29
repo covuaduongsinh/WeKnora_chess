@@ -108,6 +108,17 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 - [x] **WS4b** — thông báo lỗi engine thân thiện (`friendlyEngineError` trong `chess_common.go`, áp cho analyze/best_move/explain_move); `httpEngine.Health()` probe + cảnh báo sớm lúc init trong `getChessEngine` (agent_service.go C1). Test: `chess_engine_error_test.go`. (Resolve fuzzy đã có test sẵn `chess_resolve_test.go`.) *Còn nợ:* endpoint `/chess/engine/health` (cần refactor engine thành service DI) — để sau.
 - [x] **WS4a** — áp thương hiệu Dương Sinh: file đè `frontend/src/assets/theme/duongsinh-brand.css` (thang `--td-brand-color-*` → navy #2B3990, light+dark) import sau theme.css ở `main.ts`/`embed-main.ts` (C3 frontend); `index.html` đổi title + favicon SVG + meta; logo `frontend/public/duongsinh-{symbol,logo}.svg` (từ `@ds/brand`). Build frontend OK. *Lưu ý:* brand thật là navy + xanh, KHÔNG cam/gold (đã đính chính `01-du-an-duongsinh.md`).
 
+### Đợt củng cố sau audit (2026-06-29) — nhánh `feat/chess-audit-hardening`
+Rà soát toàn dự án (3 agent: backend/frontend/hạ tầng) → triển khai 4 nhóm A–D.
+- [x] **WS-A (vận hành & an toàn):**
+  - Thêm `migrations/versioned/000068_*.down.sql` + `000069_*.down.sql` (trước đó thiếu cặp `.down` → không rollback được). Mục B nhật ký.
+  - `docker-compose.chess.yml` (file cờ riêng): thêm `healthcheck` cho `chess-engine` (probe `/health`) + `app.depends_on` đổi sang `condition: service_healthy`.
+  - `.gitignore`: thêm `data/*.bak*`; `git rm --cached data/weknora.db.bak-131441` (gỡ khỏi track, giữ file local).
+  - `.github/workflows/cicd-deploy.yml` (file CI riêng, C5): thêm job `test` (go vet+test package cờ, frontend type-check) làm gate trước `deploy`.
+- [ ] **WS-B (củng cố backend):** test 4 tool; endpoint `/chess/engine/health` (DI service); config hóa hằng số; gom trùng lặp FEN/side.
+- [ ] **WS-C (frontend/brand):** bundle font Roboto; họa tiết ô cờ; tách `ChessCourses.vue`; validate FEN; type-safe + fix preview.
+- [ ] **WS-D (tính năng nợ):** bật RAG cờ (production) + đổi tên slug.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.

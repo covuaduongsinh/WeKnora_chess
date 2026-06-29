@@ -23,6 +23,14 @@ services:
     networks:
       - WeKnora-network
     restart: unless-stopped
+    # Probe cầu HTTP /health (uci_http_bridge.py) để app biết engine đã sẵn sàng.
+    # start_period cho Arasan kịp khởi tạo UCI (uci/isready) trước khi tính fail.
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   app:
     # Dùng định dạng list cho khớp environment ở docker-compose.yml (tránh lỗi merge).
@@ -37,4 +45,5 @@ services:
     volumes:
       - ./config/builtin_agents.yaml:/app/config/builtin_agents.yaml
     depends_on:
-      - chess-engine
+      chess-engine:
+        condition: service_healthy
