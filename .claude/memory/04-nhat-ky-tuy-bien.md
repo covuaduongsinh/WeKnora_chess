@@ -120,7 +120,14 @@ Rà soát toàn dự án (3 agent: backend/frontend/hạ tầng) → triển kha
   - Gom trùng lặp: `validateFENArg` trong `chess_common.go` (áp analyze/best_move/explain_move); gộp `chessSideToMove`→`fenSide` (xóa bản trùng ở demo test); lookup dùng `fenSide`.
   - Config hóa: thêm `EvaluateDepth`/`EvaluateMaxPlies`/`LookupOpeningLimit` vào `ChessConfig` (`config.go` C1) + env `CHESS_EVALUATE_DEPTH`/`CHESS_EVALUATE_MAX_PLIES`/`CHESS_LOOKUP_OPENING_LIMIT` (`.env.example`); constructor tool nhận tham số; `agent_service.go` (C1) thêm getter + truyền vào `NewChessEvaluateGameTool`/`NewChessLookupOpeningTool`.
   - Endpoint `GET /chess/engine/health`: file MỚI `internal/application/service/chess_engine.go` + `internal/handler/chess_engine.go` + `internal/types/interfaces/chess_engine.go`; wiring `container.go` (C1, +2 Provide) + route `router.go` (C1, `RegisterChessEngineRoutes`, Viewer). **Quyết định:** làm service ENGINE ĐỘC LẬP (không sửa `NewAgentService`) để giữ file xung đột cao nhất tối thiểu — engine http là wrapper rẻ nên chấp nhận init lười riêng. Trả `{enabled, healthy, detail}`.
-- [ ] **WS-C (frontend/brand):** bundle font Roboto; họa tiết ô cờ; tách `ChessCourses.vue`; validate FEN; type-safe + fix preview.
+- [x] **WS-C (frontend/brand):**
+  - Font Roboto self-host (Apache-2.0): 9 file woff2 (latin/latin-ext/vietnamese × 400/500/700) ở `frontend/public/fonts/` + `@font-face` trong `duongsinh-brand.css`. Build OK, dist copy đủ.
+  - Họa tiết ô cờ (checkerboard rất nhạt) cho `.chess-manage` (scoped, không đụng global).
+  - Validate FEN khi nhập: `isValidFEN()` trong `utils/chessBlocks.ts` (validator cấu trúc, không import chess.js để khỏi phình bundle chat); áp ở `PuzzleBank.vue` + `ChessCourses.vue` (FEN bài học, chỉ khi nhập).
+  - Type-safe: `PuzzleDialogState`/`CourseDialogState`/`LessonDialogState` thay `reactive<any>`; fix viewer PuzzleBank cập nhật sau khi sửa (revealKey++).
+  - a11y: `menu.vue` (C3 shared) thêm `alt="Cờ vua Dương Sinh"` cho logo.
+  - **CI đính chính:** `npm run type-check` (vue-tsc) ĐANG đỏ do lỗi type tồn đọng ở phần upstream (KnowledgeBase/ApiInfo/GraphSettings…) → ĐÃ BỎ khỏi gate `cicd-deploy.yml` (giữ gate Go; frontend vẫn dựng qua `vite build` ở build-ui). Bật lại type-check khi dọn sạch type upstream.
+  - **HOÃN C3** (tách `ChessCourses.vue` 637 dòng): refactor thuần nội bộ, không thêm giá trị; picker gắn chặt template-ref `<textarea>` nên tách "mù" (không chạy được app để test runtime tại đây) dễ hồi quy → để lại backlog, làm khi chạy app kiểm thử được.
 - [ ] **WS-D (tính năng nợ):** bật RAG cờ (production) + đổi tên slug.
 
 ### Backlog cũ

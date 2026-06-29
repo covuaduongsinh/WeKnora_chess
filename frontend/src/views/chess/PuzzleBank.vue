@@ -86,6 +86,7 @@ import {
   exportPuzzles, importPuzzles, type ChessPuzzle,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
+import { isValidFEN } from '@/utils/chessBlocks';
 
 const { t } = useI18n();
 
@@ -171,7 +172,16 @@ async function doImport() {
   } catch (e: any) { MessagePlugin.error(e?.error || e?.message || 'Import thất bại'); }
 }
 
-const dialog = reactive<any>({ visible: false, id: '', title: '', fen: '', solution: '', theme: '', difficulty: '' });
+interface PuzzleDialogState {
+  visible: boolean;
+  id: string;
+  title: string;
+  fen: string;
+  solution: string;
+  theme: string;
+  difficulty: string;
+}
+const dialog = reactive<PuzzleDialogState>({ visible: false, id: '', title: '', fen: '', solution: '', theme: '', difficulty: '' });
 function openDialog(p?: ChessPuzzle) {
   dialog.visible = true;
   dialog.id = p?.id || '';
@@ -183,15 +193,25 @@ function openDialog(p?: ChessPuzzle) {
 }
 async function save() {
   if (!dialog.fen.trim()) { MessagePlugin.warning('Nhập thế cờ FEN'); return; }
+  if (!isValidFEN(dialog.fen)) {
+    MessagePlugin.warning('Thế cờ FEN không hợp lệ — kiểm tra lại (8 hàng, đủ 8 ô mỗi hàng).');
+    return;
+  }
   const payload = {
     title: dialog.title, fen: dialog.fen, solution: dialog.solution,
     theme: dialog.theme, difficulty: dialog.difficulty,
   };
   try {
-    if (dialog.id) await updatePuzzle(dialog.id, payload);
+    const editingId = dialog.id;
+    if (editingId) await updatePuzzle(editingId, payload);
     else await createPuzzle(payload);
     dialog.visible = false;
     await load();
+    // Nếu đang sửa bài tập đang xem → cập nhật viewer để bàn cờ phản ánh thay đổi.
+    if (editingId && selected.value?.id === editingId) {
+      const updated = puzzles.value.find((p) => p.id === editingId);
+      if (updated) { selected.value = updated; revealed.value = false; revealKey.value++; }
+    }
     MessagePlugin.success('Đã lưu bài tập');
   } catch (e: any) {
     MessagePlugin.error(e?.error || e?.message || 'Lưu thất bại (kiểm tra FEN)');
