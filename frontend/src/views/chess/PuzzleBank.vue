@@ -36,6 +36,7 @@
             <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyWikilink(p)">
               <t-icon name="link" />
             </t-button>
+            <t-button size="small" variant="text" title="Đổi slug" @click.stop="renameSlug(p)"><t-icon name="tag" /></t-button>
             <t-button size="small" variant="text" @click.stop="openDialog(p)"><t-icon name="edit" /></t-button>
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(p)"><t-icon name="delete" /></t-button>
           </span>
@@ -83,7 +84,7 @@ import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle,
-  exportPuzzles, importPuzzles, type ChessPuzzle,
+  exportPuzzles, importPuzzles, renamePuzzleSlug, type ChessPuzzle,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 import { isValidFEN } from '@/utils/chessBlocks';
@@ -217,6 +218,23 @@ async function save() {
     MessagePlugin.error(e?.error || e?.message || 'Lưu thất bại (kiểm tra FEN)');
   }
 }
+// Đổi slug bài tập (power-feature cho HLV): link cũ [[puzzle/<cũ>]] vẫn sống nhờ alias.
+async function renameSlug(p: ChessPuzzle) {
+  if (!p.slug) { MessagePlugin.warning('Bài tập chưa có slug'); return; }
+  const next = window.prompt(`Đổi slug cho "${p.title || p.slug}" (link cũ vẫn sống nhờ alias):`, p.slug);
+  if (next == null) return;
+  const v = next.trim();
+  if (!v || v === p.slug) return;
+  try {
+    const res: any = await renamePuzzleSlug(p.id, v);
+    await load();
+    if (selected.value?.id === p.id && res?.data) selected.value = res.data;
+    MessagePlugin.success(`Đã đổi slug → ${res?.data?.slug || v}`);
+  } catch (e: any) {
+    MessagePlugin.error(e?.error || e?.message || 'Đổi slug thất bại');
+  }
+}
+
 function remove(p: ChessPuzzle) {
   DialogPlugin.confirm({
     header: 'Xóa bài tập', body: `Xóa "${p.title || 'bài tập'}"?`,

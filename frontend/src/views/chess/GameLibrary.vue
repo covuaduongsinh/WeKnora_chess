@@ -34,6 +34,7 @@
             <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyWikilink(g)">
               <t-icon name="link" />
             </t-button>
+            <t-button size="small" variant="text" title="Đổi slug" @click.stop="renameSlug(g)"><t-icon name="tag" /></t-button>
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(g)"><t-icon name="delete" /></t-button>
           </span>
         </div>
@@ -64,7 +65,7 @@ import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import type { ChessBoardData } from '@/types/tool-results';
-import { listGames, getGameBySlug, deleteGame, importGames, exportGamesPGN, type ChessGame } from '@/api/chess';
+import { listGames, getGameBySlug, deleteGame, importGames, exportGamesPGN, renameGameSlug, type ChessGame } from '@/api/chess';
 import { downloadText } from '@/utils/fileTransfer';
 
 const { t } = useI18n();
@@ -132,6 +133,23 @@ function remove(g: ChessGame) {
     },
   });
 }
+// Đổi slug ván (power-feature cho HLV): link cũ [[game/<cũ>]] vẫn sống nhờ alias.
+async function renameSlug(g: ChessGame) {
+  if (!g.slug) { MessagePlugin.warning('Ván chưa có slug'); return; }
+  const next = window.prompt(`Đổi slug cho ván "${g.white || '?'} – ${g.black || '?'}" (link cũ vẫn sống nhờ alias):`, g.slug);
+  if (next == null) return;
+  const v = next.trim();
+  if (!v || v === g.slug) return;
+  try {
+    const res: any = await renameGameSlug(g.id, v);
+    await load();
+    if (selected.value?.id === g.id && res?.data) selected.value = res.data;
+    MessagePlugin.success(`Đã đổi slug → ${res?.data?.slug || v}`);
+  } catch (e: any) {
+    MessagePlugin.error(e?.error || e?.message || 'Đổi slug thất bại');
+  }
+}
+
 async function doExport() {
   try {
     const res: any = await exportGamesPGN(filter);

@@ -53,6 +53,27 @@ Overlay đã mount YAML → chỉ **restart `app`**, không cần rebuild:
 docker compose -f docker-compose.yml -f docker-compose.chess.yml restart app
 ```
 
+## 3b. Bật trên PRODUCTION (`weknora.covuaduongsinh.com`)
+> Các lệnh ở trên dùng compose local. Trên VPS (GHCR/Caddy) làm tuần tự, **AN TOÀN TRƯỚC**:
+1. **Backup DB trước tiên** (bắt buộc — thao tác có rủi ro):
+   ```bash
+   bash scripts/deploy/backup.sh    # hoặc theo docs/deploy/backup-restore.md
+   ```
+2. Đặt `CHESS_KB_INDEX=true` trong `.env` trên VPS (mục service `app`).
+3. Áp lại & khởi động lại `app` (không cần rebuild nếu chỉ đổi env):
+   ```bash
+   bash scripts/deploy/redeploy.sh   # hoặc: dc up -d app  (xem scripts/deploy/dc.sh)
+   ```
+4. Backfill dữ liệu cũ — gọi reindex vào URL production (API key tenant ở UI → Cài đặt → API key):
+   ```bash
+   curl -X POST https://weknora.covuaduongsinh.com/api/v1/chess/library/reindex \
+     -H "X-API-Key: <API_KEY_TENANT>"
+   ```
+5. Sửa block `builtin-chess-coach` (mục 3) trong `config/builtin_agents.yaml` trên VPS → restart `app`.
+6. Nghiệm thu (mục 4). Nếu trục trặc → Rollback (mục 5) + restore backup nếu cần.
+
+> **Khuyến nghị mạnh:** chạy thử **local 1 lượt** (mục 1–4) trước khi làm production để bắt sớm lỗi pipeline embedding/worker.
+
 ## 4. Nghiệm thu
 1. Nạp ≥ vài tài liệu lý thuyết vào KB cờ (hoặc dựa vào ván/bài tập đã reindex).
 2. Hỏi HLV một câu lý thuyết về nội dung vừa nạp.

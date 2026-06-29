@@ -512,6 +512,7 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		games.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetGameBacklinks)
 		games.GET("/:id", g.Viewer(), h.GetGame)
 		games.PUT("/:id", g.Contributor(), h.UpdateGame)
+		games.PUT("/:id/slug", g.Contributor(), h.RenameGameSlug)
 		games.DELETE("/:id", g.Contributor(), h.DeleteGame)
 	}
 	puzzles := r.Group("/chess/puzzles")
@@ -526,6 +527,7 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		puzzles.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetPuzzleBacklinks)
 		puzzles.GET("/:id", g.Viewer(), h.GetPuzzle)
 		puzzles.PUT("/:id", g.Contributor(), h.UpdatePuzzle)
+		puzzles.PUT("/:id/slug", g.Contributor(), h.RenamePuzzleSlug)
 		puzzles.DELETE("/:id", g.Contributor(), h.DeletePuzzle)
 	}
 	// Bảo trì KB tri thức cờ (đẩy lại index sau khi bật CHESS_KB_INDEX). Nặng →

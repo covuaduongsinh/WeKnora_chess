@@ -115,6 +115,38 @@ func (s *chessLibraryService) UpdateGame(ctx context.Context, game *types.ChessG
 	return updated, err
 }
 
+// RenameGameSlug đổi slug ván sang newSlug (chuẩn hóa + đảm bảo duy nhất theo
+// tenant) và ghi alias slug-cũ→mới để wikilink [[game/<cũ>]] vẫn giải mã đúng.
+func (s *chessLibraryService) RenameGameSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessGame, error) {
+	g, err := s.repo.GetGame(ctx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	base := slugifyChess(newSlug)
+	if base == "" {
+		return nil, fmt.Errorf("slug mới không hợp lệ (cần chứa chữ/số)")
+	}
+	if base == g.Slug {
+		return g, nil // không đổi
+	}
+	unique, err := ensureUniqueChessSlug(ctx, tenantID, base, g.ID, s.repo.GameSlugExists)
+	if err != nil {
+		return nil, err
+	}
+	oldSlug := g.Slug
+	if err := s.repo.UpdateGameSlug(ctx, tenantID, id, unique); err != nil {
+		return nil, err
+	}
+	if s.aliasRepo != nil && oldSlug != "" {
+		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypeGame, oldSlug, unique)
+	}
+	updated, err := s.repo.GetGame(ctx, tenantID, id)
+	if err == nil && updated != nil && s.indexer != nil {
+		s.indexer.IndexGame(ctx, updated)
+	}
+	return updated, err
+}
+
 func (s *chessLibraryService) DeleteGame(ctx context.Context, tenantID uint64, id string) error {
 	g, _ := s.repo.GetGame(ctx, tenantID, id)
 	if err := s.repo.DeleteGame(ctx, tenantID, id); err != nil {
@@ -229,6 +261,37 @@ func (s *chessLibraryService) UpdatePuzzle(ctx context.Context, puzzle *types.Ch
 		return nil, err
 	}
 	updated, err := s.repo.GetPuzzle(ctx, puzzle.TenantID, puzzle.ID)
+	if err == nil && updated != nil && s.indexer != nil {
+		s.indexer.IndexPuzzle(ctx, updated)
+	}
+	return updated, err
+}
+
+// RenamePuzzleSlug đổi slug bài tập sang newSlug + ghi alias slug-cũ→mới.
+func (s *chessLibraryService) RenamePuzzleSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessPuzzle, error) {
+	p, err := s.repo.GetPuzzle(ctx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	base := slugifyChess(newSlug)
+	if base == "" {
+		return nil, fmt.Errorf("slug mới không hợp lệ (cần chứa chữ/số)")
+	}
+	if base == p.Slug {
+		return p, nil
+	}
+	unique, err := ensureUniqueChessSlug(ctx, tenantID, base, p.ID, s.repo.PuzzleSlugExists)
+	if err != nil {
+		return nil, err
+	}
+	oldSlug := p.Slug
+	if err := s.repo.UpdatePuzzleSlug(ctx, tenantID, id, unique); err != nil {
+		return nil, err
+	}
+	if s.aliasRepo != nil && oldSlug != "" {
+		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypePuzzle, oldSlug, unique)
+	}
+	updated, err := s.repo.GetPuzzle(ctx, tenantID, id)
 	if err == nil && updated != nil && s.indexer != nil {
 		s.indexer.IndexPuzzle(ctx, updated)
 	}

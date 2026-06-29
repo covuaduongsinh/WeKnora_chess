@@ -17,6 +17,9 @@ type ChessLibraryService interface {
 	GetGameBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreateGame(ctx context.Context, game *types.ChessGame) (*types.ChessGame, error)
 	UpdateGame(ctx context.Context, game *types.ChessGame) (*types.ChessGame, error)
+	// RenameGameSlug đổi slug ván sang newSlug (chuẩn hóa + đảm bảo duy nhất) và ghi
+	// alias slug-cũ→mới để wikilink cũ vẫn sống.
+	RenameGameSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessGame, error)
 	DeleteGame(ctx context.Context, tenantID uint64, id string) error
 	// ImportGames tách một PGN nhiều ván và tạo nhiều ChessGame; trả số ván đã thêm.
 	ImportGames(ctx context.Context, tenantID uint64, pgn string) (int, error)
@@ -30,6 +33,8 @@ type ChessLibraryService interface {
 	GetPuzzleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error)
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) (*types.ChessPuzzle, error)
+	// RenamePuzzleSlug đổi slug bài tập sang newSlug + ghi alias slug-cũ→mới.
+	RenamePuzzleSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessPuzzle, error)
 	DeletePuzzle(ctx context.Context, tenantID uint64, id string) error
 	RandomPuzzle(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (*types.ChessPuzzle, error)
 
@@ -58,6 +63,8 @@ type ChessLibraryRepository interface {
 	CreateGame(ctx context.Context, game *types.ChessGame) error
 	CreateGames(ctx context.Context, games []*types.ChessGame) error
 	UpdateGame(ctx context.Context, game *types.ChessGame) error
+	// UpdateGameSlug chỉ đổi cột slug (tách riêng vì UpdateGame cố tình không đụng slug).
+	UpdateGameSlug(ctx context.Context, tenantID uint64, id, slug string) error
 	DeleteGame(ctx context.Context, tenantID uint64, id string) error
 
 	// ---- Bài tập ----
@@ -69,6 +76,8 @@ type ChessLibraryRepository interface {
 	PuzzleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
 	CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error
 	UpdatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error
+	// UpdatePuzzleSlug chỉ đổi cột slug (tách riêng như UpdateGameSlug).
+	UpdatePuzzleSlug(ctx context.Context, tenantID uint64, id, slug string) error
 	DeletePuzzle(ctx context.Context, tenantID uint64, id string) error
 	RandomPuzzle(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (*types.ChessPuzzle, error)
 }
