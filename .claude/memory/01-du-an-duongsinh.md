@@ -30,9 +30,11 @@ Khung phân loại để tổ chức knowledge base, tag tài liệu, phân tầ
 > Mỗi bài giảng / ván / bài tập / trang Wiki nên gắn tag cấp độ (Tốt…Vua) để agent trả lời đúng độ sâu người hỏi.
 
 ## Nhận diện thương hiệu (áp cho mọi tùy biến UI/ấn phẩm)
-- **Màu chủ đạo:** `#2B3990` (navy/blue) + **gold**.
+> **Nguồn chuẩn:** package `@ds/brand` tại `C:\Users\duongsinh\Documents\code\covuaduongsinh\packages\brand` (theme.css token, logo SVG, pattern, fonts). Lấy màu/asset từ đây, đừng đoán.
+- **Màu chủ đạo:** `#2B3990` (navy) + tông **xanh** bổ trợ (teal `#3dbb95`, blue `#2275b4`). ⚠️ **KHÔNG dùng cam/gold** cho nhận diện — amber/đỏ chỉ biểu thị trạng thái (warning/error). *(Đính chính: ghi chú "gold" trước đây là SAI so với brand guide.)*
 - **Font:** Roboto / Calibri.
-- **Họa tiết:** ô vuông bàn cờ (checkerboard), logo Dương Sinh.
+- **Họa tiết:** ô vuông bàn cờ (checkerboard), logo Dương Sinh (`logo-symbol.svg` = biểu tượng ô cờ, `logo-full.svg` = logo đầy đủ).
+- **Đã áp vào frontend (WS4a):** `frontend/src/assets/theme/duongsinh-brand.css` đè thang `--td-brand-color-*` sang navy (import sau theme.css ở `main.ts`/`embed-main.ts`); favicon + title ở `index.html`; logo copy vào `frontend/public/duongsinh-*.svg`.
 
 ## Bối cảnh kỹ thuật của Thầy Tường
 - Soạn sách cờ vua trong **Obsidian** (vault OBSIDIAN2026), tích hợp AI. Nguồn giáo trình gốc **tiếng Nga**, đang **Việt hóa** theo cấu trúc bài giảng có sẵn.

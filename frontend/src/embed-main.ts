@@ -4,6 +4,7 @@ import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import TDesign from 'tdesign-vue-next'
 import 'tdesign-vue-next/es/style/index.css'
 import '@/assets/theme/theme.css'
+import '@/assets/theme/duongsinh-brand.css' // override màu brand → navy Dương Sinh
 import { installTDesignIconOfflineGuard } from '@/utils/tdesign-icon-offline'
 import i18n from './i18n/embed'
 import EmbedPage from '@/views/embed/EmbedPage.vue'

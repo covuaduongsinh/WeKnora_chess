@@ -106,10 +106,10 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 - [x] **WS3** — Mở rộng khai cuộc: nhúng `data/eco.tsv` (3733 khai cuộc, lichess CC0) qua `chess_openings_data.go`; `openingIndex` gộp dataset + overlay Việt hoá; `chess_lookup_opening.go` dùng index. Test: `chess_lookup_opening_test.go`.
 - [x] **WS2 (chuẩn bị, CHƯA bật)** — `ReindexAll` (service+interface chess) + route `POST /chess/library/reindex` (router.go C1) + runbook `docs/chess-rag-enable.md`. Bật runtime do Thầy theo runbook.
 - [x] **WS4b** — thông báo lỗi engine thân thiện (`friendlyEngineError` trong `chess_common.go`, áp cho analyze/best_move/explain_move); `httpEngine.Health()` probe + cảnh báo sớm lúc init trong `getChessEngine` (agent_service.go C1). Test: `chess_engine_error_test.go`. (Resolve fuzzy đã có test sẵn `chess_resolve_test.go`.) *Còn nợ:* endpoint `/chess/engine/health` (cần refactor engine thành service DI) — để sau.
-- [ ] **WS4a** — áp thương hiệu (chờ file logo).
+- [x] **WS4a** — áp thương hiệu Dương Sinh: file đè `frontend/src/assets/theme/duongsinh-brand.css` (thang `--td-brand-color-*` → navy #2B3990, light+dark) import sau theme.css ở `main.ts`/`embed-main.ts` (C3 frontend); `index.html` đổi title + favicon SVG + meta; logo `frontend/public/duongsinh-{symbol,logo}.svg` (từ `@ds/brand`). Build frontend OK. *Lưu ý:* brand thật là navy + xanh, KHÔNG cam/gold (đã đính chính `01-du-an-duongsinh.md`).
 
 ### Backlog cũ
-- [ ] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` + gold, logo) vào `frontend/`.
+- [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.
 - [ ] Nút "đổi tên slug" để dùng `chess_slug_aliases` (bảng đang trống).
 - [ ] Khi merge upstream lần tới: ưu tiên rà C1 (móc lõi) + C4 (i18n/prompt) + C6 (migration sqlite).

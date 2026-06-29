@@ -1,0 +1,47 @@
+/* ============================================================================
+   Nhận diện thương hiệu CÔNG TY CP CỜ VUA DƯƠNG SINH
+   Đè bảng màu brand của TDesign sang NAVY #2B3990 (chủ đạo) + tông xanh.
+   Nguồn chuẩn: packages/brand (@ds/brand). LƯU Ý brand guide: KHÔNG dùng cam/gold
+   cho nhận diện — amber/đỏ chỉ biểu thị trạng thái (warning/error giữ nguyên).
+   File này import SAU theme.css để override (xem main.ts / embed-main.ts).
+   ============================================================================ */
+
+:root,
+:root[theme-mode="light"] {
+  /* Font thương hiệu: ưu tiên Roboto / Calibri, fallback hệ thống */
+  --app-font-family: "Roboto", "Calibri", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+
+  /* Thang màu thương hiệu (navy) — bậc 4 = chủ đạo #2B3990 (TDesign dùng -4 ở light) */
+  --td-brand-color-1: #eef0fa;
+  --td-brand-color-2: #c9d0ee;
+  --td-brand-color-3: #8e9bd6;
+  --td-brand-color-4: #2b3990; /* CHỦ ĐẠO — navy Dương Sinh */
+  --td-brand-color-5: #22307a;
+  --td-brand-color-6: #1e2a6b;
+  --td-brand-color-7: #18225a;
+  --td-brand-color-8: #151d49;
+  --td-brand-color-9: #101640;
+  --td-brand-color-10: #0b0f30;
+  --td-brand-color-disabled: #aab2dd;
+}
+
+:root[theme-mode="dark"] {
+  --app-font-family: "Roboto", "Calibri", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+
+  /* Dark: TDesign dùng -6 làm chủ đạo → chọn navy-xanh sáng hơn cho tương phản */
+  --td-brand-color-1: #1a1f3a;
+  --td-brand-color-2: #232a52;
+  --td-brand-color-3: #2b3990;
+  --td-brand-color-4: #3644a8;
+  --td-brand-color-5: #4453bf;
+  --td-brand-color-6: #5566cc; /* CHỦ ĐẠO (dark) */
+  --td-brand-color-7: #6b7ad6;
+  --td-brand-color-8: #8d9ae2;
+  --td-brand-color-9: #b3bcec;
+  --td-brand-color-10: #d9def6;
+  --td-brand-color-disabled: #2f3a6b;
+}
