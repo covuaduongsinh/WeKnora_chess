@@ -514,6 +514,12 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		puzzles.PUT("/:id", g.Contributor(), h.UpdatePuzzle)
 		puzzles.DELETE("/:id", g.Contributor(), h.DeletePuzzle)
 	}
+	// Bảo trì KB tri thức cờ (đẩy lại index sau khi bật CHESS_KB_INDEX). Nặng →
+	// cần Contributor. No-op khi RAG cờ chưa bật.
+	library := r.Group("/chess/library")
+	{
+		library.POST("/reindex", g.Contributor(), h.ReindexKB)
+	}
 }
 
 // RegisterMessageRoutes 注册消息相关的路由。

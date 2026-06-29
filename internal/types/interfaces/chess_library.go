@@ -40,6 +40,10 @@ type ChessLibraryService interface {
 	ExportPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]types.ChessPuzzleBundle, error)
 	// ImportPuzzles nhập danh sách bài tập (luôn tạo mới); trả số bài đã thêm.
 	ImportPuzzles(ctx context.Context, tenantID uint64, items []types.ChessPuzzleBundle) (int, error)
+
+	// ReindexAll đẩy lại toàn bộ ván + bài tập của tenant vào KB tri thức cờ (chỉ
+	// tác dụng khi CHESS_KB_INDEX bật). Trả (số ván, số bài tập) đã index.
+	ReindexAll(ctx context.Context, tenantID uint64) (int, int, error)
 }
 
 // ChessLibraryRepository định nghĩa thao tác lưu trữ kho ván & bài tập.

@@ -333,3 +333,19 @@ func (h *ChessLibraryHandler) DeletePuzzle(c *gin.Context) {
 	}
 	chessOK(c, gin.H{"deleted": true})
 }
+
+// ---- Bảo trì KB ----
+
+// ReindexKB POST /chess/library/reindex — đẩy lại toàn bộ ván+bài tập vào KB tri
+// thức cờ. Dùng MỘT LẦN sau khi bật CHESS_KB_INDEX để index dữ liệu cũ (import
+// hàng loạt không tự index). Trả lỗi rõ ràng nếu RAG cờ chưa bật.
+func (h *ChessLibraryHandler) ReindexKB(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	games, puzzles, err := h.service.ReindexAll(ctx, tenantID)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, gin.H{"games_indexed": games, "puzzles_indexed": puzzles})
+}

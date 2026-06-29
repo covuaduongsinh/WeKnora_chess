@@ -311,3 +311,27 @@ func (s *chessLibraryService) ImportPuzzles(ctx context.Context, tenantID uint64
 	}
 	return created, nil
 }
+
+// ReindexAll đẩy lại toàn bộ ván + bài tập của tenant vào KB tri thức cờ. Dùng sau
+// khi bật CHESS_KB_INDEX để index dữ liệu cũ (import hàng loạt KHÔNG tự index). An
+// toàn: no-op khi indexer chưa bật; lỗi index từng bản ghi là best-effort (chỉ log).
+func (s *chessLibraryService) ReindexAll(ctx context.Context, tenantID uint64) (int, int, error) {
+	if s.indexer == nil || !s.indexer.Enabled() {
+		return 0, 0, fmt.Errorf("CHESS_KB_INDEX chưa bật — không có gì để index")
+	}
+	games, err := s.repo.ListGames(ctx, tenantID, types.ChessGameFilter{})
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, g := range games {
+		s.indexer.IndexGame(ctx, g)
+	}
+	puzzles, err := s.repo.ListPuzzles(ctx, tenantID, types.ChessPuzzleFilter{})
+	if err != nil {
+		return len(games), 0, err
+	}
+	for _, p := range puzzles {
+		s.indexer.IndexPuzzle(ctx, p)
+	}
+	return len(games), len(puzzles), nil
+}
