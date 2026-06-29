@@ -70,7 +70,7 @@ func (t *ChessAnalyzePositionTool) Execute(ctx context.Context, args json.RawMes
 
 	analysis, err := t.engine.Analyze(ctx, input.FEN, depth)
 	if err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Engine lỗi: %v", err)}, nil
+		return &types.ToolResult{Success: false, Error: friendlyEngineError(err)}, nil
 	}
 
 	var b strings.Builder

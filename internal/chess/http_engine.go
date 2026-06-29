@@ -90,3 +90,21 @@ func (e *httpEngine) Analyze(ctx context.Context, fen string, depth int) (*Analy
 
 // Close không cần làm gì với client HTTP.
 func (e *httpEngine) Close() error { return nil }
+
+// Health kiểm tra sidecar có sống không (probe nhẹ, không phân tích). Coi BẤT KỲ
+// phản hồi HTTP nào (kể cả 404) là "sống"; chỉ lỗi kết nối/timeout mới là "chết".
+// Trả ErrEngineUnavailable khi không kết nối được — caller dùng để cảnh báo sớm.
+func (e *httpEngine) Health(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, e.endpoint+"/health", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := e.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrEngineUnavailable, err)
+	}
+	_ = resp.Body.Close()
+	return nil
+}

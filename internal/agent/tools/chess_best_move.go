@@ -70,7 +70,7 @@ func (t *ChessBestMoveTool) Execute(ctx context.Context, args json.RawMessage) (
 
 	analysis, err := t.engine.Analyze(ctx, input.FEN, depth)
 	if err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Engine lỗi: %v", err)}, nil
+		return &types.ToolResult{Success: false, Error: friendlyEngineError(err)}, nil
 	}
 	if analysis.BestMove == "" {
 		return &types.ToolResult{

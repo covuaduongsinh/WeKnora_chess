@@ -1,11 +1,28 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/Tencent/WeKnora/internal/chess"
 )
+
+// friendlyEngineError dịch lỗi từ engine sang thông báo thân thiện (tiếng Việt) cho
+// người học/HLV, thay vì lỗi kỹ thuật thô. Dùng chung cho các tool gọi engine để
+// khi engine "câm" (sidecar chết/timeout) người dùng vẫn nhận lời nhắn rõ ràng.
+func friendlyEngineError(err error) string {
+	switch {
+	case errors.Is(err, chess.ErrAnalysisTimeout):
+		return "Engine cờ phân tích quá lâu và đã hết thời gian chờ. Hãy thử lại với độ sâu nhỏ hơn hoặc thử lại sau."
+	case errors.Is(err, chess.ErrEngineUnavailable):
+		return "Engine cờ tạm thời không phản hồi (dịch vụ phân tích có thể đang khởi động lại). Vui lòng thử lại sau ít phút."
+	case errors.Is(err, chess.ErrInvalidFEN):
+		return "Thế cờ (FEN) không hợp lệ — vui lòng kiểm tra lại chuỗi FEN."
+	default:
+		return fmt.Sprintf("Engine gặp sự cố khi phân tích: %v", err)
+	}
+}
 
 // chess_common.go gom các tiện ích dùng chung cho nhóm tool cờ vua.
 

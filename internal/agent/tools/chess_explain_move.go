@@ -85,11 +85,11 @@ func (t *ChessExplainMoveTool) Execute(ctx context.Context, args json.RawMessage
 
 	before, err := t.engine.Analyze(ctx, input.FEN, depth)
 	if err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Engine lỗi: %v", err)}, nil
+		return &types.ToolResult{Success: false, Error: friendlyEngineError(err)}, nil
 	}
 	after, err := t.engine.Analyze(ctx, fenAfter, depth)
 	if err != nil {
-		return &types.ToolResult{Success: false, Error: fmt.Sprintf("Engine lỗi: %v", err)}, nil
+		return &types.ToolResult{Success: false, Error: friendlyEngineError(err)}, nil
 	}
 
 	mover := before.SideToMove
