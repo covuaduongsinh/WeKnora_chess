@@ -39,7 +39,7 @@ func TestSanKeyFromPGN(t *testing.T) {
 
 // Tool phải nhận diện một khai cuộc NGOÀI bảng gốc (vd 1.f4 Bird) nhờ dataset.
 func TestLookupOpening_FromDataset(t *testing.T) {
-	tool := NewChessLookupOpeningTool()
+	tool := NewChessLookupOpeningTool(0)
 	args, _ := json.Marshal(ChessLookupOpeningInput{Moves: []string{"f4"}})
 	res, err := tool.Execute(context.Background(), args)
 	if err != nil || res == nil || !res.Success {

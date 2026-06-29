@@ -75,6 +75,7 @@ type RouterParams struct {
 	TagHandler                   *handler.TagHandler
 	ChessCourseHandler           *handler.ChessCourseHandler
 	ChessLibraryHandler          *handler.ChessLibraryHandler
+	ChessEngineHandler           *handler.ChessEngineHandler
 	ChessRefHandler              *handler.ChessRefHandler
 	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
@@ -210,6 +211,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterChessCourseRoutes(v1, params.ChessCourseHandler, rbacGuards)
 		RegisterChessLibraryRoutes(v1, params.ChessLibraryHandler, rbacGuards)
+		RegisterChessEngineRoutes(v1, params.ChessEngineHandler, rbacGuards)
 		RegisterChessRefRoutes(v1, params.ChessRefHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
@@ -478,6 +480,18 @@ func RegisterChessRefRoutes(r *gin.RouterGroup, h *handler.ChessRefHandler, g *r
 	refs := r.Group("/chess/refs")
 	{
 		refs.GET("/search", g.Viewer(), h.SearchRefs)
+	}
+}
+
+// RegisterChessEngineRoutes đăng ký API trạng thái engine cờ (vận hành/monitor).
+// Chỉ đọc → cần Viewer.
+func RegisterChessEngineRoutes(r *gin.RouterGroup, h *handler.ChessEngineHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	engine := r.Group("/chess/engine")
+	{
+		engine.GET("/health", g.Viewer(), h.Health)
 	}
 }
 

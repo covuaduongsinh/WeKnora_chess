@@ -34,14 +34,22 @@ type ChessLookupOpeningInput struct {
 	Moves []string `json:"moves,omitempty" jsonschema:"Danh sách nước đi SAN, ví dụ [\"e4\",\"c5\"]"`
 }
 
+// defaultLookupOpeningLimit là số nước đầu tối đa xét khi tra khai cuộc (đủ bắt
+// các biến lý thuyết sâu) khi không cấu hình CHESS_LOOKUP_OPENING_LIMIT.
+const defaultLookupOpeningLimit = 40
+
 // ChessLookupOpeningTool tra cứu khai cuộc theo bảng ECO nhúng.
 type ChessLookupOpeningTool struct {
 	BaseTool
+	limit int
 }
 
-// NewChessLookupOpeningTool tạo tool chess_lookup_opening.
-func NewChessLookupOpeningTool() *ChessLookupOpeningTool {
-	return &ChessLookupOpeningTool{BaseTool: chessLookupOpeningTool}
+// NewChessLookupOpeningTool tạo tool chess_lookup_opening. limit <= 0 dùng mặc định.
+func NewChessLookupOpeningTool(limit int) *ChessLookupOpeningTool {
+	if limit <= 0 {
+		limit = defaultLookupOpeningLimit
+	}
+	return &ChessLookupOpeningTool{BaseTool: chessLookupOpeningTool, limit: limit}
 }
 
 type ecoEntry struct {
@@ -139,10 +147,11 @@ func (t *ChessLookupOpeningTool) Execute(ctx context.Context, args json.RawMessa
 	}
 
 	// Tìm tiền tố dài nhất khớp index khai cuộc (gộp dataset + overlay Việt hoá).
-	// Giới hạn ~40 nước đầu để bắt được cả các biến lý thuyết sâu.
+	// Giới hạn số nước đầu (cấu hình qua CHESS_LOOKUP_OPENING_LIMIT) để bắt cả các
+	// biến lý thuyết sâu mà không quét quá dài.
 	limit := len(sans)
-	if limit > 40 {
-		limit = 40
+	if limit > t.limit {
+		limit = t.limit
 	}
 	var matched ecoEntry
 	matchedLen := 0
@@ -174,14 +183,10 @@ func (t *ChessLookupOpeningTool) Execute(ctx context.Context, args json.RawMessa
 	output := fmt.Sprintf("Khai cuộc: %s\nMã ECO: %s\nKhớp %d nước đầu: %s",
 		matched.name, matched.eco, matchedLen, strings.Join(sans[:matchedLen], " "))
 
-	stm := "w"
-	if f := strings.Fields(fen); len(f) >= 2 {
-		stm = f[1]
-	}
 	data := map[string]interface{}{
 		"display_type": "chess_board",
 		"fen":          fen,
-		"side_to_move": stm,
+		"side_to_move": fenSide(fen),
 		"caption":      fmt.Sprintf("%s (%s)", matched.name, matched.eco),
 	}
 

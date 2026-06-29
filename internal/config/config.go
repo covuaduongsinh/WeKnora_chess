@@ -71,6 +71,13 @@ type ChessConfig struct {
 	MaxConcurrent int `yaml:"max_concurrent" json:"max_concurrent"`
 	// TimeoutSec là thời gian tối đa cho một lần phân tích (giây). Mặc định 15.
 	TimeoutSec int `yaml:"timeout_sec" json:"timeout_sec"`
+	// EvaluateDepth là độ sâu engine khi chấm cả ván (chess_evaluate_game).
+	// Mặc định 12 (nhỏ để nhanh trong vòng lặp agent).
+	EvaluateDepth int `yaml:"evaluate_depth" json:"evaluate_depth"`
+	// EvaluateMaxPlies giới hạn số nửa-nước phân tích khi chấm ván. Mặc định 60.
+	EvaluateMaxPlies int `yaml:"evaluate_max_plies" json:"evaluate_max_plies"`
+	// LookupOpeningLimit giới hạn số nước đầu xét khi tra khai cuộc. Mặc định 40.
+	LookupOpeningLimit int `yaml:"lookup_opening_limit" json:"lookup_opening_limit"`
 }
 
 // IMConfig configures the IM integration service.
@@ -834,6 +841,21 @@ func applyChessEnvOverrides(cfg *Config) {
 	}
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_CHESS_ENABLED")); value != "" {
 		c.Enabled = strings.EqualFold(value, "true")
+	}
+	if value := strings.TrimSpace(os.Getenv("CHESS_EVALUATE_DEPTH")); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			c.EvaluateDepth = n
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("CHESS_EVALUATE_MAX_PLIES")); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			c.EvaluateMaxPlies = n
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("CHESS_LOOKUP_OPENING_LIMIT")); value != "" {
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			c.LookupOpeningLimit = n
+		}
 	}
 
 	// Tự suy ra Enabled: nếu chưa bật tường minh nhưng đã có đủ thông tin engine

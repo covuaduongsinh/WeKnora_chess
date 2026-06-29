@@ -115,7 +115,11 @@ Rà soát toàn dự án (3 agent: backend/frontend/hạ tầng) → triển kha
   - `docker-compose.chess.yml` (file cờ riêng): thêm `healthcheck` cho `chess-engine` (probe `/health`) + `app.depends_on` đổi sang `condition: service_healthy`.
   - `.gitignore`: thêm `data/*.bak*`; `git rm --cached data/weknora.db.bak-131441` (gỡ khỏi track, giữ file local).
   - `.github/workflows/cicd-deploy.yml` (file CI riêng, C5): thêm job `test` (go vet+test package cờ, frontend type-check) làm gate trước `deploy`.
-- [ ] **WS-B (củng cố backend):** test 4 tool; endpoint `/chess/engine/health` (DI service); config hóa hằng số; gom trùng lặp FEN/side.
+- [x] **WS-B (củng cố backend):**
+  - Test 4 tool: thêm `chess_analyze_position_test.go`, `chess_best_move_test.go`, `chess_explain_move_test.go`, `chess_evaluate_game_test.go` (tái dùng `stubEngine`/`errEngine`, thêm `emptyMoveEngine`).
+  - Gom trùng lặp: `validateFENArg` trong `chess_common.go` (áp analyze/best_move/explain_move); gộp `chessSideToMove`→`fenSide` (xóa bản trùng ở demo test); lookup dùng `fenSide`.
+  - Config hóa: thêm `EvaluateDepth`/`EvaluateMaxPlies`/`LookupOpeningLimit` vào `ChessConfig` (`config.go` C1) + env `CHESS_EVALUATE_DEPTH`/`CHESS_EVALUATE_MAX_PLIES`/`CHESS_LOOKUP_OPENING_LIMIT` (`.env.example`); constructor tool nhận tham số; `agent_service.go` (C1) thêm getter + truyền vào `NewChessEvaluateGameTool`/`NewChessLookupOpeningTool`.
+  - Endpoint `GET /chess/engine/health`: file MỚI `internal/application/service/chess_engine.go` + `internal/handler/chess_engine.go` + `internal/types/interfaces/chess_engine.go`; wiring `container.go` (C1, +2 Provide) + route `router.go` (C1, `RegisterChessEngineRoutes`, Viewer). **Quyết định:** làm service ENGINE ĐỘC LẬP (không sửa `NewAgentService`) để giữ file xung đột cao nhất tối thiểu — engine http là wrapper rẻ nên chấp nhận init lười riêng. Trả `{enabled, healthy, detail}`.
 - [ ] **WS-C (frontend/brand):** bundle font Roboto; họa tiết ô cờ; tách `ChessCourses.vue`; validate FEN; type-safe + fix preview.
 - [ ] **WS-D (tính năng nợ):** bật RAG cờ (production) + đổi tên slug.
 

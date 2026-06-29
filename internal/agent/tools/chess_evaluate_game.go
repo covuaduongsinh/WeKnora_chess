@@ -47,12 +47,21 @@ type ChessEvaluateGameInput struct {
 // ChessEvaluateGameTool chấm điểm cả ván.
 type ChessEvaluateGameTool struct {
 	BaseTool
-	engine chess.EngineClient
+	engine   chess.EngineClient
+	maxPlies int // số nửa-nước tối đa phân tích (trần)
+	depth    int // độ sâu engine mỗi nước
 }
 
-// NewChessEvaluateGameTool tạo tool chess_evaluate_game.
-func NewChessEvaluateGameTool(engine chess.EngineClient) *ChessEvaluateGameTool {
-	return &ChessEvaluateGameTool{BaseTool: chessEvaluateGameTool, engine: engine}
+// NewChessEvaluateGameTool tạo tool chess_evaluate_game. maxPlies/depth <= 0 dùng
+// mặc định (cấu hình qua CHESS_EVALUATE_MAX_PLIES / CHESS_EVALUATE_DEPTH).
+func NewChessEvaluateGameTool(engine chess.EngineClient, maxPlies, depth int) *ChessEvaluateGameTool {
+	if maxPlies <= 0 {
+		maxPlies = defaultEvaluateMaxPlies
+	}
+	if depth <= 0 {
+		depth = defaultEvaluateDepth
+	}
+	return &ChessEvaluateGameTool{BaseTool: chessEvaluateGameTool, engine: engine, maxPlies: maxPlies, depth: depth}
 }
 
 // whiteScore quy một Analysis về điểm centipawn theo góc nhìn Trắng để so sánh.
@@ -101,11 +110,11 @@ func (t *ChessEvaluateGameTool) Execute(ctx context.Context, args json.RawMessag
 
 	depth := input.Depth
 	if depth <= 0 {
-		depth = defaultEvaluateDepth
+		depth = t.depth
 	}
 	maxPlies := input.MaxPlies
-	if maxPlies <= 0 || maxPlies > defaultEvaluateMaxPlies {
-		maxPlies = defaultEvaluateMaxPlies
+	if maxPlies <= 0 || maxPlies > t.maxPlies {
+		maxPlies = t.maxPlies
 	}
 
 	// Điểm Trắng trước nước đầu tiên (thế cờ ban đầu của ván).

@@ -22,24 +22,11 @@ func (stubEngine) Analyze(_ context.Context, fen string, depth int) (*chess.Anal
 	}
 	return &chess.Analysis{
 		FEN: fen, BestMove: best, BestMoveSAN: san,
-		EvalCP: 35, Depth: depth, SideToMove: chessSideToMove(fen),
+		EvalCP: 35, Depth: depth, SideToMove: fenSide(fen),
 		PV: []string{"e2e4", "e7e5"},
 	}, nil
 }
 func (stubEngine) Close() error { return nil }
-
-// chessSideToMove đọc bên đi từ FEN (trường thứ 2).
-func chessSideToMove(fen string) string {
-	for i := 0; i < len(fen); i++ {
-		if fen[i] == ' ' && i+1 < len(fen) {
-			if fen[i+1] == 'b' {
-				return "b"
-			}
-			return "w"
-		}
-	}
-	return "w"
-}
 
 const demoStartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -63,7 +50,7 @@ func TestDemoChessTools(t *testing.T) {
 
 	// 2) chess_lookup_opening — CHẠY THẬT, không cần engine.
 	t.Log("───── chess_lookup_opening (Sicilian Najdorf) ─────")
-	ltool := NewChessLookupOpeningTool()
+	ltool := NewChessLookupOpeningTool(0)
 	largs, _ := json.Marshal(ChessLookupOpeningInput{
 		Moves: []string{"e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6"},
 	})
@@ -76,7 +63,7 @@ func TestDemoChessTools(t *testing.T) {
 
 	// 3) chess_evaluate_game (qua stub engine) — kiểm tra parse PGN + dựng plies.
 	t.Log("───── chess_evaluate_game ─────")
-	etool := NewChessEvaluateGameTool(stubEngine{})
+	etool := NewChessEvaluateGameTool(stubEngine{}, 0, 0)
 	eargs, _ := json.Marshal(ChessEvaluateGameInput{
 		PGN: "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0", Depth: 8,
 	})
