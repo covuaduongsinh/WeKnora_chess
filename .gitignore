@@ -61,3 +61,10 @@ miniprogram/project.private.config.json
 # Gói backup/restore WeKnora (chứa toàn bộ dữ liệu + khóa mã hóa — KHÔNG commit)
 weknora-backup-*.tar.gz
 pre-restore-*.sql.gz
+
+
+# --- Dương Sinh: cho phép commit memory/instructions của AI agent ---
+# (ghi đè dòng ".*" và "Claude.md" ở trên để Claude Code memory đi theo repo)
+!CLAUDE.md
+!.claude/
+!.claude/**
