@@ -64,6 +64,10 @@ type agentService struct {
 	tenantService         interfaces.TenantService
 	toolApprovalGate      approval.MCPApproval
 
+	// Service kho ván & ngân hàng bài tập cờ — cấp cho tool chess_generate_puzzle
+	// để ra bài tập từ DB thật thay vì chỉ bộ nhúng cứng.
+	chessLibraryService interfaces.ChessLibraryService
+
 	// Engine cờ vua dùng chung, khởi tạo lười và tái sử dụng giữa các phiên.
 	chessEngine     chess.EngineClient
 	chessEngineOnce sync.Once
@@ -91,6 +95,13 @@ func (s *agentService) getChessEngine(ctx context.Context) chess.EngineClient {
 		}
 		s.chessEngine = client
 		logger.Infof(ctx, "Đã khởi tạo engine cờ vua (mode=%s)", cc.Mode)
+		// Probe sức khỏe sidecar (chế độ http) để cảnh báo sớm nếu chưa sẵn sàng;
+		// chỉ log, KHÔNG chặn — tool engine vẫn đăng ký và tự xử lý lỗi lúc gọi.
+		if hc, ok := client.(interface{ Health(context.Context) error }); ok {
+			if herr := hc.Health(ctx); herr != nil {
+				logger.Warnf(ctx, "Engine cờ (http) probe sức khỏe lỗi: %v — tool cờ có thể tạm thời không phản hồi", herr)
+			}
+		}
 	})
 	return s.chessEngine
 }
@@ -120,6 +131,7 @@ func NewAgentService(
 	webSearchStateService interfaces.WebSearchStateService,
 	wikiPageService interfaces.WikiPageService,
 	tenantService interfaces.TenantService,
+	chessLibraryService interfaces.ChessLibraryService,
 	toolApprovalGate approval.MCPApproval,
 ) interfaces.AgentService {
 	return &agentService{
@@ -138,6 +150,7 @@ func NewAgentService(
 		webSearchStateService: webSearchStateService,
 		wikiPageService:       wikiPageService,
 		tenantService:         tenantService,
+		chessLibraryService:   chessLibraryService,
 		toolApprovalGate:      toolApprovalGate,
 	}
 }
@@ -625,7 +638,7 @@ func (s *agentService) registerTools(
 		case tools.ToolChessLookupOpening:
 			toolToRegister = tools.NewChessLookupOpeningTool()
 		case tools.ToolChessGeneratePuzzle:
-			toolToRegister = tools.NewChessGeneratePuzzleTool()
+			toolToRegister = tools.NewChessGeneratePuzzleTool(s.chessLibraryService)
 		case tools.ToolChessAnalyzePosition:
 			if eng := s.getChessEngine(ctx); eng != nil {
 				toolToRegister = tools.NewChessAnalyzePositionTool(eng, s.chessDefaultDepth())

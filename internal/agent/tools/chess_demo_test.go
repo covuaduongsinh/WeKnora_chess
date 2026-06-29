@@ -97,7 +97,7 @@ func TestEmbeddedPuzzlesValid(t *testing.T) {
 		}
 	}
 	// Tool generate_puzzle phải trả về display_type bàn cờ.
-	res, err := NewChessGeneratePuzzleTool().Execute(context.Background(), []byte(`{"theme":"chiếu hết"}`))
+	res, err := NewChessGeneratePuzzleTool(nil).Execute(context.Background(), []byte(`{"theme":"chiếu hết"}`))
 	if err != nil || !res.Success {
 		t.Fatalf("generate_puzzle lỗi: %v / %s", err, res.Error)
 	}
