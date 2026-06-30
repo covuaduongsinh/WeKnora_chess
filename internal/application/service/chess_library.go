@@ -96,7 +96,7 @@ func (s *chessLibraryService) CreateGame(ctx context.Context, game *types.ChessG
 		return nil, err
 	}
 	if s.indexer != nil {
-		s.indexer.IndexGame(ctx, game)
+		_ = s.indexer.IndexGame(ctx, game) // best-effort: không chặn CRUD
 	}
 	return game, nil
 }
@@ -110,7 +110,7 @@ func (s *chessLibraryService) UpdateGame(ctx context.Context, game *types.ChessG
 	}
 	updated, err := s.repo.GetGame(ctx, game.TenantID, game.ID)
 	if err == nil && updated != nil && s.indexer != nil {
-		s.indexer.IndexGame(ctx, updated)
+		_ = s.indexer.IndexGame(ctx, updated) // best-effort: không chặn CRUD
 	}
 	return updated, err
 }
@@ -142,7 +142,7 @@ func (s *chessLibraryService) RenameGameSlug(ctx context.Context, tenantID uint6
 	}
 	updated, err := s.repo.GetGame(ctx, tenantID, id)
 	if err == nil && updated != nil && s.indexer != nil {
-		s.indexer.IndexGame(ctx, updated)
+		_ = s.indexer.IndexGame(ctx, updated) // best-effort: không chặn CRUD
 	}
 	return updated, err
 }
@@ -243,7 +243,7 @@ func (s *chessLibraryService) CreatePuzzle(ctx context.Context, puzzle *types.Ch
 		return nil, err
 	}
 	if s.indexer != nil {
-		s.indexer.IndexPuzzle(ctx, puzzle)
+		_ = s.indexer.IndexPuzzle(ctx, puzzle) // best-effort: không chặn CRUD
 	}
 	return puzzle, nil
 }
@@ -262,7 +262,7 @@ func (s *chessLibraryService) UpdatePuzzle(ctx context.Context, puzzle *types.Ch
 	}
 	updated, err := s.repo.GetPuzzle(ctx, puzzle.TenantID, puzzle.ID)
 	if err == nil && updated != nil && s.indexer != nil {
-		s.indexer.IndexPuzzle(ctx, updated)
+		_ = s.indexer.IndexPuzzle(ctx, updated) // best-effort: không chặn CRUD
 	}
 	return updated, err
 }
@@ -293,7 +293,7 @@ func (s *chessLibraryService) RenamePuzzleSlug(ctx context.Context, tenantID uin
 	}
 	updated, err := s.repo.GetPuzzle(ctx, tenantID, id)
 	if err == nil && updated != nil && s.indexer != nil {
-		s.indexer.IndexPuzzle(ctx, updated)
+		_ = s.indexer.IndexPuzzle(ctx, updated) // best-effort: không chặn CRUD
 	}
 	return updated, err
 }
@@ -376,25 +376,66 @@ func (s *chessLibraryService) ImportPuzzles(ctx context.Context, tenantID uint64
 }
 
 // ReindexAll đẩy lại toàn bộ ván + bài tập của tenant vào KB tri thức cờ. Dùng sau
-// khi bật CHESS_KB_INDEX để index dữ liệu cũ (import hàng loạt KHÔNG tự index). An
-// toàn: no-op khi indexer chưa bật; lỗi index từng bản ghi là best-effort (chỉ log).
-func (s *chessLibraryService) ReindexAll(ctx context.Context, tenantID uint64) (int, int, error) {
+// khi bật CHESS_KB_INDEX để index dữ liệu cũ (import hàng loạt KHÔNG tự index).
+//
+// FAIL-LOUD: trước khi đẩy, kiểm tra KB cờ có embedding model — nếu KHÔNG thì trả
+// lỗi rõ ràng (không "success" giả) vì RAG sẽ không truy hồi được nội dung. Báo cáo
+// TRUNG THỰC: tách tổng vs số đã enqueue vs lỗi. Lưu ý "enqueued" ≠ "đã embed" —
+// embedding chạy nền, kiểm tra hoàn tất qua IndexStatus (completed).
+func (s *chessLibraryService) ReindexAll(ctx context.Context, tenantID uint64) (*types.ChessReindexResult, error) {
 	if s.indexer == nil || !s.indexer.Enabled() {
-		return 0, 0, fmt.Errorf("CHESS_KB_INDEX chưa bật — không có gì để index")
+		return nil, fmt.Errorf("CHESS_KB_INDEX chưa bật — không có gì để index")
 	}
+	// Tiền điều kiện: KB cờ phải có embedding model, nếu không index vô nghĩa.
+	kb, err := s.indexer.ensureChessKB(ctx)
+	if err != nil || kb == nil {
+		if err == nil {
+			err = fmt.Errorf("KB cờ không khả dụng")
+		}
+		return nil, fmt.Errorf("không sẵn sàng index: %w", err)
+	}
+	if strings.TrimSpace(kb.EmbeddingModelID) == "" {
+		return nil, fmt.Errorf(
+			"KB %q chưa có embedding model — RAG sẽ không truy hồi được nội dung; "+
+				"hãy cấu hình embedding cho ít nhất 1 KB rồi thử lại", chessKBName)
+	}
+
+	res := &types.ChessReindexResult{}
+	record := func(kind, slug string, e error) {
+		if e != nil {
+			res.Failed++
+			if len(res.Errors) < 5 {
+				res.Errors = append(res.Errors, fmt.Sprintf("%s/%s: %v", kind, slug, e))
+			}
+			return
+		}
+		res.Enqueued++
+	}
+
 	games, err := s.repo.ListGames(ctx, tenantID, types.ChessGameFilter{})
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
+	res.GamesTotal = len(games)
 	for _, g := range games {
-		s.indexer.IndexGame(ctx, g)
+		record("game", g.Slug, s.indexer.IndexGame(ctx, g))
 	}
+
 	puzzles, err := s.repo.ListPuzzles(ctx, tenantID, types.ChessPuzzleFilter{})
 	if err != nil {
-		return len(games), 0, err
+		return res, err
 	}
+	res.PuzzlesTotal = len(puzzles)
 	for _, p := range puzzles {
-		s.indexer.IndexPuzzle(ctx, p)
+		record("puzzle", p.Slug, s.indexer.IndexPuzzle(ctx, p))
 	}
-	return len(games), len(puzzles), nil
+	return res, nil
+}
+
+// IndexStatus báo cáo trạng thái KB tri thức cờ để chẩn đoán RAG (ủy quyền indexer).
+func (s *chessLibraryService) IndexStatus(ctx context.Context) (*types.ChessIndexStatus, error) {
+	if s.indexer == nil {
+		return &types.ChessIndexStatus{}, nil
+	}
+	return s.indexer.IndexStatus(ctx)
 }

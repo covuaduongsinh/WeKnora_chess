@@ -50,28 +50,30 @@ func (ix *ChessKnowledgeIndexer) Enabled() bool {
 }
 
 // IndexGame / IndexPuzzle / IndexLesson đồng bộ một đối tượng cờ (tạo/cập nhật).
-func (ix *ChessKnowledgeIndexer) IndexGame(ctx context.Context, g *types.ChessGame) {
+// Trả error để caller ĐẾM ĐƯỢC kết quả (vd ReindexAll); caller CRUD vẫn best-effort
+// (bỏ qua lỗi để không chặn thao tác). No-op khi gate tắt → trả nil.
+func (ix *ChessKnowledgeIndexer) IndexGame(ctx context.Context, g *types.ChessGame) error {
 	if !ix.Enabled() || g == nil || g.Slug == "" {
-		return
+		return nil
 	}
 	title, content := buildGameKnowledgeText(g)
-	ix.upsert(ctx, g.TenantID, types.ChessRefTypeGame, g.Slug, title, content)
+	return ix.upsert(ctx, g.TenantID, types.ChessRefTypeGame, g.Slug, title, content)
 }
 
-func (ix *ChessKnowledgeIndexer) IndexPuzzle(ctx context.Context, p *types.ChessPuzzle) {
+func (ix *ChessKnowledgeIndexer) IndexPuzzle(ctx context.Context, p *types.ChessPuzzle) error {
 	if !ix.Enabled() || p == nil || p.Slug == "" {
-		return
+		return nil
 	}
 	title, content := buildPuzzleKnowledgeText(p)
-	ix.upsert(ctx, p.TenantID, types.ChessRefTypePuzzle, p.Slug, title, content)
+	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePuzzle, p.Slug, title, content)
 }
 
-func (ix *ChessKnowledgeIndexer) IndexLesson(ctx context.Context, l *types.ChessLesson) {
+func (ix *ChessKnowledgeIndexer) IndexLesson(ctx context.Context, l *types.ChessLesson) error {
 	if !ix.Enabled() || l == nil || l.Slug == "" {
-		return
+		return nil
 	}
 	title, content := buildLessonKnowledgeText(l)
-	ix.upsert(ctx, l.TenantID, types.ChessRefTypeLesson, l.Slug, title, content)
+	return ix.upsert(ctx, l.TenantID, types.ChessRefTypeLesson, l.Slug, title, content)
 }
 
 // Remove xóa bản ghi Knowledge tương ứng (khi đối tượng cờ bị xóa).
@@ -93,8 +95,9 @@ func (ix *ChessKnowledgeIndexer) Remove(ctx context.Context, tenantID uint64, ch
 	}
 }
 
-// upsert tạo mới hoặc cập nhật bản ghi Knowledge cho một đối tượng cờ (best-effort).
-func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, chessType, slug, title, content string) {
+// upsert tạo mới hoặc cập nhật bản ghi Knowledge cho một đối tượng cờ. Vẫn log lỗi
+// (best-effort cho caller CRUD) NHƯNG trả error để caller cần đếm (ReindexAll) biết.
+func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, chessType, slug, title, content string) error {
 	payload := &types.ManualKnowledgePayload{
 		Title:   title,
 		Content: content,
@@ -105,24 +108,81 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 	if existing != nil && existing.KnowledgeID != "" {
 		if _, err := ix.knowledgeService.UpdateManualKnowledge(ctx, existing.KnowledgeID, payload); err != nil {
 			logger.Warnf(ctx, "chess index: cập nhật knowledge cho %s/%s thất bại: %v", chessType, slug, err)
+			return err
 		}
-		return
+		return nil
 	}
 	kb, err := ix.ensureChessKB(ctx)
 	if err != nil || kb == nil {
+		if err == nil {
+			err = fmt.Errorf("KB cờ không khả dụng")
+		}
 		logger.Warnf(ctx, "chess index: không có KB cờ để index %s/%s: %v", chessType, slug, err)
-		return
+		return err
 	}
 	k, err := ix.knowledgeService.CreateKnowledgeFromManual(ctx, kb.ID, payload, "chess")
 	if err != nil || k == nil {
+		if err == nil {
+			err = fmt.Errorf("tạo knowledge thất bại")
+		}
 		logger.Warnf(ctx, "chess index: tạo knowledge cho %s/%s thất bại: %v", chessType, slug, err)
-		return
+		return err
 	}
 	if err := ix.idxRepo.Upsert(ctx, &types.ChessKBIndex{
 		TenantID: tenantID, ChessType: chessType, ChessSlug: slug, KnowledgeID: k.ID, KBID: kb.ID,
 	}); err != nil {
 		logger.Warnf(ctx, "chess index: lưu mapping %s/%s thất bại: %v", chessType, slug, err)
+		return err
 	}
+	return nil
+}
+
+// IndexStatus đọc trạng thái KB "Tri thức cờ vua" để chẩn đoán RAG (KHÔNG tạo KB).
+// Tenant lấy từ ctx (như các lời gọi kbService/knowledgeService khác).
+func (ix *ChessKnowledgeIndexer) IndexStatus(ctx context.Context) (*types.ChessIndexStatus, error) {
+	st := &types.ChessIndexStatus{}
+	if ix == nil || ix.kbService == nil || ix.knowledgeService == nil {
+		return st, nil
+	}
+	st.Enabled = ix.Enabled()
+	kbs, err := ix.kbService.ListKnowledgeBases(ctx)
+	if err != nil {
+		return st, err
+	}
+	var chessKB *types.KnowledgeBase
+	for _, kb := range kbs {
+		if kb.Name == chessKBName {
+			chessKB = kb
+			break
+		}
+	}
+	if chessKB == nil {
+		return st, nil // KB cờ chưa được tạo (chưa index lần nào / chưa có KB embedding mẫu)
+	}
+	st.KBExists = true
+	st.KBID = chessKB.ID
+	st.EmbeddingModelID = chessKB.EmbeddingModelID
+	st.EmbeddingConfigured = strings.TrimSpace(chessKB.EmbeddingModelID) != ""
+
+	ks, err := ix.knowledgeService.ListKnowledgeByKnowledgeBaseID(ctx, chessKB.ID)
+	if err != nil {
+		return st, err
+	}
+	st.Total = len(ks)
+	for _, k := range ks {
+		switch k.ParseStatus {
+		case types.ParseStatusCompleted:
+			st.Completed++
+		case types.ParseStatusFailed:
+			st.Failed++
+			if st.SampleError == "" && strings.TrimSpace(k.ErrorMessage) != "" {
+				st.SampleError = k.ErrorMessage
+			}
+		default: // pending / processing / finalizing / rỗng
+			st.Pending++
+		}
+	}
+	return st, nil
 }
 
 // ensureChessKB tìm KB cờ của tenant; chưa có thì tạo bằng cách SAO CHÉP cấu hình

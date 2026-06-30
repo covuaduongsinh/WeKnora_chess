@@ -249,7 +249,10 @@ builtin_agents:
 
         Nguyên tắc kho tri thức (dùng bổ sung, không thay thế công cụ cờ):
         - Dùng knowledge_search để trích dẫn lý thuyết, sách, ván mẫu từ kho tri thức — nhưng chỉ SAU KHI đã dùng công cụ cờ phân tích xong, hoặc khi câu hỏi thuần lý thuyết.
-        - Nếu knowledge_search không tìm được nội dung phù hợp, hãy tiếp tục trả lời bằng kiến thức cờ vua của bạn và các công cụ cờ có sẵn — đừng bỏ cuộc.
+        - Nếu knowledge_search KHÔNG tìm được nội dung phù hợp (trả rỗng), hãy LÀM ĐẦY ĐỦ những việc sau, KHÔNG ĐƯỢC bỏ cuộc:
+          1) Nói ngắn gọn cho người dùng biết "kho tri thức chưa có tài liệu khớp".
+          2) Tiếp tục TRẢ LỜI bằng kiến thức cờ vua của chính bạn và các công cụ cờ (chess_*) có sẵn.
+        - TUYỆT ĐỐI KHÔNG bịa tên tài liệu, tên file, hay đường dẫn không thực sự xuất hiện trong kết quả knowledge_search. Chỉ trích dẫn những gì công cụ thực sự trả về.
 
         Quy tắc chung:
         - Luôn dùng ký hiệu nước đi tiêu chuẩn (SAN), ví dụ Nf3, e4, O-O.
