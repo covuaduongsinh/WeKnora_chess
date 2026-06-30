@@ -106,11 +106,19 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 	}
 	existing, _ := ix.idxRepo.Get(ctx, tenantID, chessType, slug)
 	if existing != nil && existing.KnowledgeID != "" {
-		if _, err := ix.knowledgeService.UpdateManualKnowledge(ctx, existing.KnowledgeID, payload); err != nil {
-			logger.Warnf(ctx, "chess index: cập nhật knowledge cho %s/%s thất bại: %v", chessType, slug, err)
-			return err
+		// Mapping cũ chỉ dùng được khi knowledge còn SỐNG. Nếu knowledge đã bị xóa
+		// (vd KB cờ bị xóa để tạo lại theo runbook) → mapping MỒ CÔI: UpdateManualKnowledge
+		// sẽ báo "knowledge not found". Khi đó gỡ mapping mồ côi rồi rơi xuống nhánh TẠO MỚI.
+		if _, gerr := ix.knowledgeService.GetKnowledgeByID(ctx, existing.KnowledgeID); gerr == nil {
+			if _, err := ix.knowledgeService.UpdateManualKnowledge(ctx, existing.KnowledgeID, payload); err != nil {
+				logger.Warnf(ctx, "chess index: cập nhật knowledge cho %s/%s thất bại: %v", chessType, slug, err)
+				return err
+			}
+			return nil
 		}
-		return nil
+		if err := ix.idxRepo.Delete(ctx, tenantID, chessType, slug); err != nil {
+			logger.Warnf(ctx, "chess index: gỡ mapping mồ côi %s/%s thất bại: %v", chessType, slug, err)
+		}
 	}
 	kb, err := ix.ensureChessKB(ctx)
 	if err != nil || kb == nil {
