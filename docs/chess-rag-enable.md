@@ -80,6 +80,30 @@ docker compose -f docker-compose.yml -f docker-compose.chess.yml restart app
 3. Kỳ vọng: câu trả lời **có trích nguồn** từ "Tri thức cờ vua".
 4. Soi pipeline (tùy chọn): bật Langfuse `--profile langfuse`.
 
+## 4b. Chẩn đoán bằng endpoint trạng thái (khi RAG "rỗng")
+> Embedding chạy **NỀN**: `reindex` trả `enqueued` ≠ "đã embed xong". Sau ~1 phút, gọi:
+```bash
+curl -s https://weknora.covuaduongsinh.com/api/v1/chess/library/index-status \
+  -H "X-API-Key: <API_KEY_TENANT>" | jq .data
+# {
+#   "enabled": true, "kb_exists": true, "kb_id": "...",
+#   "embedding_model_id": "...", "embedding_configured": true,
+#   "total": 7, "completed": 7, "pending": 0, "failed": 0, "sample_error": ""
+# }
+```
+Đọc kết quả theo bảng nhánh:
+
+| Triệu chứng | Nghĩa | Cách xử lý |
+|---|---|---|
+| `enabled:false` | `CHESS_KB_INDEX` chưa bật | Làm lại Bước 1 (env + restart `app`). |
+| `kb_exists:false` | KB cờ chưa tạo (chưa index lần nào / **chưa có KB embedding mẫu**) | Đảm bảo tenant có ≥1 KB cấu hình embedding → reindex lại. |
+| `embedding_configured:false` | **NGUYÊN NHÂN GỐC** — KB cờ không có embedding model → chunk không lên vector store | Cấu hình embedding cho 1 KB; xóa KB cờ rỗng rồi reindex để tạo lại với model đúng. |
+| `failed > 0`, có `sample_error` | Embedding lỗi (model hỏng / rate-limit / hết quota) | Đọc `sample_error`; sửa cấu hình model rồi reindex lại. |
+| `pending` lâu không về 0 | Worker embedding chưa chạy/kẹt | Kiểm tra container worker (asynq) + log `app`. |
+| `completed == total > 0` | OK — RAG truy hồi được | Nếu agent vẫn không ra nội dung → soi `kb_selection_mode`/threshold trong YAML. |
+
+> SQL fallback (khi không gọi được endpoint): `SELECT name, embedding_model_id FROM knowledge_bases WHERE name='Tri thức cờ vua';` và `SELECT parse_status, count(*) FROM knowledges WHERE knowledge_base_id='<kb_id>' GROUP BY parse_status;`
+
 ## 5. Rollback (tắt lại)
 - `.env`: `CHESS_KB_INDEX=false` → restart `app` (ngừng index; dữ liệu đã index vẫn còn).
 - `builtin_agents.yaml`: trả `kb_selection_mode: "none"` + bỏ `knowledge_search`/`grep_chunks` → restart `app`.

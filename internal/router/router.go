@@ -535,6 +535,8 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 	library := r.Group("/chess/library")
 	{
 		library.POST("/reindex", g.Contributor(), h.ReindexKB)
+		// Chẩn đoán RAG cờ: KB tồn tại?, có embedding model?, completed/pending/failed.
+		library.GET("/index-status", g.Contributor(), h.IndexStatus)
 	}
 }
 

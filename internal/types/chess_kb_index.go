@@ -17,3 +17,31 @@ type ChessKBIndex struct {
 
 // TableName ánh xạ tới bảng chess_kb_index.
 func (ChessKBIndex) TableName() string { return "chess_kb_index" }
+
+// ChessIndexStatus tóm tắt trạng thái KB "Tri thức cờ vua" để CHẨN ĐOÁN RAG cờ.
+// Đọc qua GET /chess/library/index-status. Mục đích: biến phỏng đoán "vì sao RAG
+// rỗng" thành dữ liệu — không cần gõ SQL trên production.
+type ChessIndexStatus struct {
+	Enabled             bool   `json:"enabled"`              // CHESS_KB_INDEX bật?
+	KBExists            bool   `json:"kb_exists"`            // KB "Tri thức cờ vua" tồn tại?
+	KBID                string `json:"kb_id"`                // ID KB cờ (rỗng nếu chưa có)
+	EmbeddingModelID    string `json:"embedding_model_id"`   // model embedding KB cờ đang dùng
+	EmbeddingConfigured bool   `json:"embedding_configured"` // false = NGUYÊN NHÂN GỐC (không embed được)
+	Total               int    `json:"total"`                // tổng Knowledge trong KB cờ
+	Completed           int    `json:"completed"`            // parse_status=completed (đã embed → truy hồi được)
+	Pending             int    `json:"pending"`              // pending/processing/finalizing (chưa xong)
+	Failed              int    `json:"failed"`               // parse_status=failed (embed lỗi)
+	SampleError         string `json:"sample_error"`         // mẫu error_message của bản ghi failed
+}
+
+// ChessReindexResult báo cáo TRUNG THỰC kết quả reindex (POST /chess/library/reindex).
+// Khác bản cũ chỉ trả 2 số "đã index": ở đây tách rõ tổng vs số đã enqueue vs lỗi —
+// vì embedding chạy NỀN, "enqueued" không đồng nghĩa "đã embed". Kiểm tra hoàn tất
+// embedding qua ChessIndexStatus (completed) sau ~1 phút.
+type ChessReindexResult struct {
+	GamesTotal   int      `json:"games_total"`      // số ván của tenant
+	PuzzlesTotal int      `json:"puzzles_total"`    // số bài tập của tenant
+	Enqueued     int      `json:"enqueued"`         // số bản ghi đã đẩy đi index (chờ embed nền)
+	Failed       int      `json:"failed"`           // số bản ghi lỗi ngay khi đẩy
+	Errors       []string `json:"errors,omitempty"` // mẫu lỗi (tối đa 5)
+}

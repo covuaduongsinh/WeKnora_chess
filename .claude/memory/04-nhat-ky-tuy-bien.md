@@ -44,7 +44,7 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 | `internal/application/service/agent_service.go` | Gắn agent/tool cờ vào luồng agent. **WS1 (nối Puzzle Bank):** +field `chessLibraryService` + param `NewAgentService` + truyền vào `NewChessGeneratePuzzleTool(s.chessLibraryService)` để tool ra bài tập từ DB. | 32× |
 | `internal/config/config.go` | Đọc `WEKNORA_CHESS_*`, `CHESS_KB_INDEX` | 23× |
 | `internal/agent/tools/definitions.go` | Đăng ký 6 tool `chess_*` vào registry | 21× |
-| `internal/router/router.go` | Mount route `/api/v1/chess/...`. **WS2:** +nhóm `/chess/library` với `POST /reindex` (backfill KB cờ). | 17× |
+| `internal/router/router.go` | Mount route `/api/v1/chess/...`. **WS2:** +nhóm `/chess/library` với `POST /reindex` (backfill KB cờ). **WS-RAG:** +`GET /chess/library/index-status` (chẩn đoán RAG, Contributor). | 17× |
 | `internal/container/container.go` | Wiring DI service/repo cờ | 11× |
 | `internal/types/custom_agent.go` | Field phục vụ agent cờ | 3× |
 | `config/builtin_agents.yaml` | Agent `builtin-chess-coach` | (block cuối) |
@@ -131,6 +131,14 @@ Rà soát toàn dự án (3 agent: backend/frontend/hạ tầng) → triển kha
 - [x] **WS-D (tính năng nợ):**
   - **D1 — RAG cờ:** runbook `docs/chess-rag-enable.md` đã khớp code; thêm mục **3b Production** turn-key (backup DB trước → set `CHESS_KB_INDEX=true` → redeploy → reindex prod URL → sửa agent YAML → nghiệm thu). KHÔNG commit đổi `builtin_agents.yaml` (toggle vận hành; flip sớm sẽ đổi hành vi HLV + `kb_selection_mode:all` kéo mọi KB trước khi KB cờ sẵn sàng) — Thầy bật theo runbook. Bật production là thao tác trên server (ngoài tầm tác động của agent ở đây).
   - **D2 — đổi tên slug:** thêm repo `UpdateGameSlug`/`UpdatePuzzleSlug` (tách riêng vì `UpdateGame`/`UpdatePuzzle` cố tình KHÔNG đụng cột slug); service `RenameGameSlug`/`RenamePuzzleSlug` (chuẩn hóa qua `slugifyChess` + `ensureUniqueChessSlug` + ghi `chess_slug_aliases` old→new); handler + route `PUT /chess/{games,puzzles}/:id/slug` (router.go C1, Contributor); frontend api `renameGameSlug`/`renamePuzzleSlug` + nút "Đổi slug" (prompt) ở `GameLibrary.vue`/`PuzzleBank.vue`. Bảng `chess_slug_aliases` (000068) nay được dùng → resolve `exact→alias→fuzzy` có dữ liệu. *Còn lại:* rename cho course/lesson (service khác) — backlog.
+
+### Đợt sửa RAG sau khi bật production (2026-06-30) — nhánh `feat/chess-audit-hardening`
+RAG production bật xong nhưng agent "tìm thấy tên nhưng không ra nội dung". Rà 3 agent + đọc code → **nguyên nhân gốc:** reindex báo `success` GIẢ (đếm số ván của tenant, không phải số đã embed); embedding chạy NỀN; bị SKIP im lặng nếu KB cờ không có embedding model → chunk lưu DB nhưng không lên vector store → `knowledge_search` rỗng. Triển khai "hoàn thiện sâu":
+- **Endpoint chẩn đoán** `GET /chess/library/index-status` (Contributor): file MỚI logic trong `chess_knowledge_indexer.go` (`IndexStatus`), lộ qua `chessLibraryService.IndexStatus` + handler `chess_library.go` + route `router.go` (C1). Trả `{enabled, kb_exists, embedding_configured, total, completed, pending, failed, sample_error}`. Struct `ChessIndexStatus`/`ChessReindexResult` đặt ở `internal/types/chess_kb_index.go` (tránh import cycle interfaces→service).
+- **Reindex trung thực + fail-loud:** `IndexGame/IndexPuzzle/IndexLesson/upsert` (indexer) nay TRẢ `error` (caller CRUD vẫn best-effort qua `_ =`); `ReindexAll` đổi chữ ký trả `*types.ChessReindexResult`, **chặn trước** khi KB cờ thiếu embedding model (lỗi rõ thay vì success giả), đếm thật (total/enqueued/failed/errors). Handler giữ `games_indexed`/`puzzles_indexed` để tương thích ngược + thêm `note` nhắc kiểm tra index-status. Đổi interface `ChessLibraryService` (file cờ riêng).
+- **Agent prompt** (`builtin_agents.yaml`, C1): khi `knowledge_search` rỗng → nói "kho tri thức chưa có tài liệu khớp" + trả lời bằng kiến thức cờ + công cụ cờ; **CẤM bịa tên file/đường dẫn** (gemini-2.5-flash từng confabulate "Opera Game.md"). Threshold đã hạ trước đó (vector 0.3/rerank 0.1) — giữ.
+- **Runbook** `docs/chess-rag-enable.md`: thêm mục **4b** bảng chẩn đoán theo `index-status` + SQL fallback.
+- *Đa số diff trong file `*chess*` (an toàn merge); file dùng chung: `router.go` (1 route), `builtin_agents.yaml` (prompt).*
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).

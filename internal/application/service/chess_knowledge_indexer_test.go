@@ -1,0 +1,138 @@
+package service
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
+)
+
+// --- Stub gọn: embed interface để chỉ override method cần, phần còn lại không gọi ---
+
+type stubKBService struct {
+	interfaces.KnowledgeBaseService
+	kbs []*types.KnowledgeBase
+}
+
+func (s stubKBService) ListKnowledgeBases(ctx context.Context) ([]*types.KnowledgeBase, error) {
+	return s.kbs, nil
+}
+
+type stubKnowService struct {
+	interfaces.KnowledgeService
+	byKB map[string][]*types.Knowledge
+}
+
+func (s stubKnowService) ListKnowledgeByKnowledgeBaseID(ctx context.Context, kbID string) ([]*types.Knowledge, error) {
+	return s.byKB[kbID], nil
+}
+
+type stubIdxRepo struct {
+	interfaces.ChessKBIndexRepository
+}
+
+func newTestIndexer(kbs []*types.KnowledgeBase, byKB map[string][]*types.Knowledge) *ChessKnowledgeIndexer {
+	return NewChessKnowledgeIndexer(
+		stubKBService{kbs: kbs},
+		stubKnowService{byKB: byKB},
+		stubIdxRepo{},
+	)
+}
+
+func TestChessIndexStatus_CountsByParseStatus(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	kb := &types.KnowledgeBase{ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1"}
+	ks := []*types.Knowledge{
+		{ParseStatus: types.ParseStatusCompleted},
+		{ParseStatus: types.ParseStatusCompleted},
+		{ParseStatus: types.ParseStatusPending},
+		{ParseStatus: types.ParseStatusFailed, ErrorMessage: "embed lỗi mẫu"},
+	}
+	ix := newTestIndexer([]*types.KnowledgeBase{kb}, map[string][]*types.Knowledge{"kb-chess": ks})
+
+	st, err := ix.IndexStatus(context.Background())
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if !st.Enabled || !st.KBExists || !st.EmbeddingConfigured {
+		t.Fatalf("kỳ vọng enabled/kb_exists/embedding_configured = true, nhận %+v", st)
+	}
+	if st.KBID != "kb-chess" || st.EmbeddingModelID != "emb-1" {
+		t.Errorf("KBID/EmbeddingModelID sai: %+v", st)
+	}
+	if st.Total != 4 || st.Completed != 2 || st.Pending != 1 || st.Failed != 1 {
+		t.Errorf("đếm sai: total=%d completed=%d pending=%d failed=%d", st.Total, st.Completed, st.Pending, st.Failed)
+	}
+	if st.SampleError != "embed lỗi mẫu" {
+		t.Errorf("SampleError sai: %q", st.SampleError)
+	}
+}
+
+func TestChessIndexStatus_NoChessKB(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	other := &types.KnowledgeBase{ID: "kb-x", Name: "KB khác", EmbeddingModelID: "emb-1"}
+	ix := newTestIndexer([]*types.KnowledgeBase{other}, nil)
+
+	st, err := ix.IndexStatus(context.Background())
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if st.KBExists {
+		t.Errorf("không có KB cờ → kb_exists phải false, nhận %+v", st)
+	}
+}
+
+func TestChessIndexStatus_EmbeddingNotConfigured(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	// KB cờ tồn tại nhưng KHÔNG có embedding model → nguyên nhân gốc RAG rỗng.
+	kb := &types.KnowledgeBase{ID: "kb-chess", Name: chessKBName, EmbeddingModelID: ""}
+	ix := newTestIndexer([]*types.KnowledgeBase{kb}, map[string][]*types.Knowledge{})
+
+	st, err := ix.IndexStatus(context.Background())
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if !st.KBExists || st.EmbeddingConfigured {
+		t.Errorf("kỳ vọng kb_exists=true, embedding_configured=false, nhận %+v", st)
+	}
+}
+
+func TestReindexAll_FailsWhenNoEmbeddingTemplate(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	// Không có KB cờ và không KB nào có embedding model → không thể tạo KB cờ.
+	noEmbed := &types.KnowledgeBase{ID: "kb-x", Name: "KB rỗng", EmbeddingModelID: ""}
+	ix := newTestIndexer([]*types.KnowledgeBase{noEmbed}, nil)
+	svc := &chessLibraryService{indexer: ix}
+
+	_, err := svc.ReindexAll(context.Background(), 1)
+	if err == nil {
+		t.Fatal("kỳ vọng ReindexAll trả lỗi khi không có embedding template, nhận nil")
+	}
+	if !strings.Contains(err.Error(), "index") && !strings.Contains(err.Error(), "embedding") {
+		t.Errorf("thông báo lỗi nên nhắc embedding/index, nhận: %v", err)
+	}
+}
+
+func TestReindexAll_FailsWhenChessKBHasNoEmbedding(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	// KB cờ đã tồn tại nhưng thiếu embedding model → chặn fail-loud, không success giả.
+	kb := &types.KnowledgeBase{ID: "kb-chess", Name: chessKBName, EmbeddingModelID: ""}
+	ix := newTestIndexer([]*types.KnowledgeBase{kb}, nil)
+	svc := &chessLibraryService{indexer: ix}
+
+	_, err := svc.ReindexAll(context.Background(), 1)
+	if err == nil || !strings.Contains(err.Error(), "embedding") {
+		t.Fatalf("kỳ vọng lỗi nhắc 'embedding', nhận: %v", err)
+	}
+}
+
+func TestReindexAll_DisabledGate(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "false")
+	ix := newTestIndexer(nil, nil)
+	svc := &chessLibraryService{indexer: ix}
+	if _, err := svc.ReindexAll(context.Background(), 1); err == nil {
+		t.Fatal("gate tắt → ReindexAll phải trả lỗi 'chưa bật'")
+	}
+}

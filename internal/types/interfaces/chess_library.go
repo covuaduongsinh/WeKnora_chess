@@ -47,8 +47,12 @@ type ChessLibraryService interface {
 	ImportPuzzles(ctx context.Context, tenantID uint64, items []types.ChessPuzzleBundle) (int, error)
 
 	// ReindexAll đẩy lại toàn bộ ván + bài tập của tenant vào KB tri thức cờ (chỉ
-	// tác dụng khi CHESS_KB_INDEX bật). Trả (số ván, số bài tập) đã index.
-	ReindexAll(ctx context.Context, tenantID uint64) (int, int, error)
+	// tác dụng khi CHESS_KB_INDEX bật). FAIL-LOUD nếu KB cờ chưa có embedding model.
+	// Trả báo cáo trung thực (tổng / đã enqueue / lỗi) — "enqueued" ≠ "đã embed".
+	ReindexAll(ctx context.Context, tenantID uint64) (*types.ChessReindexResult, error)
+	// IndexStatus báo cáo trạng thái KB "Tri thức cờ vua" để chẩn đoán RAG cờ
+	// (KB tồn tại?, có embedding model?, bao nhiêu doc completed/pending/failed).
+	IndexStatus(ctx context.Context) (*types.ChessIndexStatus, error)
 }
 
 // ChessLibraryRepository định nghĩa thao tác lưu trữ kho ván & bài tập.

@@ -376,14 +376,38 @@ func (h *ChessLibraryHandler) DeletePuzzle(c *gin.Context) {
 
 // ReindexKB POST /chess/library/reindex — đẩy lại toàn bộ ván+bài tập vào KB tri
 // thức cờ. Dùng MỘT LẦN sau khi bật CHESS_KB_INDEX để index dữ liệu cũ (import
-// hàng loạt không tự index). Trả lỗi rõ ràng nếu RAG cờ chưa bật.
+// hàng loạt không tự index). Trả lỗi rõ ràng nếu RAG cờ chưa bật hoặc KB cờ chưa
+// có embedding model (fail-loud). Báo cáo trung thực: tổng / đã enqueue / lỗi.
 func (h *ChessLibraryHandler) ReindexKB(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	games, puzzles, err := h.service.ReindexAll(ctx, tenantID)
+	res, err := h.service.ReindexAll(ctx, tenantID)
 	if err != nil {
 		chessFail(c, http.StatusBadRequest, err)
 		return
 	}
-	chessOK(c, gin.H{"games_indexed": games, "puzzles_indexed": puzzles})
+	chessOK(c, gin.H{
+		"games_total":   res.GamesTotal,
+		"puzzles_total": res.PuzzlesTotal,
+		"enqueued":      res.Enqueued,
+		"failed":        res.Failed,
+		"errors":        res.Errors,
+		// Tương thích ngược với client/runbook cũ:
+		"games_indexed":   res.GamesTotal,
+		"puzzles_indexed": res.PuzzlesTotal,
+		"note":            "đã enqueue để index; embedding chạy nền — kiểm tra GET /chess/library/index-status sau ~1 phút để xác nhận 'completed'",
+	})
+}
+
+// IndexStatus GET /chess/library/index-status — báo trạng thái KB tri thức cờ để
+// CHẨN ĐOÁN khi RAG rỗng (KB tồn tại?, có embedding model?, completed/pending/failed
+// + mẫu lỗi). Luôn 200 (báo cáo trạng thái, không phải thao tác có thể thất bại).
+func (h *ChessLibraryHandler) IndexStatus(c *gin.Context) {
+	ctx := c.Request.Context()
+	st, err := h.service.IndexStatus(ctx)
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, st)
 }
