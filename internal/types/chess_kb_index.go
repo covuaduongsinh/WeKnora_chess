@@ -26,12 +26,20 @@ type ChessIndexStatus struct {
 	KBExists            bool   `json:"kb_exists"`            // KB "Tri thức cờ vua" tồn tại?
 	KBID                string `json:"kb_id"`                // ID KB cờ (rỗng nếu chưa có)
 	EmbeddingModelID    string `json:"embedding_model_id"`   // model embedding KB cờ đang dùng
-	EmbeddingConfigured bool   `json:"embedding_configured"` // false = NGUYÊN NHÂN GỐC (không embed được)
-	Total               int    `json:"total"`                // tổng Knowledge trong KB cờ
-	Completed           int    `json:"completed"`            // parse_status=completed (đã embed → truy hồi được)
-	Pending             int    `json:"pending"`              // pending/processing/finalizing (chưa xong)
-	Failed              int    `json:"failed"`               // parse_status=failed (embed lỗi)
-	SampleError         string `json:"sample_error"`         // mẫu error_message của bản ghi failed
+	EmbeddingConfigured bool   `json:"embedding_configured"` // KB có embedding model ID?
+	// VectorSearchable: KB có bật vector HOẶC keyword index không. ĐÂY là điều kiện
+	// để knowledge_search "nhìn thấy" KB (capability filter) VÀ để embedding thực sự
+	// chạy lúc index. false = NGUYÊN NHÂN GỐC: KB bị loại khỏi search + chunk không embed.
+	VectorEnabled  bool   `json:"vector_enabled"`
+	KeywordEnabled bool   `json:"keyword_enabled"`
+	Searchable     bool   `json:"searchable"`    // vector || keyword (capability để agent search)
+	Total          int    `json:"total"`         // tổng Knowledge trong KB cờ
+	Completed      int    `json:"completed"`     // parse_status=completed
+	Pending        int    `json:"pending"`       // pending/processing/finalizing
+	Failed         int    `json:"failed"`        // parse_status=failed
+	EnabledDocs    int    `json:"enabled_docs"`  // enable_status=enabled (truy hồi được)
+	DisabledDocs   int    `json:"disabled_docs"` // enable_status≠enabled (KHÔNG truy hồi)
+	SampleError    string `json:"sample_error"`  // mẫu error_message của bản ghi failed
 }
 
 // ChessReindexResult báo cáo TRUNG THỰC kết quả reindex (POST /chess/library/reindex).

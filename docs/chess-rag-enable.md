@@ -88,19 +88,23 @@ curl -s https://weknora.covuaduongsinh.com/api/v1/chess/library/index-status \
 # {
 #   "enabled": true, "kb_exists": true, "kb_id": "...",
 #   "embedding_model_id": "...", "embedding_configured": true,
-#   "total": 7, "completed": 7, "pending": 0, "failed": 0, "sample_error": ""
+#   "vector_enabled": true, "keyword_enabled": true, "searchable": true,
+#   "total": 7, "completed": 7, "pending": 0, "failed": 0,
+#   "enabled_docs": 7, "disabled_docs": 0, "sample_error": ""
 # }
 ```
-Đọc kết quả theo bảng nhánh:
+Đọc kết quả theo bảng nhánh (kiểm tra **theo thứ tự**):
 
 | Triệu chứng | Nghĩa | Cách xử lý |
 |---|---|---|
 | `enabled:false` | `CHESS_KB_INDEX` chưa bật | Làm lại Bước 1 (env + restart `app`). |
 | `kb_exists:false` | KB cờ chưa tạo (chưa index lần nào / **chưa có KB embedding mẫu**) | Đảm bảo tenant có ≥1 KB cấu hình embedding → reindex lại. |
-| `embedding_configured:false` | **NGUYÊN NHÂN GỐC** — KB cờ không có embedding model → chunk không lên vector store | Cấu hình embedding cho 1 KB; xóa KB cờ rỗng rồi reindex để tạo lại với model đúng. |
+| `searchable:false` (vector+keyword đều tắt) | **NGUYÊN NHÂN GỐC HAY GẶP** — KB cờ bị tắt index → knowledge_search KHÔNG "nhìn thấy" KB (capability filter) + embedding bị skip lúc index. KB cũ tạo trước bản vá thường dính lỗi này. | **XÓA KB "Tri thức cờ vua"** trong UI (Kho tri thức → … → Xóa) rồi gọi lại `reindex`. Code mới tạo KB với vector+keyword BẬT tường minh → fix dứt điểm. |
+| `embedding_configured:false` | KB cờ không có embedding model → chunk không lên vector store | Cấu hình embedding cho 1 KB; xóa KB cờ rồi reindex để tạo lại với model đúng. |
 | `failed > 0`, có `sample_error` | Embedding lỗi (model hỏng / rate-limit / hết quota) | Đọc `sample_error`; sửa cấu hình model rồi reindex lại. |
+| `disabled_docs > 0` (mà `searchable:true`) | Tài liệu chưa được bật sau xử lý | Reindex lại để xử lý lại; nếu vẫn → kiểm tra log worker. |
 | `pending` lâu không về 0 | Worker embedding chưa chạy/kẹt | Kiểm tra container worker (asynq) + log `app`. |
-| `completed == total > 0` | OK — RAG truy hồi được | Nếu agent vẫn không ra nội dung → soi `kb_selection_mode`/threshold trong YAML. |
+| `searchable:true`, `completed==total`, `enabled_docs==total` | OK — RAG truy hồi được | Nếu agent vẫn không ra nội dung → soi `kb_selection_mode`/threshold trong YAML. |
 
 > SQL fallback (khi không gọi được endpoint): `SELECT name, embedding_model_id FROM knowledge_bases WHERE name='Tri thức cờ vua';` và `SELECT parse_status, count(*) FROM knowledges WHERE knowledge_base_id='<kb_id>' GROUP BY parse_status;`
 
