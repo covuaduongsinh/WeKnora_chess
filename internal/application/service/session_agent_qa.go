@@ -100,25 +100,20 @@ func (s *sessionService) AgentQA(
 	}
 
 	if hasKnowledgeSearchTool {
-		// Rerank model is resolved purely from the agent config now.
-		// We used to fall back to ConversationConfig.RerankModelID at
-		// the tenant level, but that path encouraged "leave rerank
-		// blank on the agent and inherit silently" which made debugging
-		// retrieval quality a guessing game across tenant settings vs
-		// agent settings. Forcing the agent to declare its own rerank
-		// model puts the configuration where the user actually edits
-		// the agent. If a Wiki-only agent doesn't need reranking,
-		// agentRequiresRerankModel() below already lets it pass.
+		// Rerank model is resolved from the agent config. KHÔNG bắt buộc cứng:
+		// khi tenant chưa cấu hình rerank model, knowledge_search tự degrade sang
+		// LLM-based rerank dùng chat model (xem knowledge_search.go: "fall back to
+		// chatModel"). Hard-fail ở đây sẽ chặn RAG cho tenant không có rerank model
+		// (vd Gemini không cung cấp API rerank) — nên chỉ cảnh báo rồi đi tiếp.
 		rerankModelID := req.CustomAgent.Config.RerankModelID
 		if rerankModelID == "" {
-			logger.Warnf(ctx, "No rerank model configured for custom agent %s, but knowledge_search tool is enabled", req.CustomAgent.ID)
-			return errors.New("rerank model is not configured: please set rerank_model_id on the agent")
-		}
-
-		rerankModel, err = s.modelService.GetRerankModel(ctx, rerankModelID)
-		if err != nil {
-			logger.Warnf(ctx, "Failed to get rerank model: %v", err)
-			return fmt.Errorf("failed to get rerank model: %w", err)
+			logger.Warnf(ctx, "No rerank model for custom agent %s; knowledge_search sẽ dùng LLM-based rerank fallback (chat model)", req.CustomAgent.ID)
+		} else {
+			rerankModel, err = s.modelService.GetRerankModel(ctx, rerankModelID)
+			if err != nil {
+				logger.Warnf(ctx, "Failed to get rerank model: %v", err)
+				return fmt.Errorf("failed to get rerank model: %w", err)
+			}
 		}
 	} else {
 		logger.Infof(ctx, "knowledge_search tool not enabled, skipping rerank model initialization")
