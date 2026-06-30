@@ -163,6 +163,9 @@ func (ix *ChessKnowledgeIndexer) IndexStatus(ctx context.Context) (*types.ChessI
 	st.KBID = chessKB.ID
 	st.EmbeddingModelID = chessKB.EmbeddingModelID
 	st.EmbeddingConfigured = strings.TrimSpace(chessKB.EmbeddingModelID) != ""
+	st.VectorEnabled = chessKB.IsVectorEnabled()
+	st.KeywordEnabled = chessKB.IsKeywordEnabled()
+	st.Searchable = st.VectorEnabled || st.KeywordEnabled
 
 	ks, err := ix.knowledgeService.ListKnowledgeByKnowledgeBaseID(ctx, chessKB.ID)
 	if err != nil {
@@ -181,6 +184,11 @@ func (ix *ChessKnowledgeIndexer) IndexStatus(ctx context.Context) (*types.ChessI
 		default: // pending / processing / finalizing / rỗng
 			st.Pending++
 		}
+		if k.EnableStatus == "enabled" {
+			st.EnabledDocs++
+		} else {
+			st.DisabledDocs++
+		}
 	}
 	return st, nil
 }
@@ -195,6 +203,14 @@ func (ix *ChessKnowledgeIndexer) ensureChessKB(ctx context.Context) (*types.Know
 	var tpl *types.KnowledgeBase
 	for _, kb := range kbs {
 		if kb.Name == chessKBName {
+			// KB cờ đã tồn tại. Nếu vô tình TẮT cả vector lẫn keyword thì
+			// knowledge_search KHÔNG "nhìn thấy" KB (capability filter) và embedding
+			// bị skip lúc index → RAG rỗng. Cảnh báo rõ để vận hành xử lý (xóa KB cờ
+			// rồi reindex để tạo lại đúng cấu hình).
+			if !kb.IsVectorEnabled() && !kb.IsKeywordEnabled() {
+				logger.Warnf(ctx, "chess index: KB %q ĐANG TẮT cả vector lẫn keyword → "+
+					"RAG không truy hồi được; XÓA KB này rồi gọi reindex để tạo lại", chessKBName)
+			}
 			return kb, nil
 		}
 		if tpl == nil && kb.EmbeddingModelID != "" {
@@ -205,7 +221,8 @@ func (ix *ChessKnowledgeIndexer) ensureChessKB(ctx context.Context) (*types.Know
 		return nil, fmt.Errorf("chưa có KB cấu hình embedding để sao chép")
 	}
 	// Chỉ sao chép các trường cần cho embedding/lưu trữ; bỏ wiki/faq/extract để KB
-	// cờ là KB tài liệu thuần (EnsureDefaults sẽ điền phần còn lại).
+	// cờ là KB tài liệu thuần. Set TƯỜNG MINH IndexingStrategy (vector+keyword bật)
+	// — KHÔNG phụ thuộc EnsureDefaults — để KB cờ LUÔN truy hồi được qua knowledge_search.
 	nk := &types.KnowledgeBase{
 		Name:                  chessKBName,
 		Type:                  "document",
@@ -218,6 +235,7 @@ func (ix *ChessKnowledgeIndexer) ensureChessKB(ctx context.Context) (*types.Know
 		ASRConfig:             tpl.ASRConfig,
 		StorageProviderConfig: tpl.StorageProviderConfig,
 		VectorStoreID:         tpl.VectorStoreID,
+		IndexingStrategy:      types.DefaultIndexingStrategy(),
 	}
 	return ix.kbService.CreateKnowledgeBase(ctx, nk)
 }

@@ -43,12 +43,15 @@ func newTestIndexer(kbs []*types.KnowledgeBase, byKB map[string][]*types.Knowled
 
 func TestChessIndexStatus_CountsByParseStatus(t *testing.T) {
 	t.Setenv("CHESS_KB_INDEX", "true")
-	kb := &types.KnowledgeBase{ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1"}
+	kb := &types.KnowledgeBase{
+		ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1",
+		IndexingStrategy: types.DefaultIndexingStrategy(), // vector+keyword bật
+	}
 	ks := []*types.Knowledge{
-		{ParseStatus: types.ParseStatusCompleted},
-		{ParseStatus: types.ParseStatusCompleted},
-		{ParseStatus: types.ParseStatusPending},
-		{ParseStatus: types.ParseStatusFailed, ErrorMessage: "embed lỗi mẫu"},
+		{ParseStatus: types.ParseStatusCompleted, EnableStatus: "enabled"},
+		{ParseStatus: types.ParseStatusCompleted, EnableStatus: "enabled"},
+		{ParseStatus: types.ParseStatusPending, EnableStatus: "disabled"},
+		{ParseStatus: types.ParseStatusFailed, ErrorMessage: "embed lỗi mẫu", EnableStatus: "disabled"},
 	}
 	ix := newTestIndexer([]*types.KnowledgeBase{kb}, map[string][]*types.Knowledge{"kb-chess": ks})
 
@@ -59,14 +62,35 @@ func TestChessIndexStatus_CountsByParseStatus(t *testing.T) {
 	if !st.Enabled || !st.KBExists || !st.EmbeddingConfigured {
 		t.Fatalf("kỳ vọng enabled/kb_exists/embedding_configured = true, nhận %+v", st)
 	}
+	if !st.VectorEnabled || !st.KeywordEnabled || !st.Searchable {
+		t.Errorf("kỳ vọng vector/keyword/searchable = true, nhận %+v", st)
+	}
 	if st.KBID != "kb-chess" || st.EmbeddingModelID != "emb-1" {
 		t.Errorf("KBID/EmbeddingModelID sai: %+v", st)
 	}
 	if st.Total != 4 || st.Completed != 2 || st.Pending != 1 || st.Failed != 1 {
 		t.Errorf("đếm sai: total=%d completed=%d pending=%d failed=%d", st.Total, st.Completed, st.Pending, st.Failed)
 	}
+	if st.EnabledDocs != 2 || st.DisabledDocs != 2 {
+		t.Errorf("đếm enable_status sai: enabled=%d disabled=%d", st.EnabledDocs, st.DisabledDocs)
+	}
 	if st.SampleError != "embed lỗi mẫu" {
 		t.Errorf("SampleError sai: %q", st.SampleError)
+	}
+}
+
+func TestChessIndexStatus_NotSearchableWhenIndexingOff(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	// KB cờ có embedding model nhưng TẮT vector+keyword → bị loại khỏi search.
+	kb := &types.KnowledgeBase{ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1"}
+	ix := newTestIndexer([]*types.KnowledgeBase{kb}, map[string][]*types.Knowledge{})
+
+	st, err := ix.IndexStatus(context.Background())
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if st.Searchable || st.VectorEnabled || st.KeywordEnabled {
+		t.Errorf("kỳ vọng searchable=false khi indexing off, nhận %+v", st)
 	}
 }
 
