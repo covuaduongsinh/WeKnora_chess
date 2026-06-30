@@ -279,8 +279,8 @@ builtin_agents:
       multi_turn_enabled: true
       history_turns: 10
       embedding_top_k: 10
-      keyword_threshold: 0.3
-      vector_threshold: 0.5
+      keyword_threshold: 0.2
+      vector_threshold: 0.3
       rerank_top_k: 10
-      rerank_threshold: 0.3
+      rerank_threshold: 0.1
 
