@@ -1,6 +1,9 @@
 package chess
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // fen.go gom các tiện ích FEN dùng chung cho "ngân hàng thế cờ" (chess_positions).
 // Khác với board.go (ParsePGN, FENAfterMove...) vốn giả định thế cờ hợp lệ theo
@@ -78,4 +81,20 @@ func HasBothKings(fen string) bool {
 // thay vì giữ một bản triển khai trùng lặp thứ ba.
 func SideToMove(fen string) string {
 	return sideToMove(fen)
+}
+
+// FullMoveNumber trả về số nước đầy đủ (1-based), đọc từ trường thứ SÁU của fen.
+// Mặc định 1 nếu thiếu/không hợp lệ. Dùng để đánh số nước đúng cho cả ván bắt
+// đầu từ thế cờ giữa ván (vd Đen đi trước ở nước 24) — khác với công thức
+// i/2+1 vốn giả định ván luôn bắt đầu từ thế cờ ban đầu với Trắng đi trước.
+func FullMoveNumber(fen string) int {
+	fields := strings.Fields(fen)
+	if len(fields) < 6 {
+		return 1
+	}
+	n, err := strconv.Atoi(fields[5])
+	if err != nil || n < 1 {
+		return 1
+	}
+	return n
 }

@@ -30,21 +30,31 @@
         <button class="nav-btn" :disabled="currentIndex === positions.length - 1" @click="goTo(positions.length - 1)" :title="t('chess.end')">⏭</button>
         <button class="nav-btn" @click="flip" :title="t('chess.flip')">⇅</button>
       </div>
-
-      <div class="move-list">
-        <span
-          v-for="(pos, idx) in positions"
-          :key="idx"
-          v-show="idx > 0"
-          class="move-item"
-          :class="{ active: idx === currentIndex }"
-          @click="goTo(idx)"
-        >{{ pos.label }}</span>
-      </div>
     </div>
 
     <div v-else class="chess-nav-single">
       <button class="nav-btn" @click="flip" :title="t('chess.flip')">⇅ {{ t('chess.flip') }}</button>
+    </div>
+
+    <!-- Danh sách nước đi — TÁCH RIÊNG khỏi .chess-nav để BookPrint.vue có thể ẩn
+         nút bấm điều hướng (vô nghĩa trên giấy) mà vẫn in được chuỗi nước đi
+         dạng chữ (xem :deep(.chess-nav) trong BookPrint.vue). -->
+    <div v-if="positions.length > 1" class="move-list">
+      <span v-for="(g, gi) in moveGroups" :key="gi" class="move-group">
+        <span class="move-no">{{ g.number }}{{ g.white ? '.' : '...' }}</span>
+        <span
+          v-if="g.white"
+          class="move-item"
+          :class="{ active: g.white.idx === currentIndex }"
+          @click="goTo(g.white.idx)"
+        >{{ g.white.san }}</span>
+        <span
+          v-if="g.black"
+          class="move-item"
+          :class="{ active: g.black.idx === currentIndex }"
+          @click="goTo(g.black.idx)"
+        >{{ g.black.san }}</span>
+      </span>
     </div>
   </div>
 </template>
@@ -65,7 +75,10 @@ const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 interface PosItem {
   fen: string;
-  label: string;
+  label: string;        // nhãn ĐẦY ĐỦ "5... Nf6" — dùng cho thanh nav + defineExpose
+  san?: string;          // chỉ nước đi "Nf6" — dùng cho ô trong move list (không lặp lại số)
+  moveNumber?: number;   // số nước đầy đủ (đọc từ FEN, không giả định Trắng luôn đi trước)
+  side?: 'w' | 'b';
 }
 
 const caption = computed(() => props.data.caption || '');
@@ -79,8 +92,12 @@ const positions = computed<PosItem[]>(() => {
   if (props.data.plies && props.data.plies.length) {
     list.push({ fen: startFen, label: t('chess.startPosition') });
     for (const p of props.data.plies) {
-      const prefix = p.side === 'w' ? `${p.move_number}.` : `${p.move_number}...`;
-      list.push({ fen: p.fen_after, label: `${prefix} ${p.san}` });
+      const side = p.side === 'b' ? 'b' : 'w';
+      const prefix = side === 'w' ? `${p.move_number}.` : `${p.move_number}...`;
+      list.push({
+        fen: p.fen_after, label: `${prefix} ${p.san}`,
+        san: p.san, moveNumber: p.move_number, side,
+      });
     }
     return list;
   }
@@ -92,9 +109,14 @@ const positions = computed<PosItem[]>(() => {
       const hist = game.history({ verbose: true }) as Array<{ san: string; after: string; before: string; color: string }>;
       list.push({ fen: hist.length ? hist[0].before : startFen, label: t('chess.startPosition') });
       hist.forEach((h, i) => {
-        const num = Math.floor(i / 2) + 1;
-        const prefix = h.color === 'w' ? `${num}.` : `${num}...`;
-        list.push({ fen: h.after, label: `${prefix} ${h.san}` });
+        // Số nước đọc từ trường thứ 6 của FEN "trước nước đi" — đúng cả khi ván
+        // bắt đầu từ thế cờ giữa ván (Đen đi trước), khác với Math.floor(i/2)+1
+        // vốn giả định Trắng luôn đi nước đầu tiên.
+        const fenMoveNo = Number(h.before.split(' ')[5]);
+        const num = Number.isFinite(fenMoveNo) && fenMoveNo > 0 ? fenMoveNo : Math.floor(i / 2) + 1;
+        const side = h.color === 'b' ? 'b' : 'w';
+        const prefix = side === 'w' ? `${num}.` : `${num}...`;
+        list.push({ fen: h.after, label: `${prefix} ${h.san}`, san: h.san, moveNumber: num, side });
       });
       return list;
     } catch {
@@ -104,6 +126,26 @@ const positions = computed<PosItem[]>(() => {
 
   list.push({ fen: startFen, label: t('chess.startPosition') });
   return list;
+});
+
+// Gom từng cặp nửa-nước Trắng/Đen cùng số nước thành một nhóm, đúng ký hiệu PGN
+// sách vở "1. d4 e6" thay vì lặp số hai lần "1. d4 1... e6". positions[0] (thế cờ
+// ban đầu) không có moveNumber/side nên tự động bị bỏ qua khi gom nhóm.
+interface MoveCell { idx: number; san: string }
+interface MoveGroup { number: number; white: MoveCell | null; black: MoveCell | null }
+const moveGroups = computed<MoveGroup[]>(() => {
+  const groups: MoveGroup[] = [];
+  let current: MoveGroup | null = null;
+  positions.value.forEach((pos, idx) => {
+    if (pos.moveNumber === undefined || !pos.side || !pos.san) return;
+    if (!current || current.number !== pos.moveNumber || current[pos.side === 'w' ? 'white' : 'black']) {
+      current = { number: pos.moveNumber, white: null, black: null };
+      groups.push(current);
+    }
+    const cell: MoveCell = { idx, san: pos.san };
+    if (pos.side === 'w') current.white = cell; else current.black = cell;
+  });
+  return groups;
 });
 
 const currentIndex = ref(0);
@@ -322,10 +364,24 @@ defineExpose({ currentFen, currentIndex, currentLabel });
 .move-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 2px 10px;
   margin-top: 8px;
   max-height: 120px;
   overflow-y: auto;
+
+  .move-group {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .move-no {
+    font-family: var(--app-font-family-mono);
+    font-size: 12px;
+    color: var(--td-text-color-placeholder);
+    user-select: none;
+  }
 
   .move-item {
     font-family: var(--app-font-family-mono);

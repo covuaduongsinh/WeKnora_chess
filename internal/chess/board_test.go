@@ -84,6 +84,35 @@ func TestParsePGN(t *testing.T) {
 	}
 }
 
+func TestParsePGNFromMidGamePosition(t *testing.T) {
+	// Ván bắt đầu từ thế cờ giữa ván (SetUp/FEN), Đen đi trước ở nước 24 —
+	// MoveNumber phải đọc từ FEN, không được giả định Trắng luôn đi nước đầu.
+	pgn := `[Event "Test"]
+[White "A"]
+[Black "B"]
+[SetUp "1"]
+[FEN "4k3/8/8/8/8/8/8/4K3 b - - 0 24"]
+[Result "*"]
+
+24... Kd7 25. Kd2 Ke6 *`
+	info, err := ParsePGN(pgn)
+	if err != nil {
+		t.Fatalf("lỗi không mong đợi: %v", err)
+	}
+	if len(info.Plies) != 3 {
+		t.Fatalf("muốn 3 nước, nhận %d", len(info.Plies))
+	}
+	if info.Plies[0].MoveNumber != 24 || info.Plies[0].Side != "b" {
+		t.Fatalf("nước đầu phải là 24... Kd7, nhận %+v", info.Plies[0])
+	}
+	if info.Plies[1].MoveNumber != 25 || info.Plies[1].Side != "w" {
+		t.Fatalf("nước thứ 2 phải là 25. Kd2, nhận %+v", info.Plies[1])
+	}
+	if info.Plies[2].MoveNumber != 25 || info.Plies[2].Side != "b" {
+		t.Fatalf("nước thứ 3 phải cùng số 25 (Đen), nhận %+v", info.Plies[2])
+	}
+}
+
 func TestParseMultiPGN(t *testing.T) {
 	pgn := `[Event "Giải A"]
 [White "An"]

@@ -163,7 +163,7 @@ func ParsePGN(pgn string) (*GameInfo, error) {
 			side = "b"
 		}
 		info.Plies = append(info.Plies, GamePly{
-			MoveNumber: i/2 + 1,
+			MoveNumber: FullMoveNumber(before.String()),
 			Side:       side,
 			SAN:        notnil.AlgebraicNotation{}.Encode(before, mv),
 			UCI:        notnil.UCINotation{}.Encode(before, mv),

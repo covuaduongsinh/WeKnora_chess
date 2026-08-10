@@ -175,6 +175,21 @@ onMounted(async () => {
 :deep(.eval-bar),
 :deep(.chess-eval-line) { display: none !important; }
 
+// .move-list (danh sách nước đi dạng chữ, vd "1. e4 e5 2. Nf3 Nc6") nằm NGOÀI
+// .chess-nav (xem ChessBoardDisplay.vue) nên KHÔNG bị ẩn bởi luật trên — đây
+// là nội dung sách cờ cần in ra giấy. Chỉ bỏ khung cuộn 120px (vô nghĩa khi
+// không còn bấm/cuộn được) và tắt hiệu ứng con trỏ/hover — cả 2 nơi (xem
+// preview) lẫn khi in, cùng lý do nhất quán như trên.
+:deep(.move-list) {
+  max-height: none;
+  overflow: visible;
+}
+:deep(.move-item) {
+  cursor: default;
+
+  &:hover { background: none; }
+}
+
 @media print {
   .no-print { display: none !important; }
   .bkp { padding: 0; overflow-x: visible; }
