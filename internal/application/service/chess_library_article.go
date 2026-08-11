@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/google/uuid"
@@ -77,6 +78,7 @@ func (s *chessLibraryService) CreateArticle(ctx context.Context, article *types.
 		return nil, err
 	}
 	s.syncArticleChessRefs(ctx, article)
+	s.syncArticleAliases(ctx, article)
 	s.reindexArticle(ctx, article)
 	return article, nil
 }
@@ -96,6 +98,7 @@ func (s *chessLibraryService) UpdateArticle(ctx context.Context, article *types.
 		return updated, err
 	}
 	s.syncArticleChessRefs(ctx, updated)
+	s.syncArticleAliases(ctx, updated)
 	s.reindexArticle(ctx, updated)
 	return updated, nil
 }
@@ -145,28 +148,47 @@ func (s *chessLibraryService) RenameArticleSlug(ctx context.Context, tenantID ui
 	if err != nil || updated == nil {
 		return updated, err
 	}
+	// Chú giải/nội dung có thể tự tham chiếu slug cũ trong một số ngữ cảnh
+	// hiển thị — đồng bộ lại nguồn ref dưới slug MỚI để backlink nhất quán.
 	s.syncArticleChessRefs(ctx, updated)
+	// Bí danh KHÔNG đổi khi đổi slug — nhưng target (new_slug trong bảng
+	// alias) phải trỏ theo slug MỚI. ReplaceSynonyms dùng ON CONFLICT theo
+	// old_slug (chuỗi bí danh không đổi) nên gọi lại đây TỰ SỬA new_slug của
+	// các dòng hiện có từ slug cũ sang slug mới, không để mồ côi.
+	s.syncArticleAliases(ctx, updated)
 	s.reindexArticle(ctx, updated)
 	return updated, nil
 }
 
 // DeleteArticle xóa bài viết VÀ cascade: ref TRỎ TỚI nó (backlink từ nơi
-// khác) + ref TỪ nội dung của chính nó (nó từng trỏ đi đâu) + gỡ khỏi KB tri
-// thức cờ. (Ảnh/lịch sử phiên bản/pivot chuyên mục thuộc Phase 2/3 — chưa có
-// dữ liệu để dọn ở Phase 1.)
+// khác) + ref TỪ nội dung của chính nó (nó từng trỏ đi đâu) + mọi alias
+// (rename lẫn synonym) trỏ tới nó + pivot chuyên mục + ảnh chèn bài (cả bản
+// ghi lẫn file vật lý) + gỡ khỏi KB tri thức cờ. (Lịch sử phiên bản thuộc
+// Phase 3 — chưa có dữ liệu để dọn ở Phase 2.)
 func (s *chessLibraryService) DeleteArticle(ctx context.Context, tenantID uint64, id string) error {
 	a, _ := s.repo.GetArticle(ctx, tenantID, id)
+	images, _ := s.repo.ListArticleImagesByArticle(ctx, tenantID, id)
 	if err := s.repo.DeleteArticle(ctx, tenantID, id); err != nil {
 		return err
 	}
+	_ = s.repo.RemoveArticleFromAllTopics(ctx, tenantID, id)
 	if a != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeArticle, a.Slug)
 		if s.chessRefRepo != nil && a.Slug != "" {
 			_ = s.chessRefRepo.DeleteForArticle(ctx, tenantID, a.Slug)
 		}
+		if s.aliasRepo != nil && a.Slug != "" {
+			_ = s.aliasRepo.DeleteAliasesFor(ctx, tenantID, types.ChessRefTypeArticle, a.Slug)
+		}
 		if s.indexer != nil {
 			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeArticle, a.Slug)
 		}
+	}
+	for _, img := range images {
+		if s.fileService != nil && img.Path != "" {
+			_ = s.fileService.DeleteFile(ctx, img.Path)
+		}
+		_ = s.repo.DeleteArticleImage(ctx, tenantID, img.ID)
 	}
 	return nil
 }
@@ -186,6 +208,85 @@ func (s *chessLibraryService) syncArticleChessRefs(ctx context.Context, a *types
 		refs[i].PageSlug = a.Slug
 	}
 	_ = s.chessRefRepo.ReplaceForArticle(ctx, a.TenantID, a.Slug, refs)
+}
+
+// syncArticleAliases đồng bộ bí danh/từ đồng nghĩa (cột Aliases, CSV hiển
+// thị người dùng gõ tay) vào chess_slug_aliases (kind="synonym") để
+// [[article/<bí danh>]] giải mã đúng bài + autocomplete/RAG bắt trúng khi hỏi
+// bằng từ đồng nghĩa. Bỏ qua (KHÔNG lưu) bí danh trùng slug THẬT của MỘT BÀI
+// KHÁC đang tồn tại — thứ tự resolve là exact→alias nên bí danh trùng slug
+// thật sẽ che khuất bài kia VĨNH VIỄN nếu lưu vào.
+func (s *chessLibraryService) syncArticleAliases(ctx context.Context, a *types.ChessArticle) {
+	if s.aliasRepo == nil || a == nil || a.Slug == "" {
+		return
+	}
+	seen := make(map[string]bool)
+	candidates := make([]string, 0, 4)
+	for _, raw := range strings.Split(a.Aliases, ",") {
+		slug := slugifyChess(raw)
+		if slug == "" || slug == a.Slug || seen[slug] {
+			continue
+		}
+		seen[slug] = true
+		if exists, _ := s.repo.ArticleSlugExists(ctx, a.TenantID, slug); exists {
+			continue // trùng slug thật của bài khác — bỏ qua, không che khuất
+		}
+		candidates = append(candidates, slug)
+	}
+	_ = s.aliasRepo.ReplaceSynonyms(ctx, a.TenantID, types.ChessRefTypeArticle, a.Slug, candidates)
+}
+
+// ---- Ảnh chèn trong bài viết ----
+
+// UploadArticleImage lưu file qua FileService rồi ghi bản ghi ChessArticleImage
+// (sao y UploadBookImage, book_id → article_id).
+func (s *chessLibraryService) UploadArticleImage(ctx context.Context, tenantID uint64, articleID, fileName, mime string, data []byte) (*types.ChessArticleImage, error) {
+	if s.fileService == nil {
+		return nil, fmt.Errorf("dịch vụ lưu file chưa sẵn sàng")
+	}
+	if _, err := s.repo.GetArticle(ctx, tenantID, articleID); err != nil {
+		return nil, fmt.Errorf("bài viết không tồn tại")
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("file ảnh rỗng")
+	}
+	if len(data) > maxBookImageSize {
+		return nil, fmt.Errorf("ảnh vượt quá %dMB", maxBookImageSize>>20)
+	}
+	ext, ok := bookImageExtByMime[strings.ToLower(mime)]
+	if !ok {
+		return nil, fmt.Errorf("định dạng ảnh không hỗ trợ (chỉ png/jpeg/gif/webp)")
+	}
+	id := uuid.New().String()
+	storedName := fmt.Sprintf("article-images/%s%s", id, ext)
+	path, err := s.fileService.SaveBytes(ctx, data, tenantID, storedName, false)
+	if err != nil {
+		return nil, fmt.Errorf("lưu ảnh thất bại: %w", err)
+	}
+	img := &types.ChessArticleImage{
+		ID: id, TenantID: tenantID, ArticleID: articleID, Path: path,
+		FileName: fileName, Mime: mime, Size: int64(len(data)),
+	}
+	if err := s.repo.CreateArticleImage(ctx, img); err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+// GetArticleImage trả metadata + luồng đọc nội dung ảnh (caller PHẢI Close()).
+func (s *chessLibraryService) GetArticleImage(ctx context.Context, tenantID uint64, imageID string) (*types.ChessArticleImage, io.ReadCloser, error) {
+	img, err := s.repo.GetArticleImage(ctx, tenantID, imageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if s.fileService == nil {
+		return nil, nil, fmt.Errorf("dịch vụ lưu file chưa sẵn sàng")
+	}
+	rc, err := s.fileService.GetFile(ctx, img.Path)
+	if err != nil {
+		return nil, nil, err
+	}
+	return img, rc, nil
 }
 
 // ---- Export / Import ----

@@ -140,3 +140,28 @@ func (r *chessLibraryRepository) UpdateArticleSlug(ctx context.Context, tenantID
 func (r *chessLibraryRepository) DeleteArticle(ctx context.Context, tenantID uint64, id string) error {
 	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.ChessArticle{}).Error
 }
+
+// ---- Ảnh chèn trong bài viết (sao y chess_book.go phần ảnh, book_id → article_id) ----
+
+func (r *chessLibraryRepository) CreateArticleImage(ctx context.Context, img *types.ChessArticleImage) error {
+	return r.db.WithContext(ctx).Create(img).Error
+}
+
+func (r *chessLibraryRepository) GetArticleImage(ctx context.Context, tenantID uint64, id string) (*types.ChessArticleImage, error) {
+	var img types.ChessArticleImage
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).First(&img).Error; err != nil {
+		return nil, err
+	}
+	return &img, nil
+}
+
+// ListArticleImagesByArticle phục vụ xóa file vật lý khi cascade delete bài viết.
+func (r *chessLibraryRepository) ListArticleImagesByArticle(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleImage, error) {
+	var imgs []*types.ChessArticleImage
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND article_id = ?", tenantID, articleID).Find(&imgs).Error
+	return imgs, err
+}
+
+func (r *chessLibraryRepository) DeleteArticleImage(ctx context.Context, tenantID uint64, id string) error {
+	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.ChessArticleImage{}).Error
+}

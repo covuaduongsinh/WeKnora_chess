@@ -146,6 +146,14 @@ func articleSlugBase(a *types.ChessArticle) string {
 	return "bai-viet"
 }
 
+// topicSlugBase: tên chuyên mục bài viết.
+func topicSlugBase(t *types.ChessArticleTopic) string {
+	if s := slugifyChess(t.Title); s != "" {
+		return s
+	}
+	return "chuyen-muc"
+}
+
 // id8 lấy 8 hex đầu của UUID (đã bỏ dấu "-") làm hậu tố/giá trị dự phòng.
 func id8(uuid string) string {
 	h := strings.ReplaceAll(uuid, "-", "")

@@ -15,12 +15,33 @@
       <t-button variant="outline" size="small" @click="doImport">
         <template #icon><t-icon name="upload" /></template>Import
       </t-button>
+      <t-button variant="outline" size="small" @click="topicManagerVisible = true">
+        <template #icon><t-icon name="folder" /></template>Quản lý chuyên mục
+      </t-button>
       <t-button theme="primary" size="small" @click="createDialog.visible = true">
         <template #icon><t-icon name="add" /></template>Bài viết mới
       </t-button>
     </div>
 
     <div class="atb-body">
+      <div class="atb-topics">
+        <div class="atb-topic-row" :class="{ active: !filter.topic_id }" @click="selectTopic('')">
+          <span>Tất cả</span>
+        </div>
+        <template v-for="node in topicTree" :key="node.id">
+          <div class="atb-topic-row" :class="{ active: filter.topic_id === node.id }" @click="selectTopic(node.id)">
+            <span>{{ node.title }}</span>
+            <span class="atb-topic-count">{{ node.article_count || 0 }}</span>
+          </div>
+          <div v-for="child in node.children" :key="child.id" class="atb-topic-row atb-topic-row--child"
+            :class="{ active: filter.topic_id === child.id }" @click="selectTopic(child.id)">
+            <span>{{ child.title }}</span>
+            <span class="atb-topic-count">{{ child.article_count || 0 }}</span>
+          </div>
+        </template>
+        <div v-if="topics.length === 0" class="atb-empty">Chưa có chuyên mục.</div>
+      </div>
+
       <div class="atb-list">
         <div v-if="articles.length === 0" class="atb-empty">Chưa có bài viết. Nhấn "Bài viết mới".</div>
         <div v-for="a in articles" :key="a.id" class="atb-row" :class="{ active: selected && selected.id === a.id }"
@@ -105,10 +126,21 @@
               <label>Ảnh bìa (URL, tùy chọn)</label>
               <t-input v-model="editDraft.cover_url" placeholder="https://…" />
               <div class="atb-content-label">
-                <label>Nội dung (markdown — gõ [[ để chèn liên kết ván/thế cờ/bài giảng/sách)</label>
+                <label>Nội dung (markdown — gõ [[ để chèn liên kết ván/thế cờ/bài giảng/sách; dán/kéo-thả ảnh)</label>
+                <div class="atb-editor-toolbar">
+                  <t-button v-for="btn in editor.toolbarButtons" :key="btn.key" size="small" variant="text"
+                    :title="btn.title" @click="btn.action">
+                    <t-icon :name="btn.icon" />
+                  </t-button>
+                  <t-button size="small" variant="text" title="Chèn ảnh" @click="imageInputEl?.click()">
+                    <t-icon name="image" />
+                  </t-button>
+                </div>
               </div>
               <t-textarea ref="contentRef" v-model="editDraft.content" :autosize="{ minRows: 10 }"
-                placeholder="Viết nội dung bài… Gõ [[ để gợi ý ván/thế cờ/bài tập/sách/chương." />
+                placeholder="Viết nội dung bài… Gõ [[ để gợi ý ván/thế cờ/bài tập/sách/chương. Dán/kéo-thả ảnh vào đây." />
+              <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+                style="display:none" @change="onImageInputChange" />
               <ChessWikiLinkSuggest :textarea="contentTextareaEl" v-model="editDraft.content" />
             </div>
           </template>
@@ -127,11 +159,12 @@
     </t-dialog>
 
     <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
+    <ChessArticleTopicManager v-model:visible="topicManagerVisible" @changed="loadTopics" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { marked } from 'marked';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
@@ -140,9 +173,11 @@ import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
+import ChessArticleTopicManager from '@/views/chess/components/ChessArticleTopicManager.vue';
 import {
   listArticles, getArticleBySlug, createArticle, updateArticle, deleteArticle,
   renameArticleSlug, exportArticles, importArticles, type ChessArticle,
+  listArticleTopics, uploadArticleImage, type ChessArticleTopic,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 import { splitChessContent, renderChessChips } from '@/utils/chessBlocks';
@@ -150,6 +185,7 @@ import {
   articleCategoryOptions, articleLevelOptions, articleStatusOptions,
   articleCategoryLabel, articleLevelLabel, articleStatusLabel,
 } from '@/utils/chessArticleOptions';
+import { useChessEditor } from '@/views/chess/composables/useChessEditor';
 
 const { t } = useI18n();
 
@@ -167,7 +203,7 @@ watch(() => props.focusSlug, (s) => focusBySlug(s));
 
 const articles = ref<ChessArticle[]>([]);
 const selected = ref<ChessArticle | null>(null);
-const filter = reactive({ category: '', level: '', status: '', q: '' });
+const filter = reactive({ category: '', level: '', status: '', q: '', topic_id: '' });
 const editing = ref(false);
 
 async function load() {
@@ -177,6 +213,27 @@ async function load() {
   } catch { MessagePlugin.error('Tải ngân hàng bài viết thất bại'); }
 }
 function select(a: ChessArticle) { selected.value = a; editing.value = false; }
+
+// ---- Chuyên mục (trục DỌC điều hướng — trục NGANG là bộ lọc category/level/
+// status/q ở trên). Cây tối đa 2 tầng: gốc + con. Chọn "Tất cả" (topic_id='')
+// quay về đúng danh sách phẳng đã lọc. ----
+const topics = ref<ChessArticleTopic[]>([]);
+const topicManagerVisible = ref(false);
+interface TopicNode extends ChessArticleTopic { children: ChessArticleTopic[] }
+const topicTree = computed<TopicNode[]>(() => {
+  const roots = topics.value.filter((t) => !t.parent_id);
+  return roots.map((r) => ({ ...r, children: topics.value.filter((t) => t.parent_id === r.id) }));
+});
+async function loadTopics() {
+  try {
+    const res: any = await listArticleTopics();
+    topics.value = res?.data || [];
+  } catch { MessagePlugin.error('Tải danh sách chuyên mục thất bại'); }
+}
+function selectTopic(topicId: string) {
+  filter.topic_id = topicId;
+  load();
+}
 
 // Sao chép wikilink [[article/<slug>]] để dán vào nội dung bài khác/wiki.
 async function copyWikilink(a: ChessArticle) {
@@ -331,24 +388,58 @@ async function doImport() {
   } catch (e: any) { MessagePlugin.error(e?.error || e?.message || 'Import thất bại'); }
 }
 
-// ---- Autocomplete "[[" trong ô nội dung ----
+// ---- Autocomplete "[[" + soạn thảo (toolbar, dán/kéo-thả ảnh) trong ô nội dung ----
 const contentRef = ref<any>(null);
 const contentTextareaEl = ref<HTMLTextAreaElement | null>(null);
+const imageInputEl = ref<HTMLInputElement | null>(null);
+
+const contentModel = computed({
+  get: () => editDraft.content,
+  set: (v: string) => { editDraft.content = v; },
+});
+const editor = useChessEditor({
+  getTextarea: () => contentTextareaEl.value,
+  content: contentModel,
+  upload: async (file: File) => {
+    if (!selected.value) throw new Error('Chưa chọn bài viết');
+    const res: any = await uploadArticleImage(selected.value.id, file);
+    return res?.data?.url as string;
+  },
+  onUploadError: (e: any) => MessagePlugin.error(e?.error || e?.message || 'Tải ảnh lên thất bại'),
+});
+function onImageInputChange(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) editor.uploadAndInsert(file);
+  input.value = '';
+}
+
 watch(editing, async (isEditing) => {
-  if (!isEditing) { contentTextareaEl.value = null; return; }
+  if (!isEditing) { contentTextareaEl.value = null; editor.bindTextarea(null); return; }
   await nextTick();
   const root = contentRef.value?.$el || contentRef.value;
   contentTextareaEl.value = (root?.querySelector?.('textarea') as HTMLTextAreaElement) || null;
+  editor.bindTextarea(contentTextareaEl.value);
 });
 
 load();
+loadTopics();
 </script>
 
 <style lang="less" scoped>
 .atb { display: flex; flex-direction: column; height: 100%; }
 .atb-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .atb-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
-.atb-list { width: 340px; flex: 0 0 340px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 12px; }
+.atb-topics { width: 220px; flex: 0 0 220px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 10px; }
+.atb-topic-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-bottom: 2px;
+  &:hover { background: var(--td-bg-color-container-hover); }
+  &.active { background: var(--td-bg-color-secondarycontainer); color: var(--td-brand-color); font-weight: 600; }
+}
+.atb-topic-row--child { padding-left: 20px; font-size: 12px; }
+.atb-topic-count { color: var(--td-text-color-placeholder); font-size: 12px; }
+.atb-list { width: 320px; flex: 0 0 320px; overflow-y: auto; border-right: 1px solid var(--td-component-stroke); padding-right: 12px; }
 .atb-viewer { flex: 1; overflow-y: auto; }
 .atb-backlinks { margin: 0 0 12px; }
 .atb-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
@@ -377,6 +468,7 @@ load();
   &:hover { text-decoration: underline; }
 }
 .atb-form { display: flex; flex-direction: column; gap: 6px; label { font-size: 13px; color: var(--td-text-color-secondary); margin-top: 6px; } }
-.atb-content-label { margin-top: 6px; }
+.atb-content-label { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; }
+.atb-editor-toolbar { display: flex; gap: 2px; }
 .atb-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
 </style>
