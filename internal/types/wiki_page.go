@@ -141,6 +141,7 @@ const (
 	WikiNodeTypeChessPosition = "chess_position"
 	WikiNodeTypeChessBook     = "chess_book"
 	WikiNodeTypeChessChapter  = "chess_chapter"
+	WikiNodeTypeChessArticle  = "chess_article"
 )
 
 // ChessRefTypeToNodeType ánh xạ loại tham chiếu cờ → loại node đồ thị.
@@ -160,6 +161,8 @@ func ChessRefTypeToNodeType(chessType string) string {
 		return WikiNodeTypeChessBook
 	case ChessRefTypeChapter:
 		return WikiNodeTypeChessChapter
+	case ChessRefTypeArticle:
+		return WikiNodeTypeChessArticle
 	}
 	return ""
 }

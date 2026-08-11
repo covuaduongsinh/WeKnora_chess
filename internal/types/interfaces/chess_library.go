@@ -54,6 +54,28 @@ type ChessLibraryService interface {
 	// ListPositionsByGame liệt kê các thế cờ đã trích từ MỘT ván cụ thể.
 	ListPositionsByGame(ctx context.Context, tenantID uint64, gameID string) ([]*types.ChessPosition, error)
 
+	// ---- Bài viết (Ngân hàng bài viết) ----
+	ListArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) ([]*types.ChessArticle, error)
+	// SearchArticles tìm bài viết theo từ khóa (slug/title/aliases/summary/
+	// content) toàn tenant — autocomplete wikilink.
+	SearchArticles(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessArticle, error)
+	GetArticle(ctx context.Context, tenantID uint64, id string) (*types.ChessArticle, error)
+	// GetArticleBySlug giải mã wikilink [[article/<slug>]] về bài viết.
+	GetArticleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticle, error)
+	// GetArticleBacklinks liệt kê trang wiki/bài giảng/thế cờ/chương/bài viết
+	// khác trỏ tới bài viết này.
+	GetArticleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
+	CreateArticle(ctx context.Context, article *types.ChessArticle) (*types.ChessArticle, error)
+	UpdateArticle(ctx context.Context, article *types.ChessArticle) (*types.ChessArticle, error)
+	// RenameArticleSlug đổi slug bài viết sang newSlug + ghi alias slug-cũ→mới.
+	RenameArticleSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessArticle, error)
+	// DeleteArticle xóa bài viết VÀ cascade: ref 2 chiều + gỡ khỏi KB tri thức cờ.
+	DeleteArticle(ctx context.Context, tenantID uint64, id string) error
+	// ExportArticles xuất các bài viết (theo filter) để sao lưu/chia sẻ.
+	ExportArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) ([]types.ChessArticleBundle, error)
+	// ImportArticles nhập danh sách bài viết (luôn tạo mới); trả số bài đã thêm.
+	ImportArticles(ctx context.Context, tenantID uint64, items []types.ChessArticleBundle) (int, error)
+
 	// ---- Thư viện sách: Kệ ----
 	ListShelves(ctx context.Context, tenantID uint64, f types.ChessShelfFilter) ([]*types.ChessShelf, error)
 	GetShelf(ctx context.Context, tenantID uint64, id string) (*types.ChessShelf, error)
@@ -189,6 +211,20 @@ type ChessLibraryRepository interface {
 	ListPositionsByGame(ctx context.Context, tenantID uint64, gameID string) ([]*types.ChessPosition, error)
 	// FindByFENKey tìm thế cờ trùng theo fen_key (phục vụ cảnh báo trùng khi tạo mới).
 	FindByFENKey(ctx context.Context, tenantID uint64, fenKey string) ([]*types.ChessPosition, error)
+
+	// ---- Bài viết (Ngân hàng bài viết) ----
+	ListArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) ([]*types.ChessArticle, error)
+	SearchArticles(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessArticle, error)
+	GetArticle(ctx context.Context, tenantID uint64, id string) (*types.ChessArticle, error)
+	GetArticleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticle, error)
+	// ArticleSlugs trả mọi slug bài viết sống của tenant (pool fuzzy-resolve).
+	ArticleSlugs(ctx context.Context, tenantID uint64) ([]string, error)
+	ArticleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
+	CreateArticle(ctx context.Context, article *types.ChessArticle) error
+	UpdateArticle(ctx context.Context, article *types.ChessArticle) error
+	// UpdateArticleSlug chỉ đổi cột slug (tách riêng như UpdateGameSlug).
+	UpdateArticleSlug(ctx context.Context, tenantID uint64, id, slug string) error
+	DeleteArticle(ctx context.Context, tenantID uint64, id string) error
 
 	// ---- Thư viện sách: Kệ ----
 	ListShelves(ctx context.Context, tenantID uint64, f types.ChessShelfFilter) ([]*types.ChessShelf, error)

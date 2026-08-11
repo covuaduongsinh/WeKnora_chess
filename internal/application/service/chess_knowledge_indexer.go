@@ -84,6 +84,17 @@ func (ix *ChessKnowledgeIndexer) IndexPosition(ctx context.Context, p *types.Che
 	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePosition, p.Slug, title, content)
 }
 
+// IndexArticle chỉ index bài viết ở trạng thái "published" — bản thảo (draft)
+// KHÔNG được đưa vào KB tri thức cờ để agent không trích dẫn nội dung chưa
+// duyệt (cùng quy tắc IndexBook/IndexChapter).
+func (ix *ChessKnowledgeIndexer) IndexArticle(ctx context.Context, a *types.ChessArticle) error {
+	if !ix.Enabled() || a == nil || a.Slug == "" || a.Status != types.ChessArticleStatusPublished {
+		return nil
+	}
+	title, content := buildArticleKnowledgeText(a)
+	return ix.upsert(ctx, a.TenantID, types.ChessRefTypeArticle, a.Slug, title, content)
+}
+
 // IndexBook chỉ index sách ở trạng thái "published" — bản thảo (draft) KHÔNG
 // được đưa vào KB tri thức cờ để agent không trích dẫn nội dung chưa duyệt.
 // chapters (tùy chọn) dựng mục lục trong nội dung index; truyền nil nếu caller

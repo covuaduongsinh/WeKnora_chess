@@ -39,7 +39,7 @@ const router = useRouter();
 
 const TYPE_LABELS: Record<string, string> = {
   game: 'Ván', puzzle: 'Bài tập', lesson: 'Bài', course: 'Khóa', position: 'Thế cờ',
-  book: 'Sách', chapter: 'Chương',
+  book: 'Sách', chapter: 'Chương', article: 'Bài viết',
 };
 function typeLabel(tp: string): string { return TYPE_LABELS[tp] || tp; }
 
@@ -94,6 +94,7 @@ watch(() => props.refStr, loadSuggestions, { immediate: true });
   &[data-type='position'] { background: #0a7d6f; }
   &[data-type='book'] { background: #ad6800; }
   &[data-type='chapter'] { background: #7cb305; }
+  &[data-type='article'] { background: #c41d7f; }
 }
 .crm-chip-title { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crm-actions { margin-top: 10px; }

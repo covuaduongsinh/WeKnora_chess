@@ -5825,6 +5825,7 @@ export default {
       type_position: "Thế cờ",
       type_book: "Sách",
       type_chapter: "Chương",
+      type_article: "Bài viết",
       // Bộ chọn chèn link trong trình soạn bài giảng.
       insert: "Chèn ván/thế cờ",
       pickerTitle: "Chèn tham chiếu cờ",
@@ -5835,6 +5836,7 @@ export default {
       tabPositions: "Thế cờ",
       tabBooks: "Sách",
       tabChapters: "Chương",
+      tabArticles: "Bài viết",
       searchPlaceholder: "Tìm theo tên…",
       empty: "Không có mục nào.",
       embedToggle: "Nhúng bàn cờ inline (![[…]])",

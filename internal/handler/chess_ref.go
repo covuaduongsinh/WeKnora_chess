@@ -144,6 +144,18 @@ func (h *ChessRefHandler) SearchRefs(c *gin.Context) {
 			})
 		}
 	}
+	if want(types.ChessRefTypeArticle) {
+		articles, _ := h.library.SearchArticles(ctx, tenantID, q, perType)
+		for _, a := range articles {
+			items = append(items, types.ChessRefSearchItem{
+				Type:     types.ChessRefTypeArticle,
+				Slug:     a.Slug,
+				Ref:      types.ChessRefTypeArticle + "/" + a.Slug,
+				Title:    firstNonEmpty(a.Title, a.Slug),
+				Subtitle: strings.TrimSpace(a.Category + " " + a.Level),
+			})
+		}
+	}
 
 	chessOK(c, items)
 }

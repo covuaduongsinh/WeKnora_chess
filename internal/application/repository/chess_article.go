@@ -1,0 +1,142 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/Tencent/WeKnora/internal/types"
+	"gorm.io/gorm"
+)
+
+// chess_article.go bổ sung thao tác lưu trữ cho "Ngân hàng bài viết"
+// (chess_articles) vào CÙNG struct chessLibraryRepository (khai báo ở
+// chess_library.go) — article là "ngăn" thứ năm cạnh games/puzzles/positions/
+// thư viện sách, không phải repository riêng, để container.go không cần
+// Provide mới.
+//
+// PHASE 1: chỉ CRUD bài viết (chưa có chuyên mục/ảnh/lịch sử phiên bản — xem
+// backlog trong .claude/memory/04-nhat-ky-tuy-bien.md).
+
+// articleQuery dựng query lọc chung cho List/Export/tìm trùng — cùng khuôn
+// positionQuery/bookQuery.
+func (r *chessLibraryRepository) articleQuery(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) *gorm.DB {
+	q := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID)
+	if f.Category != "" {
+		q = q.Where("category = ?", f.Category)
+	}
+	if f.Level != "" {
+		q = q.Where("level = ?", f.Level)
+	}
+	if f.Status != "" {
+		q = q.Where("status = ?", f.Status)
+	}
+	if f.Keyword != "" {
+		kw := "%" + f.Keyword + "%"
+		q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR summary ILIKE ? OR tags ILIKE ?",
+			kw, kw, kw, kw, kw)
+	}
+	if f.TopicID != "" {
+		q = q.Joins("JOIN chess_article_topic_items ti ON ti.article_id = chess_articles.id "+
+			"AND ti.tenant_id = ? AND ti.topic_id = ?", tenantID, f.TopicID)
+	}
+	return q
+}
+
+func (r *chessLibraryRepository) ListArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) ([]*types.ChessArticle, error) {
+	var articles []*types.ChessArticle
+	q := r.articleQuery(ctx, tenantID, f).Model(&types.ChessArticle{})
+	if f.TopicID != "" {
+		q = q.Order("chess_articles.sort_order ASC, chess_articles.created_at DESC")
+	} else {
+		q = q.Order("sort_order ASC, created_at DESC")
+	}
+	err := q.Limit(500).Find(&articles).Error
+	return articles, err
+}
+
+// SearchArticles tìm bài viết theo từ khóa (slug/title/aliases/summary, VÀ
+// content trên Postgres qua full-text) — dùng cho autocomplete wikilink, cùng
+// khuôn SearchChapters. Chỉ chọn cột nhẹ (không tải Content).
+func (r *chessLibraryRepository) SearchArticles(ctx context.Context, tenantID uint64, keyword string, limit int) ([]*types.ChessArticle, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	q := r.db.WithContext(ctx).Model(&types.ChessArticle{}).
+		Select("id", "tenant_id", "slug", "title", "summary", "aliases", "category", "level", "created_at").
+		Where("tenant_id = ?", tenantID)
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		if r.db.Dialector != nil && r.db.Dialector.Name() == "postgres" {
+			q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR "+
+				"to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(aliases,'') || ' ' || "+
+				"coalesce(summary,'') || ' ' || coalesce(content,'')) @@ plainto_tsquery('simple', ?)",
+				kw, kw, kw, keyword)
+		} else {
+			// SQLite ("lite"): chưa có tsvector/pg_trgm — fallback ILIKE thường trên content.
+			q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR content ILIKE ?", kw, kw, kw, kw)
+		}
+	}
+	var articles []*types.ChessArticle
+	err := q.Order("created_at DESC").Limit(limit).Find(&articles).Error
+	return articles, err
+}
+
+func (r *chessLibraryRepository) GetArticle(ctx context.Context, tenantID uint64, id string) (*types.ChessArticle, error) {
+	var a types.ChessArticle
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).First(&a).Error; err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func (r *chessLibraryRepository) GetArticleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticle, error) {
+	var a types.ChessArticle
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND slug = ?", tenantID, slug).First(&a).Error; err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// ArticleSlugs trả toàn bộ slug bài viết "sống" của tenant — pool ứng viên fuzzy-resolve.
+func (r *chessLibraryRepository) ArticleSlugs(ctx context.Context, tenantID uint64) ([]string, error) {
+	var slugs []string
+	err := r.db.WithContext(ctx).Model(&types.ChessArticle{}).
+		Where("tenant_id = ? AND slug <> ''", tenantID).
+		Pluck("slug", &slugs).Error
+	return slugs, err
+}
+
+func (r *chessLibraryRepository) ArticleSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessArticle{}).
+		Where("tenant_id = ? AND slug = ?", tenantID, slug).Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
+func (r *chessLibraryRepository) CreateArticle(ctx context.Context, article *types.ChessArticle) error {
+	return r.db.WithContext(ctx).Create(article).Error
+}
+
+// UpdateArticle cố ý KHÔNG đụng cột slug (như UpdatePosition/UpdateBook) — đổi
+// slug đi qua UpdateArticleSlug để luôn kèm ghi alias ở tầng service.
+func (r *chessLibraryRepository) UpdateArticle(ctx context.Context, article *types.ChessArticle) error {
+	return r.db.WithContext(ctx).
+		Model(&types.ChessArticle{}).
+		Where("tenant_id = ? AND id = ?", article.TenantID, article.ID).
+		Updates(map[string]interface{}{
+			"title": article.Title, "summary": article.Summary, "aliases": article.Aliases,
+			"category": article.Category, "level": article.Level, "tags": article.Tags,
+			"status": article.Status, "cover_url": article.CoverURL, "content": article.Content,
+			"sort_order": article.SortOrder,
+		}).Error
+}
+
+func (r *chessLibraryRepository) UpdateArticleSlug(ctx context.Context, tenantID uint64, id, slug string) error {
+	return r.db.WithContext(ctx).
+		Model(&types.ChessArticle{}).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Update("slug", slug).Error
+}
+
+func (r *chessLibraryRepository) DeleteArticle(ctx context.Context, tenantID uint64, id string) error {
+	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.ChessArticle{}).Error
+}

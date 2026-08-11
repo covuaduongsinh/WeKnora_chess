@@ -31,7 +31,7 @@ export interface ChessLesson {
 
 // ---- Tìm kiếm hợp nhất tham chiếu cờ (autocomplete wikilink khi gõ "[[") ----
 export interface ChessRefSearchItem {
-  type: "game" | "puzzle" | "lesson" | "course" | "position" | "book" | "chapter";
+  type: "game" | "puzzle" | "lesson" | "course" | "position" | "book" | "chapter" | "article";
   slug: string;
   ref: string; // "<type>/<slug>"
   title: string;
@@ -264,3 +264,33 @@ export const getChapterRevision = (chapterId: string, revId: string) =>
   get(`/api/v1/chess/chapters/${chapterId}/revisions/${revId}`);
 export const restoreChapterRevision = (chapterId: string, revId: string) =>
   post(`/api/v1/chess/chapters/${chapterId}/revisions/${revId}/restore`, {});
+
+// ---- Ngân hàng bài viết ----
+// Trang tri thức ĐỘC LẬP (khái niệm/thuật ngữ/kinh nghiệm) — KHÔNG thuộc sách/
+// khóa học nào. Vừa là ĐÍCH wikilink [[article/<slug>]] vừa là NGUỒN (content
+// có thể chứa wikilink trỏ ra ván/thế cờ/bài tập/sách khác). Chỉ bài
+// status="published" được index vào KB tri thức cờ (cùng quy tắc sách).
+export interface ChessArticle {
+  id: string;
+  title: string; summary: string; aliases: string;
+  category: string; level: string; tags: string; status: string;
+  cover_url: string; content: string; sort_order: number;
+  slug?: string;
+  created_at?: string; updated_at?: string;
+}
+export const listArticles = (
+  f: Partial<{ topic_id: string; category: string; level: string; status: string; q: string }> = {},
+) => get(`/api/v1/chess/articles${qs(f as Record<string, string>)}`);
+export const getArticle = (id: string) => get(`/api/v1/chess/articles/${id}`);
+// Giải mã wikilink [[article/<slug>]] → bài viết.
+export const getArticleBySlug = (slug: string) => get(`/api/v1/chess/articles/by-slug/${encodeURIComponent(slug)}`);
+export const getArticleBacklinks = (slug: string) => get(`/api/v1/chess/articles/by-slug/${encodeURIComponent(slug)}/backlinks`);
+export const createArticle = (data: Partial<ChessArticle>) => post("/api/v1/chess/articles", data);
+export const updateArticle = (id: string, data: Partial<ChessArticle>) => put(`/api/v1/chess/articles/${id}`, data);
+// Đổi slug bài viết (giữ link cũ qua alias).
+export const renameArticleSlug = (id: string, slug: string) => put(`/api/v1/chess/articles/${id}/slug`, { slug });
+export const deleteArticle = (id: string) => del(`/api/v1/chess/articles/${id}`);
+// Export/Import bài viết dạng JSON — sao lưu/chia sẻ. Import luôn tạo mới.
+export const exportArticles = (f: Partial<{ category: string; level: string; status: string }> = {}) =>
+  get(`/api/v1/chess/articles/export${qs(f as Record<string, string>)}`);
+export const importArticles = (articles: any[]) => post("/api/v1/chess/articles/import", { articles });
