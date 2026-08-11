@@ -16,6 +16,11 @@ const (
 	// ChessRefTypeChapter là chương trong sách — vừa là ĐÍCH [[chapter/<slug>]]
 	// vừa là NGUỒN (nội dung chương có thể chứa wikilink, xem ChessRefSourceChapter).
 	ChessRefTypeChapter = "chapter"
+	// ChessRefTypeArticle là bài viết trong Ngân hàng bài viết — trang tri
+	// thức ĐỘC LẬP (khái niệm/thuật ngữ/kinh nghiệm), vừa là ĐÍCH
+	// [[article/<slug>]] vừa là NGUỒN (nội dung có thể chứa wikilink, xem
+	// ChessRefSourceArticle).
+	ChessRefTypeArticle = "article"
 )
 
 // Loại NGUỒN tham chiếu (cột source_type trong wiki_chess_refs).
@@ -26,6 +31,9 @@ const (
 	// ChessRefSourceChapter đánh dấu tham chiếu cờ PHÁT ra từ nội dung một
 	// chương sách (page_slug = slug chương, kb_id rỗng — cùng mẫu lesson/position).
 	ChessRefSourceChapter = "chapter"
+	// ChessRefSourceArticle đánh dấu tham chiếu cờ PHÁT ra từ nội dung một bài
+	// viết (page_slug = slug bài viết, kb_id rỗng — cùng mẫu chapter/position).
+	ChessRefSourceArticle = "article"
 )
 
 // WikiChessRef ghi nhận một tham chiếu từ trang wiki tới một đối tượng cờ

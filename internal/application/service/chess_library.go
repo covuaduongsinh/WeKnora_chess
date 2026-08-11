@@ -446,6 +446,16 @@ func (s *chessLibraryService) ReindexAll(ctx context.Context, tenantID uint64) (
 		record("position", p.Slug, s.indexer.IndexPosition(ctx, p))
 	}
 
+	// Chỉ bài viết ĐÃ PUBLISHED được index (bản thảo không rò vào câu trả lời của agent).
+	articles, err := s.repo.ListArticles(ctx, tenantID, types.ChessArticleFilter{Status: types.ChessArticleStatusPublished})
+	if err != nil {
+		return res, err
+	}
+	res.ArticlesTotal = len(articles)
+	for _, a := range articles {
+		record("article", a.Slug, s.indexer.IndexArticle(ctx, a))
+	}
+
 	// Chỉ sách ĐÃ PUBLISHED được index (bản thảo không rò vào câu trả lời của agent).
 	books, err := s.repo.ListBooks(ctx, tenantID, types.ChessBookFilter{Status: types.ChessBookStatusPublished})
 	if err != nil {

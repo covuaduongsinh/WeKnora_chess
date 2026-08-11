@@ -1,19 +1,20 @@
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   getGameBySlug, getPuzzleBySlug, getLessonBySlug, getCourseBySlug, getPositionBySlug,
-  getBookBySlug, getChapterBySlug,
+  getBookBySlug, getChapterBySlug, getArticleBySlug,
   getGameBacklinks, getPuzzleBacklinks, getLessonBacklinks, getCourseBacklinks, getPositionBacklinks,
-  getBookBacklinks, getChapterBacklinks,
+  getBookBacklinks, getChapterBacklinks, getArticleBacklinks,
 } from '@/api/chess';
 
 // Giải mã wikilink cờ vua [[game/<slug>]] / [[puzzle/<slug>]] / [[lesson/<slug>]]
 // / [[course/<slug>]] / [[position/<slug>]] / [[book/<slug>]] / [[chapter/<slug>]]
-// về đối tượng tương ứng + dữ liệu bàn cờ để render (khóa học/sách KHÔNG có bàn
-// cờ → board=null). Có cache để một trang nhiều chip/embed không gọi API trùng.
+// / [[article/<slug>]] về đối tượng tương ứng + dữ liệu bàn cờ để render (khóa
+// học/sách/bài viết KHÔNG có bàn cờ → board=null). Có cache để một trang nhiều
+// chip/embed không gọi API trùng.
 
-export type ChessRefType = 'game' | 'puzzle' | 'lesson' | 'course' | 'position' | 'book' | 'chapter';
+export type ChessRefType = 'game' | 'puzzle' | 'lesson' | 'course' | 'position' | 'book' | 'chapter' | 'article';
 
-const REF_TYPES: ChessRefType[] = ['game', 'puzzle', 'lesson', 'course', 'position', 'book', 'chapter'];
+const REF_TYPES: ChessRefType[] = ['game', 'puzzle', 'lesson', 'course', 'position', 'book', 'chapter', 'article'];
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -125,6 +126,13 @@ async function doResolve(ref: string): Promise<ResolvedChessRef> {
       : null;
     return { type, slug, ref, title, board, found: true, raw: ch };
   }
+  if (type === 'article') {
+    // Bài viết không có bàn cờ → board=null, chỉ là thẻ điều hướng (giống course/book).
+    const res: any = await getArticleBySlug(slug);
+    const a = res?.data;
+    if (!a) return notFound(type, slug);
+    return { type, slug, ref, title: a.title || slug, board: null, found: true, raw: a };
+  }
   // lesson
   const res: any = await getLessonBySlug(slug);
   const l = res?.data;
@@ -164,6 +172,7 @@ const BACKLINK_FN: Record<ChessRefType, (slug: string) => Promise<any>> = {
   position: getPositionBacklinks,
   book: getBookBacklinks,
   chapter: getChapterBacklinks,
+  article: getArticleBacklinks,
 };
 
 // Lấy danh sách trang wiki/bài giảng đang trỏ tới đối tượng cờ.

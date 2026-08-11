@@ -114,8 +114,11 @@ export function splitChessSegments(markdown: string): ChessSegment[] {
   return segments;
 }
 
-// Các loại tham chiếu cờ hợp lệ cho wikilink.
-const CHESS_REF_TYPES = 'game|puzzle|lesson|course|position|book|chapter';
+// Các loại tham chiếu cờ hợp lệ cho wikilink. LƯU Ý: đây là chuỗi regex
+// alternation, KHÔNG suy ra từ ChessRefType union ở chessRef.ts — thêm loại
+// mới ở CẢ HAI nơi, quên ở đây là lỗi CÂM (link không khớp regex → hiện thành
+// chữ thường, không báo lỗi gì).
+const CHESS_REF_TYPES = 'game|puzzle|lesson|course|position|book|chapter|article';
 // NHÚNG inline: ![[game/<slug>]] hoặc ![[game/<slug>|nhãn]] → bàn cờ inline.
 const CHESS_EMBED_RE = new RegExp(`!\\[\\[(${CHESS_REF_TYPES})/([^\\]|]+?)(?:\\|([^\\]]+))?\\]\\]`, 'g');
 // CHIP inline: [[game/<slug>]] (KHÔNG có dấu ! phía trước) → liên kết <a> bấm mở popup.

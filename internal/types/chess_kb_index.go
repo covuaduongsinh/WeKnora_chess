@@ -52,6 +52,7 @@ type ChessReindexResult struct {
 	PositionsTotal int      `json:"positions_total"`  // số thế cờ của tenant
 	BooksTotal     int      `json:"books_total"`      // số sách ĐÃ PUBLISHED của tenant (bản thảo không index)
 	ChaptersTotal  int      `json:"chapters_total"`   // số chương thuộc sách đã published
+	ArticlesTotal  int      `json:"articles_total"`   // số bài viết ĐÃ PUBLISHED của tenant (bản thảo không index)
 	Enqueued       int      `json:"enqueued"`         // số bản ghi đã đẩy đi index (chờ embed nền)
 	Failed         int      `json:"failed"`           // số bản ghi lỗi ngay khi đẩy
 	Errors         []string `json:"errors,omitempty"` // mẫu lỗi (tối đa 5)

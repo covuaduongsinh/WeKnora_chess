@@ -279,6 +279,40 @@ func buildChapterKnowledgeText(book *types.ChessBook, ch *types.ChessBookChapter
 	return title, out.String()
 }
 
+// buildArticleKnowledgeText sinh (tiêu đề, nội dung) cho một bài viết trong
+// Ngân hàng bài viết. Khác lesson/chapter (thuộc khóa học/sách): bài viết là
+// trang tri thức ĐỘC LẬP, nên Aliases (tên gọi khác) được đưa vào để RAG bắt
+// trúng khi học viên hỏi bằng từ đồng nghĩa/tiếng Anh — cùng khuôn
+// buildPositionKnowledgeText (chú giải/nội dung có thể chứa wikilink → expand
+// để embed sạch).
+func buildArticleKnowledgeText(a *types.ChessArticle) (string, string) {
+	name := firstNonEmptyStr(a.Title, a.Slug)
+	title := "Bài viết: " + name
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	if a.Aliases != "" {
+		fmt.Fprintf(&b, "- Tên gọi khác: %s\n", a.Aliases)
+	}
+	if a.Category != "" {
+		fmt.Fprintf(&b, "- Thể loại: %s\n", a.Category)
+	}
+	if a.Level != "" {
+		fmt.Fprintf(&b, "- Cấp độ: %s\n", chessLevelLabel(a.Level))
+	}
+	if a.Tags != "" {
+		fmt.Fprintf(&b, "- Thẻ: %s\n", a.Tags)
+	}
+	if a.Summary != "" {
+		fmt.Fprintf(&b, "\n%s\n", strings.TrimSpace(a.Summary))
+	}
+	if body := strings.TrimSpace(expandChessWikilinks(a.Content)); body != "" {
+		b.WriteString("\n")
+		b.WriteString(body)
+		b.WriteString("\n")
+	}
+	return title, b.String()
+}
+
 func firstNonEmptyStr(a, b string) string {
 	if strings.TrimSpace(a) != "" {
 		return a

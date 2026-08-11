@@ -46,18 +46,20 @@ async function load() {
 }
 
 // Nhánh RÕ RÀNG cho từng nguồn (không phải nhị phân lesson/else) — nguồn
-// 'position'/'chapter' KHÔNG được rơi vào nhánh wiki (chúng có kb_id='' nên sẽ
-// điều hướng tới KB rỗng, hỏng route mà không báo lỗi).
+// 'position'/'chapter'/'article' KHÔNG được rơi vào nhánh wiki (chúng có
+// kb_id='' nên sẽ điều hướng tới KB rỗng, hỏng route mà không báo lỗi).
 function iconFor(sourceType?: string): string {
   if (sourceType === 'lesson') return 'books';
   if (sourceType === 'position') return 'grid';
   if (sourceType === 'chapter') return 'book';
+  if (sourceType === 'article') return 'article-1';
   return 'file';
 }
 function classFor(sourceType?: string): string {
   if (sourceType === 'lesson') return 'cbl-lesson';
   if (sourceType === 'position') return 'cbl-position';
   if (sourceType === 'chapter') return 'cbl-chapter';
+  if (sourceType === 'article') return 'cbl-article';
   return 'cbl-wiki';
 }
 function open(b: ChessBacklink) {
@@ -67,6 +69,8 @@ function open(b: ChessBacklink) {
     router.push({ name: 'chessCourses', query: { ref: `position/${b.page_slug}` } });
   } else if (b.source_type === 'chapter') {
     router.push({ name: 'chessCourses', query: { ref: `chapter/${b.page_slug}` } });
+  } else if (b.source_type === 'article') {
+    router.push({ name: 'chessCourses', query: { ref: `article/${b.page_slug}` } });
   } else {
     router.push({ name: 'knowledgeBaseDetail', params: { kbId: b.kb_id }, query: { tab: 'wiki', slug: b.page_slug } });
   }

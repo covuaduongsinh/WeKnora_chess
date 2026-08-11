@@ -128,6 +128,7 @@
           <t-tab-panel value="puzzles" :label="t('chess.ref.tabPuzzles')" />
           <t-tab-panel value="lessons" :label="t('chess.ref.tabLessons')" />
           <t-tab-panel value="courses" :label="t('chess.ref.tabCourses')" />
+          <t-tab-panel value="articles" :label="t('chess.ref.tabArticles')" />
         </t-tabs>
         <div class="cc-picker-bar">
           <t-input v-model="picker.search" :placeholder="t('chess.ref.searchPlaceholder')" clearable />
@@ -180,8 +181,8 @@ import { useChessWikiDraftStore } from '@/stores/chessWikiDraft';
 import {
   listCourses, createCourse, updateCourse, deleteCourse, getCourseBySlug,
   listLessons, createLesson, updateLesson, deleteLesson, getLessonBySlug,
-  listGames, listPuzzles, listPositions, exportCourses, importCourses,
-  type ChessCourse, type ChessLesson, type ChessGame, type ChessPuzzle, type ChessPosition,
+  listGames, listPuzzles, listPositions, listArticles, exportCourses, importCourses,
+  type ChessCourse, type ChessLesson, type ChessGame, type ChessPuzzle, type ChessPosition, type ChessArticle,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 
@@ -455,10 +456,11 @@ watch(() => lessonDialog.visible, async (open) => {
 const picker = reactive<{
   visible: boolean; tab: string; search: string; embed: boolean; loading: boolean;
   games: ChessGame[]; puzzles: ChessPuzzle[]; lessons: ChessLesson[]; courses: ChessCourse[]; positions: ChessPosition[];
+  articles: ChessArticle[];
   previewRef: string; previewTitle: string; previewBoard: ChessBoardData | null; previewLoading: boolean;
 }>({
   visible: false, tab: 'games', search: '', embed: false, loading: false,
-  games: [], puzzles: [], lessons: [], courses: [], positions: [],
+  games: [], puzzles: [], lessons: [], courses: [], positions: [], articles: [],
   previewRef: '', previewTitle: '', previewBoard: null, previewLoading: false,
 });
 
@@ -489,10 +491,11 @@ async function openPicker() {
   picker.search = '';
   picker.loading = true;
   try {
-    const [g, p, pos]: any[] = await Promise.all([listGames(), listPuzzles(), listPositions()]);
+    const [g, p, pos, arts]: any[] = await Promise.all([listGames(), listPuzzles(), listPositions(), listArticles()]);
     picker.games = g?.data || [];
     picker.puzzles = p?.data || [];
     picker.positions = pos?.data || [];
+    picker.articles = arts?.data || [];
     picker.lessons = selectedCourse.value ? (await listLessons(selectedCourse.value.id) as any)?.data || [] : [];
     picker.courses = courses.value;
   } catch {
@@ -526,6 +529,11 @@ const pickerItems = computed(() => {
     return picker.positions
       .filter((p) => p.slug && (!s || `${p.title} ${p.category} ${p.tags}`.toLowerCase().includes(s)))
       .map((p) => ({ slug: p.slug as string, type: 'position' as const, label: p.title || p.slug || '' }));
+  }
+  if (picker.tab === 'articles') {
+    return picker.articles
+      .filter((a) => a.slug && (!s || `${a.title} ${a.aliases}`.toLowerCase().includes(s)))
+      .map((a) => ({ slug: a.slug as string, type: 'article' as const, label: a.title || a.slug || '' }));
   }
   return picker.lessons
     .filter((l) => l.slug && (!s || (l.title || '').toLowerCase().includes(s)))

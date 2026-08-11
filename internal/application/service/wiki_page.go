@@ -952,6 +952,7 @@ var chessRefPrefixes = map[string]bool{
 	types.ChessRefTypePosition: true,
 	types.ChessRefTypeBook:     true,
 	types.ChessRefTypeChapter:  true,
+	types.ChessRefTypeArticle:  true,
 }
 
 // splitChessRef tách "game/<slug>" → ("game", "<slug>", true). Trả false nếu

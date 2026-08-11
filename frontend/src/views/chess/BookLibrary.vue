@@ -214,6 +214,7 @@
           <t-tab-panel value="puzzles" :label="t('chess.ref.tabPuzzles')" />
           <t-tab-panel value="books" :label="t('chess.ref.tabBooks')" />
           <t-tab-panel value="chapters" :label="t('chess.ref.tabChapters')" />
+          <t-tab-panel value="articles" :label="t('chess.ref.tabArticles')" />
         </t-tabs>
         <div class="bkl-picker-bar">
           <t-input v-model="picker.search" :placeholder="t('chess.ref.searchPlaceholder')" clearable />
@@ -271,8 +272,9 @@ import {
   listShelves, listBooks, getBook, getBookBySlug, createBook, updateBook, renameBookSlug, deleteBook,
   exportBooks, importBooks, listShelvesOfBook, uploadBookImage,
   listChapters, createChapter, updateChapter, getChapterBySlug, renameChapterSlug, deleteChapter, reorderChapters,
-  listGames, listPuzzles, listPositions,
+  listGames, listPuzzles, listPositions, listArticles,
   type ChessShelf, type ChessBook, type ChessBookChapter, type ChessGame, type ChessPuzzle, type ChessPosition,
+  type ChessArticle,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 import {
@@ -763,10 +765,11 @@ const toolbarButtons = [
 const picker = reactive<{
   visible: boolean; tab: string; search: string; embed: boolean; loading: boolean;
   games: ChessGame[]; puzzles: ChessPuzzle[]; positions: ChessPosition[]; books: ChessBook[]; chapters: ChessBookChapter[];
+  articles: ChessArticle[];
   previewRef: string; previewTitle: string; previewBoard: ChessBoardData | null; previewLoading: boolean;
 }>({
   visible: false, tab: 'games', search: '', embed: false, loading: false,
-  games: [], puzzles: [], positions: [], books: [], chapters: [],
+  games: [], puzzles: [], positions: [], books: [], chapters: [], articles: [],
   previewRef: '', previewTitle: '', previewBoard: null, previewLoading: false,
 });
 let previewSeq = 0;
@@ -794,11 +797,14 @@ async function openPicker() {
   picker.search = '';
   picker.loading = true;
   try {
-    const [g, p, pos, bks]: any[] = await Promise.all([listGames(), listPuzzles(), listPositions(), listBooks()]);
+    const [g, p, pos, bks, arts]: any[] = await Promise.all([
+      listGames(), listPuzzles(), listPositions(), listBooks(), listArticles(),
+    ]);
     picker.games = g?.data || [];
     picker.puzzles = p?.data || [];
     picker.positions = pos?.data || [];
     picker.books = bks?.data || [];
+    picker.articles = arts?.data || [];
     picker.chapters = selectedBook.value ? (await listChapters(selectedBook.value.id) as any)?.data || [] : [];
   } catch {
     MessagePlugin.error('Tải danh sách thất bại');
@@ -825,6 +831,10 @@ const pickerItems = computed(() => {
   if (picker.tab === 'books') {
     return picker.books.filter((b) => b.slug && (!s || (b.title || '').toLowerCase().includes(s)))
       .map((b) => ({ slug: b.slug as string, type: 'book' as const, label: b.title || b.slug || '' }));
+  }
+  if (picker.tab === 'articles') {
+    return picker.articles.filter((a) => a.slug && (!s || `${a.title} ${a.aliases}`.toLowerCase().includes(s)))
+      .map((a) => ({ slug: a.slug as string, type: 'article' as const, label: a.title || a.slug || '' }));
   }
   return picker.chapters.filter((c) => c.slug && (!s || (c.title || '').toLowerCase().includes(s)))
     .map((c) => ({ slug: c.slug as string, type: 'chapter' as const, label: c.title || c.slug || '' }));

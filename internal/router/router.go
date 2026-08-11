@@ -547,6 +547,25 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		positions.PUT("/:id/slug", g.Contributor(), h.RenamePositionSlug)
 		positions.DELETE("/:id", g.Contributor(), h.DeletePosition)
 	}
+	// Ngân hàng bài viết — thực thể cờ thứ 7 (bên cạnh game/puzzle/lesson/
+	// course/position/book+chapter). Trang tri thức ĐỘC LẬP (khái niệm/thuật
+	// ngữ/kinh nghiệm), KHÔNG thuộc sách/khóa học nào — vừa là ĐÍCH
+	// [[article/<slug>]] vừa là NGUỒN wikilink. Chỉ status="published" được
+	// index vào KB tri thức cờ (cùng quy tắc sách).
+	articles := r.Group("/chess/articles")
+	{
+		articles.GET("", g.Viewer(), h.ListArticles)
+		articles.POST("", g.Contributor(), h.CreateArticle)
+		articles.GET("/export", g.Viewer(), h.ExportArticles)
+		articles.POST("/import", g.Contributor(), h.ImportArticles)
+		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[article/<slug>]]).
+		articles.GET("/by-slug/:slug", g.Viewer(), h.GetArticleBySlug)
+		articles.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetArticleBacklinks)
+		articles.GET("/:id", g.Viewer(), h.GetArticle)
+		articles.PUT("/:id", g.Contributor(), h.UpdateArticle)
+		articles.PUT("/:id/slug", g.Contributor(), h.RenameArticleSlug)
+		articles.DELETE("/:id", g.Contributor(), h.DeleteArticle)
+	}
 	// Thư viện sách cờ vua — Kệ → Sách → Chương. Biên soạn NỘI BỘ (markdown +
 	// FEN + ván cờ + ảnh), KHÔNG phải kho ebook PDF/EPUB để đọc. Chỉ sách
 	// status="published" được index vào KB tri thức cờ.

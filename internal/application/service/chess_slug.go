@@ -134,6 +134,18 @@ func chapterSlugBase(bookSlug string, ch *types.ChessBookChapter) string {
 	return strings.Trim(bookSlug+"-"+title, "-")
 }
 
+// articleSlugBase: tiêu đề bài viết, hoặc phân loại nếu thiếu tiêu đề, hoặc
+// tiền tố "bai-viet" nếu cả hai đều rỗng — cùng khuôn positionSlugBase.
+func articleSlugBase(a *types.ChessArticle) string {
+	if s := slugifyChess(a.Title); s != "" {
+		return s
+	}
+	if s := slugifyChess(a.Category); s != "" {
+		return s
+	}
+	return "bai-viet"
+}
+
 // id8 lấy 8 hex đầu của UUID (đã bỏ dấu "-") làm hậu tố/giá trị dự phòng.
 func id8(uuid string) string {
 	h := strings.ReplaceAll(uuid, "-", "")
