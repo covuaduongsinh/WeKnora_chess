@@ -100,6 +100,7 @@
                 <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyChapterWikilink(ch)"><t-icon name="link" /></t-button>
                 <t-button size="small" variant="text" title="Đổi slug" @click.stop="renameChapterSlugPrompt(ch)"><t-icon name="tag" /></t-button>
                 <t-button size="small" variant="text" title="Lịch sử phiên bản" @click.stop="openHistory(ch)"><t-icon name="history" /></t-button>
+                <t-button size="small" variant="text" title="In chương này" @click.stop="openPrintChapter(ch)"><t-icon name="print" /></t-button>
                 <t-button size="small" variant="text" title="Lên" @click.stop="moveChapter(ch, -1)"><t-icon name="chevron-up" /></t-button>
                 <t-button size="small" variant="text" title="Xuống" @click.stop="moveChapter(ch, 1)"><t-icon name="chevron-down" /></t-button>
                 <t-button size="small" variant="text" @click.stop="openChapterDialog(ch)"><t-icon name="edit" /></t-button>
@@ -528,7 +529,7 @@ function buildBookMarkdown(b: ChessBook, chs: ChessBookChapter[]): string {
   if (b.phase) meta.push(`- Giai đoạn: ${bookPhaseLabel(b.phase)}`);
   if (meta.length) out += meta.join('\n') + '\n\n';
   if (b.description) out += `${b.description}\n\n`;
-  let lastPart = ' ';
+  let lastPart = ' ';
   for (const ch of chs) {
     const part = ch.part || '';
     if (part !== lastPart) {
@@ -549,6 +550,16 @@ function doExportMarkdown() {
 function openPrintView() {
   if (!selectedBook.value) return;
   const routeData = router.resolve({ name: 'chessBookPrint', params: { id: selectedBook.value.id } });
+  window.open(routeData.href, '_blank');
+}
+// In riêng 1 chương — truyền qua query ?chapters=<id>, BookPrint.vue tự lọc.
+function openPrintChapter(ch: ChessBookChapter) {
+  if (!selectedBook.value) return;
+  const routeData = router.resolve({
+    name: 'chessBookPrint',
+    params: { id: selectedBook.value.id },
+    query: { chapters: ch.id },
+  });
   window.open(routeData.href, '_blank');
 }
 

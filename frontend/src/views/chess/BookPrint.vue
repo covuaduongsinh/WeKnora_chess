@@ -5,6 +5,14 @@
         <t-radio-button :value="1">1 cột</t-radio-button>
         <t-radio-button :value="2">2 cột</t-radio-button>
       </t-radio-group>
+      <t-radio-group v-model="headerLevel" variant="default-filled">
+        <t-radio-button value="full">Đầy đủ</t-radio-button>
+        <t-radio-button value="brief">Gọn</t-radio-button>
+        <t-radio-button value="none">Không</t-radio-button>
+      </t-radio-group>
+      <t-button variant="outline" :disabled="!chapters.length" @click="openChapterPicker">
+        <template #icon><t-icon name="view-list" /></template>Chọn chương ({{ selectedIds.size }}/{{ chapters.length }})
+      </t-button>
       <t-button theme="primary" @click="doPrint">
         <template #icon><t-icon name="print" /></template>In / Lưu PDF (Ctrl+P)
       </t-button>
@@ -12,18 +20,21 @@
     <div v-if="loading" class="bkp-empty">Đang tải…</div>
     <div v-else-if="!book" class="bkp-empty">Không tìm thấy sách.</div>
     <article v-else class="bkp-page" :class="{ 'bkp-page--cols-2': columns === 2 }">
-      <h1>{{ book.title }}</h1>
-      <p v-if="book.subtitle" class="bkp-subtitle">{{ book.subtitle }}</p>
-      <ul class="bkp-meta">
-        <li v-if="book.author">Tác giả: {{ book.author }}</li>
-        <li v-if="book.translator">Dịch giả: {{ book.translator }}</li>
-        <li v-if="book.publisher">Nhà xuất bản: {{ book.publisher }}</li>
-        <li v-if="book.year">Năm: {{ book.year }}</li>
-        <li v-if="book.level">Cấp độ: {{ bookLevelLabel(book.level) }}</li>
-        <li v-if="book.phase">Giai đoạn: {{ bookPhaseLabel(book.phase) }}</li>
-      </ul>
-      <div v-if="book.description" class="bkp-description" v-html="renderMd(book.description)"></div>
+      <template v-if="headerLevel !== 'none'">
+        <h1>{{ book.title }}</h1>
+        <p v-if="headerLevel === 'full' && book.subtitle" class="bkp-subtitle">{{ book.subtitle }}</p>
+        <ul class="bkp-meta">
+          <li v-if="book.author">Tác giả: {{ book.author }}</li>
+          <li v-if="book.translator">Dịch giả: {{ book.translator }}</li>
+          <li v-if="book.publisher">Nhà xuất bản: {{ book.publisher }}</li>
+          <li v-if="book.year">Năm: {{ book.year }}</li>
+          <li v-if="book.level">Cấp độ: {{ bookLevelLabel(book.level) }}</li>
+          <li v-if="book.phase">Giai đoạn: {{ bookPhaseLabel(book.phase) }}</li>
+        </ul>
+        <div v-if="headerLevel === 'full' && book.description" class="bkp-description" v-html="renderMd(book.description)"></div>
+      </template>
 
+      <div v-if="chapters.length > 0 && printedChapters.length === 0" class="bkp-empty">Chưa chọn chương nào để in.</div>
       <template v-for="(group, gi) in chapterGroups" :key="gi">
         <h2 v-if="group.part" class="bkp-part">{{ group.part }}</h2>
         <section v-for="ch in group.items" :key="ch.id" class="bkp-chapter">
@@ -36,13 +47,39 @@
         </section>
       </template>
     </article>
+
+    <!-- Dialog chọn chương để in — khuôn giống ChessShelfManager.vue (dialog +
+         ô tìm + list t-checkbox + confirm), state nháp riêng để bấm Huỷ không
+         mất lựa chọn cũ. class="no-print" phòng khi dialog còn mở lúc Ctrl+P. -->
+    <t-dialog
+      v-model:visible="pickerDialog.visible"
+      header="Chọn chương để in"
+      width="560px"
+      :on-confirm="applyChapterPicker"
+      class="no-print"
+    >
+      <t-input v-model="pickerDialog.search" placeholder="Tìm chương…" clearable style="margin-bottom: 10px" />
+      <div class="bkp-picker-actions">
+        <t-button variant="text" size="small" theme="primary" @click="pickerSelectAll">Chọn tất cả</t-button>
+        <t-button variant="text" size="small" theme="primary" @click="pickerSelectNone">Bỏ chọn tất cả</t-button>
+      </div>
+      <div class="bkp-picker-list">
+        <template v-for="(group, gi) in pickerGroups" :key="gi">
+          <div v-if="group.part" class="bkp-picker-part">{{ group.part }}</div>
+          <t-checkbox v-for="ch in group.items" :key="ch.id" v-model="pickerDialog.selected[ch.id]">
+            {{ ch.title }}
+          </t-checkbox>
+        </template>
+      </div>
+    </t-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { marked } from 'marked';
+import { MessagePlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessSegments } from '@/utils/chessBlocks';
@@ -53,9 +90,38 @@ import { bookLevelLabel, bookPhaseLabel } from '@/utils/chessBookOptions';
 // Trang IN sách: mọi chương trên một trang dài, mở tab mới rồi Ctrl+P → PDF.
 // Không dùng generator PDF server-side (repo chưa có) — @media print lo layout.
 const route = useRoute();
+const router = useRouter();
 const loading = ref(true);
 const book = ref<ChessBook | null>(null);
-const chapters = ref<ChessBookChapter[]>([]);
+const chapters = ref<ChessBookChapter[]>([]); // TẤT CẢ chương của sách — nguồn cho dialog chọn
+
+// Chương sẽ IN — mặc định (không có ?chapters trên URL) là toàn bộ, khớp hành
+// vi cũ. Lọc theo id (KHÔNG theo slug — ChessBookChapter.slug là optional).
+const selectedIds = ref<Set<string>>(new Set());
+const printedChapters = computed(() => chapters.value.filter((ch) => selectedIds.value.has(ch.id)));
+
+const QUERY_KEY = 'chapters';
+
+// Đọc lựa chọn từ ?chapters=id1,id2 lúc mount. Rỗng hoặc id không thuộc sách
+// (đã xoá/gõ sai) → rơi về CHỌN TẤT CẢ thay vì trang trắng khó hiểu.
+function applySelectionFromQuery() {
+  const raw = String(route.query[QUERY_KEY] || '');
+  const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const valid = ids.filter((id) => chapters.value.some((ch) => ch.id === id));
+  const allIds = chapters.value.map((ch) => ch.id);
+  selectedIds.value = new Set(valid.length ? valid : allIds);
+}
+
+// Ghi ngược lựa chọn ra URL (F5 / dán link cho người khác vẫn đúng chương đã
+// chọn) — chọn đủ TẤT CẢ thì xoá hẳn query cho URL sạch, khớp hành vi mặc định.
+function syncQueryFromSelection() {
+  const allIds = chapters.value.map((ch) => ch.id);
+  const isAll = selectedIds.value.size === allIds.length && allIds.every((id) => selectedIds.value.has(id));
+  const query = { ...route.query };
+  if (isAll) delete query[QUERY_KEY];
+  else query[QUERY_KEY] = Array.from(selectedIds.value).join(',');
+  router.replace({ path: route.path, query });
+}
 
 // Bố cục cột — nhớ theo trình duyệt (localStorage), không đụng DB/sách cụ
 // thể. Vùng nội dung dùng đơn vị mm khớp khổ A4 (xem <style>) nên bố cục lúc
@@ -63,7 +129,8 @@ const chapters = ref<ChessBookChapter[]>([]);
 // không reflow lúc in. cm-chessboard ghi kích thước cố định (px) qua
 // ResizeObserver bị hoãn tới macrotask; window.print() chụp layout đồng bộ
 // TRƯỚC khi macrotask đó kịp chạy, nên đổi cột chỉ trong @media print sẽ để
-// bàn cờ tràn/cắt khỏi cột — không được lặp lại cách đó.
+// bàn cờ tràn/cắt khỏi cột — không được lặp lại cách đó. Tùy chọn "phần đầu
+// sách" bên dưới áp dụng CÙNG nguyên tắc (đổi ở cả xem trước lẫn khi in).
 const COLUMNS_STORAGE_KEY = 'weknora_book_print_columns';
 function readStoredColumns(): 1 | 2 {
   return localStorage.getItem(COLUMNS_STORAGE_KEY) === '2' ? 2 : 1;
@@ -73,17 +140,31 @@ watch(columns, (v) => {
   localStorage.setItem(COLUMNS_STORAGE_KEY, String(v));
 });
 
-const chapterGroups = computed(() => {
+// Mức hiển thị phần đầu sách khi in — hữu ích khi chỉ in 1-2 chương lẻ (photo
+// một bài học) và không cần nhắc lại mô tả cả cuốn mỗi lần.
+type HeaderLevel = 'full' | 'brief' | 'none';
+const HEADER_LEVEL_STORAGE_KEY = 'weknora_book_print_header_level';
+function readStoredHeaderLevel(): HeaderLevel {
+  const v = localStorage.getItem(HEADER_LEVEL_STORAGE_KEY);
+  return v === 'brief' || v === 'none' ? v : 'full';
+}
+const headerLevel = ref<HeaderLevel>(readStoredHeaderLevel());
+watch(headerLevel, (v) => {
+  localStorage.setItem(HEADER_LEVEL_STORAGE_KEY, v);
+});
+
+const chapterGroups = computed(() => groupByPart(printedChapters.value));
+function groupByPart(list: ChessBookChapter[]) {
   const groups: { part: string; items: ChessBookChapter[] }[] = [];
   let last: string | null = null;
-  for (const ch of chapters.value) {
+  for (const ch of list) {
     const part = ch.part || '';
     if (last === null || part !== last || groups.length === 0) groups.push({ part, items: [] });
     groups[groups.length - 1].items.push(ch);
     last = part;
   }
   return groups;
-});
+}
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 function chapterBoardData(ch: ChessBookChapter): ChessBoardData {
@@ -108,6 +189,47 @@ function chapterSegments(ch: ChessBookChapter) {
 
 function doPrint() { window.print(); }
 
+// ---- Dialog chọn chương ----
+interface PickerDialogState {
+  visible: boolean;
+  search: string;
+  selected: Record<string, boolean>;
+}
+const pickerDialog = reactive<PickerDialogState>({ visible: false, search: '', selected: {} });
+
+function openChapterPicker() {
+  const sel: Record<string, boolean> = {};
+  for (const ch of chapters.value) sel[ch.id] = selectedIds.value.has(ch.id);
+  pickerDialog.selected = sel;
+  pickerDialog.search = '';
+  pickerDialog.visible = true;
+}
+
+const pickerFilteredChapters = computed(() => {
+  const q = pickerDialog.search.trim().toLowerCase();
+  if (!q) return chapters.value;
+  return chapters.value.filter((ch) => (ch.title || '').toLowerCase().includes(q));
+});
+const pickerGroups = computed(() => groupByPart(pickerFilteredChapters.value));
+
+function pickerSelectAll() {
+  for (const ch of pickerFilteredChapters.value) pickerDialog.selected[ch.id] = true;
+}
+function pickerSelectNone() {
+  for (const ch of pickerFilteredChapters.value) pickerDialog.selected[ch.id] = false;
+}
+
+function applyChapterPicker() {
+  const ids = Object.entries(pickerDialog.selected).filter(([, v]) => v).map(([id]) => id);
+  if (ids.length === 0) {
+    MessagePlugin.warning('Chọn ít nhất 1 chương');
+    return;
+  }
+  selectedIds.value = new Set(ids);
+  syncQueryFromSelection();
+  pickerDialog.visible = false;
+}
+
 onMounted(async () => {
   const id = String(route.params.id || '');
   if (!id) { loading.value = false; return; }
@@ -115,6 +237,7 @@ onMounted(async () => {
     const [br, cr]: any[] = await Promise.all([getBook(id), listChapters(id)]);
     book.value = br?.data || null;
     chapters.value = cr?.data || [];
+    applySelectionFromQuery();
   } finally {
     loading.value = false;
   }
@@ -125,7 +248,7 @@ onMounted(async () => {
 @page { size: A4 portrait; margin: 15mm; }
 
 .bkp { padding: 24px; overflow-x: auto; }
-.bkp-toolbar { position: sticky; top: 0; padding: 10px 0; background: var(--td-bg-color-page); z-index: 10; display: flex; gap: 10px; align-items: center; }
+.bkp-toolbar { position: sticky; top: 0; padding: 10px 0; background: var(--td-bg-color-page); z-index: 10; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .bkp-empty { color: var(--td-text-color-placeholder); padding: 40px; text-align: center; }
 
 // Vùng nội dung = đúng bề rộng vùng in A4 (210mm − 2×15mm lề @page ở trên) để
@@ -188,6 +311,25 @@ onMounted(async () => {
   cursor: default;
 
   &:hover { background: none; }
+}
+
+// Dialog "Chọn chương" — teleport ra ngoài .bkp nhưng CSS scoped vẫn áp dụng
+// qua data-v attribute nên style bình thường như mọi nơi khác trong file.
+.bkp-picker-actions { display: flex; gap: 4px; margin-bottom: 8px; }
+.bkp-picker-list {
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bkp-picker-part {
+  margin-top: 8px;
+  font-weight: 600;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+
+  &:first-child { margin-top: 0; }
 }
 
 @media print {
