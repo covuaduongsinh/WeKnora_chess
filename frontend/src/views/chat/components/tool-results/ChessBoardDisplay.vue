@@ -36,25 +36,25 @@
       <button class="nav-btn" @click="flip" :title="t('chess.flip')">⇅ {{ t('chess.flip') }}</button>
     </div>
 
-    <!-- Danh sách nước đi — TÁCH RIÊNG khỏi .chess-nav để BookPrint.vue có thể ẩn
-         nút bấm điều hướng (vô nghĩa trên giấy) mà vẫn in được chuỗi nước đi
-         dạng chữ (xem :deep(.chess-nav) trong BookPrint.vue). -->
-    <div v-if="positions.length > 1" class="move-list">
-      <span v-for="(g, gi) in moveGroups" :key="gi" class="move-group">
-        <span class="move-no">{{ g.number }}{{ g.white ? '.' : '...' }}</span>
-        <span
-          v-if="g.white"
-          class="move-item"
-          :class="{ active: g.white.idx === currentIndex }"
-          @click="goTo(g.white.idx)"
-        >{{ g.white.san }}</span>
-        <span
-          v-if="g.black"
-          class="move-item"
-          :class="{ active: g.black.idx === currentIndex }"
-          @click="goTo(g.black.idx)"
-        >{{ g.black.san }}</span>
-      </span>
+    <!-- Danh sách nước đi (kèm chú giải PGN nếu có: bình luận/NAG/nhánh phụ, xem
+         utils/pgnAnnotated.ts) — TÁCH RIÊNG khỏi .chess-nav để BookPrint.vue có
+         thể ẩn nút bấm điều hướng (vô nghĩa trên giấy) mà vẫn in được (xem
+         :deep(.chess-nav) trong BookPrint.vue). Điều kiện dùng tokens (không
+         phải positions) để PGN chỉ có bình luận, không nước nào, vẫn hiện được. -->
+    <div v-if="tokens.length" class="move-list" :class="{ 'move-list--annotated': hasAnnotations }">
+      <template v-for="(tk, i) in displayTokens" :key="i">
+        <span v-if="tk.kind === 'comment'" class="move-comment" :class="varClass(tk.depth)">{{ tk.text }}</span>
+        <span v-else-if="tk.kind === 'open'" class="move-paren move-paren--open" :class="varClass(tk.depth)">(</span>
+        <span v-else-if="tk.kind === 'close'" class="move-paren move-paren--close" :class="varClass(tk.depth)">)</span>
+        <span v-else class="move-group" :class="varClass(tk.depth)">
+          <span v-if="tk.num" class="move-no">{{ tk.num }}</span>
+          <span
+            class="move-item"
+            :class="{ active: tk.posIndex !== null && tk.posIndex === currentIndex, 'move-item--static': tk.posIndex === null }"
+            @click="tk.posIndex !== null && goTo(tk.posIndex)"
+          >{{ tk.san }}<span v-if="tk.glyph" class="move-nag">{{ tk.glyph }}</span></span>
+        </span>
+      </template>
     </div>
   </div>
 </template>
@@ -62,91 +62,94 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Chess } from 'chess.js';
 import { Chessboard, COLOR } from 'cm-chessboard/src/Chessboard.js';
 import piecesUrl from 'cm-chessboard/assets/pieces/standard.svg?url';
 import 'cm-chessboard/assets/chessboard.css';
 import type { ChessBoardData } from '@/types/tool-results';
+import {
+  buildAnnotatedPgn, tokensFromPositions,
+  type AnnotatedPos, type PgnToken,
+} from '@/utils/pgnAnnotated';
 
 const props = defineProps<{ data: ChessBoardData }>();
 const { t } = useI18n();
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-interface PosItem {
-  fen: string;
-  label: string;        // nhãn ĐẦY ĐỦ "5... Nf6" — dùng cho thanh nav + defineExpose
-  san?: string;          // chỉ nước đi "Nf6" — dùng cho ô trong move list (không lặp lại số)
-  moveNumber?: number;   // số nước đầy đủ (đọc từ FEN, không giả định Trắng luôn đi trước)
-  side?: 'w' | 'b';
-}
-
 const caption = computed(() => props.data.caption || '');
 
-// Xây danh sách thế cờ: ưu tiên plies từ backend, rồi tới parse PGN ở client,
-// cuối cùng là một FEN đơn lẻ.
-const positions = computed<PosItem[]>(() => {
-  const list: PosItem[] = [];
-  const startFen = props.data.fen || START_FEN;
+interface BoardModel { positions: AnnotatedPos[]; tokens: PgnToken[] }
+
+// Xây mô hình hiển thị: ưu tiên plies từ backend (không kèm chú giải), rồi tới
+// parse PGN ở client — ĐẦY ĐỦ chú giải (bình luận/NAG/nhánh phụ, xem
+// utils/pgnAnnotated.ts thay cho chess.js loadPgn() vốn âm thầm vứt bỏ 3 thứ
+// đó), cuối cùng là một FEN đơn lẻ. MỘT computed duy nhất sinh cả `positions`
+// (mainline — dùng để tua bàn cờ, giữ NGUYÊN ngữ nghĩa cũ mà GameLibrary.vue
+// đang phụ thuộc qua defineExpose bên dưới) lẫn `tokens` (toàn bộ, dùng để
+// render move-list) — tránh parse PGN hai lần và tránh hai bộ hiển thị trôi
+// lệch nhau theo thời gian.
+const model = computed<BoardModel>(() => {
+  const fallbackFen = props.data.fen || START_FEN;
+  const startEntry = (fen: string): AnnotatedPos => (
+    { fen, label: t('chess.startPosition'), san: '', moveNumber: 0, side: 'w' }
+  );
 
   if (props.data.plies && props.data.plies.length) {
-    list.push({ fen: startFen, label: t('chess.startPosition') });
-    for (const p of props.data.plies) {
+    const list: AnnotatedPos[] = props.data.plies.map((p) => {
       const side = p.side === 'b' ? 'b' : 'w';
-      const prefix = side === 'w' ? `${p.move_number}.` : `${p.move_number}...`;
-      list.push({
-        fen: p.fen_after, label: `${prefix} ${p.san}`,
-        san: p.san, moveNumber: p.move_number, side,
-      });
-    }
-    return list;
+      return {
+        fen: p.fen_after, san: p.san, moveNumber: p.move_number, side,
+        label: `${p.move_number}${side === 'w' ? '.' : '...'} ${p.san}`,
+      };
+    });
+    return { positions: [startEntry(fallbackFen), ...list], tokens: tokensFromPositions(list) };
   }
 
   if (props.data.pgn) {
-    try {
-      const game = new Chess();
-      game.loadPgn(props.data.pgn);
-      const hist = game.history({ verbose: true }) as Array<{ san: string; after: string; before: string; color: string }>;
-      list.push({ fen: hist.length ? hist[0].before : startFen, label: t('chess.startPosition') });
-      hist.forEach((h, i) => {
-        // Số nước đọc từ trường thứ 6 của FEN "trước nước đi" — đúng cả khi ván
-        // bắt đầu từ thế cờ giữa ván (Đen đi trước), khác với Math.floor(i/2)+1
-        // vốn giả định Trắng luôn đi nước đầu tiên.
-        const fenMoveNo = Number(h.before.split(' ')[5]);
-        const num = Number.isFinite(fenMoveNo) && fenMoveNo > 0 ? fenMoveNo : Math.floor(i / 2) + 1;
-        const side = h.color === 'b' ? 'b' : 'w';
-        const prefix = side === 'w' ? `${num}.` : `${num}...`;
-        list.push({ fen: h.after, label: `${prefix} ${h.san}`, san: h.san, moveNumber: num, side });
-      });
-      return list;
-    } catch {
-      // PGN lỗi → rơi về FEN đơn
+    const res = buildAnnotatedPgn(props.data.pgn, fallbackFen);
+    if (res) {
+      return { positions: [startEntry(res.startFen), ...res.positions], tokens: res.tokens };
     }
+    // parse thất bại cả 2 tầng fallback (xem buildAnnotatedPgn) → rơi về FEN đơn.
   }
 
-  list.push({ fen: startFen, label: t('chess.startPosition') });
-  return list;
+  return { positions: [startEntry(fallbackFen)], tokens: [] };
 });
 
-// Gom từng cặp nửa-nước Trắng/Đen cùng số nước thành một nhóm, đúng ký hiệu PGN
-// sách vở "1. d4 e6" thay vì lặp số hai lần "1. d4 1... e6". positions[0] (thế cờ
-// ban đầu) không có moveNumber/side nên tự động bị bỏ qua khi gom nhóm.
-interface MoveCell { idx: number; san: string }
-interface MoveGroup { number: number; white: MoveCell | null; black: MoveCell | null }
-const moveGroups = computed<MoveGroup[]>(() => {
-  const groups: MoveGroup[] = [];
-  let current: MoveGroup | null = null;
-  positions.value.forEach((pos, idx) => {
-    if (pos.moveNumber === undefined || !pos.side || !pos.san) return;
-    if (!current || current.number !== pos.moveNumber || current[pos.side === 'w' ? 'white' : 'black']) {
-      current = { number: pos.moveNumber, white: null, black: null };
-      groups.push(current);
-    }
-    const cell: MoveCell = { idx, san: pos.san };
-    if (pos.side === 'w') current.white = cell; else current.black = cell;
-  });
-  return groups;
-});
+const positions = computed(() => model.value.positions);
+const tokens = computed(() => model.value.tokens);
+// Có chú giải (bình luận/nhánh phụ) hay chỉ toàn nước đi trần — quyết định có
+// bỏ khung cuộn 120px của move-list hay không (xem CSS .move-list--annotated).
+const hasAnnotations = computed(() => tokens.value.some((tk) => tk.kind !== 'move'));
+
+// Dạng PHẲNG (không union) của PgnToken để render trong template. vue-tsc
+// không thu hẹp được kiểu union qua NHIỀU tầng v-else-if nối tiếp (chỉ loại
+// được nhánh đầu, các nhánh else-if sau vẫn giữ nguyên union) — đã xác nhận
+// bằng cách chạy type-check thật, không phải suy đoán. Thay vì ép kiểu tay
+// (dễ che giấu lỗi thật), làm phẳng dữ liệu TRƯỚC khi vào template: field nào
+// không áp dụng cho loại token đó thì để giá trị mặc định an toàn ('' / null).
+interface DisplayToken {
+  kind: PgnToken['kind'];
+  num: string;
+  san: string;
+  glyph: string;
+  posIndex: number | null;
+  depth: number;
+  text: string; // nội dung bình luận — rỗng với token không phải comment
+}
+const displayTokens = computed<DisplayToken[]>(() => tokens.value.map((tk) => ({
+  kind: tk.kind,
+  num: tk.kind === 'move' ? tk.num : '',
+  san: tk.kind === 'move' ? tk.san : '',
+  glyph: tk.kind === 'move' ? tk.glyph : '',
+  posIndex: tk.kind === 'move' ? tk.posIndex : null,
+  depth: tk.depth,
+  text: tk.kind === 'comment' ? tk.text : '',
+})));
+
+function varClass(depth: number) {
+  return depth > 0 ? ['move-var', `move-var--d${Math.min(depth, 2)}`] : undefined;
+}
 
 const currentIndex = ref(0);
 const currentLabel = computed(() => positions.value[currentIndex.value]?.label ?? '');
@@ -362,26 +365,40 @@ defineExpose({ currentFen, currentIndex, currentLabel });
 }
 
 .move-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
+  // display:block (không phải flex) — bình luận là khối chữ chảy dòng thật, và
+  // ")" của nhánh phụ không được có khoảng trắng phía trước; khoảng cách giữa
+  // các nhóm nước dùng margin-left thay cho gap (xem .move-group bên dưới).
+  display: block;
   margin-top: 8px;
+  line-height: 1.7;
   max-height: 120px;
   overflow-y: auto;
 
-  .move-group {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
-    white-space: nowrap;
+  // Có chú giải (bình luận/nhánh phụ) ⇒ đây là nội dung sách, phải hiện đủ,
+  // không nhốt trong khung cuộn 120px nghĩ cho ván cờ trần.
+  &.move-list--annotated {
+    max-height: none;
+    overflow: visible;
   }
+
+  .move-group {
+    display: inline;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  > :first-child { margin-left: 0; }
 
   .move-no {
     font-family: var(--app-font-family-mono);
     font-size: 12px;
     color: var(--td-text-color-placeholder);
     user-select: none;
+    margin-left: 6px;   // 2(pad move-item trước) + 4(move-group) + 6 = 12px giữa 2 nhóm
+    margin-right: 4px;  // 4 + 2(pad) = 6px giữa "7." và "a3"
   }
+  .move-group:first-child .move-no,
+  .move-paren--open + .move-group .move-no { margin-left: 0; }
+  .move-paren--open + .move-group { margin-left: 0; }
 
   .move-item {
     font-family: var(--app-font-family-mono);
@@ -399,6 +416,55 @@ defineExpose({ currentFen, currentIndex, currentLabel });
       background: var(--td-brand-color, #0052d9);
       color: #fff;
     }
+
+    // Nhánh phụ (RAV): chữ tĩnh, không bấm tua bàn cờ được (quyết định đã chốt
+    // — tránh đụng state điều hướng currentIndex/currentFen ngoài mainline).
+    &.move-item--static {
+      cursor: default;
+      &:hover { background: none; }
+    }
   }
+
+  // Ký hiệu NAG (⩲ ⩱ ∓ …) thiếu glyph trong nhiều font mono trên Windows.
+  .move-nag {
+    font-family: 'Segoe UI Symbol', 'DejaVu Sans', 'Noto Sans Symbols 2', sans-serif;
+    font-weight: 600;
+    margin-left: 1px;
+  }
+
+  // Bình luận: khối chữ riêng (bình luận sách cờ thường rất dài).
+  .move-comment {
+    display: block;
+    margin: 6px 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--td-text-color-primary);
+    text-align: justify;
+  }
+
+  .move-paren {
+    font-family: var(--app-font-family-mono);
+    font-size: 12px;
+    color: var(--td-text-color-placeholder);
+  }
+  .move-paren--open { margin-left: 4px; }
+  .move-paren--close { margin-left: 0; }
+
+  // Nhánh phụ: nghiêng + nhạt màu để phân biệt mainline. Bình luận NẰM TRONG
+  // nhánh phụ thì hiện inline (không xuống dòng riêng) — đúng cách sách in.
+  .move-var {
+    color: var(--td-text-color-placeholder);
+
+    .move-item, .move-no { color: inherit; font-style: italic; }
+
+    &.move-comment {
+      display: inline;
+      margin: 0 0 0 4px;
+      font-style: italic;
+      text-align: inherit;
+      color: inherit;
+    }
+  }
+  .move-var--d2 { font-size: 11px; }
 }
 </style>

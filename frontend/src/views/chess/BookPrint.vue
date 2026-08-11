@@ -288,21 +288,25 @@ onMounted(async () => {
 .bkp-page--cols-2 .bkp-chapter { break-inside: auto; }
 .bkp-chapter h3 { break-after: avoid; }
 
-// Không cắt đôi bàn cờ giữa 2 cột/2 trang; ẩn phần điều hướng tương tác (vô
-// nghĩa trên giấy) — ẩn CẢ trên màn hình lẫn khi in (trang này LÀ bản xem
-// trước, phải khớp bản in — ẩn cả 2 nơi cũng giữ chiều cao nhất quán giữa
-// hai chế độ, tránh lệch điểm ngắt trang khi bật/tắt in).
-:deep(.chess-board-display) { break-inside: avoid; }
+// Không cắt đôi BÀN CỜ giữa 2 cột/2 trang — nhưng KHÔNG áp cho cả khối
+// .chess-board-display nữa (đổi so với trước): từ khi move-list có thể mang
+// bình luận rất dài, ép "avoid" ở cấp cả khối sẽ đẩy NGUYÊN khối (bàn cờ +
+// bình luận dài) sang cột/trang sau, bỏ trắng cả cột trước — đúng cái bẫy mà
+// comment ở .bkp-chapter phía trên đã cảnh báo, nhưng ở cấp CHƯƠNG; giờ lặp
+// lại đúng vấn đề đó ở cấp một khối bàn cờ. Chỉ giữ nguyên vẹn phần .chess-body
+// (bàn cờ + thanh eval) — phần cho phép ngắt là move-list (chữ, ngắt được).
+:deep(.chess-board-display) { break-inside: auto; }
+:deep(.chess-body) { break-inside: avoid; }
 :deep(.chess-nav),
 :deep(.chess-nav-single),
 :deep(.eval-bar),
 :deep(.chess-eval-line) { display: none !important; }
 
-// .move-list (danh sách nước đi dạng chữ, vd "1. e4 e5 2. Nf3 Nc6") nằm NGOÀI
-// .chess-nav (xem ChessBoardDisplay.vue) nên KHÔNG bị ẩn bởi luật trên — đây
-// là nội dung sách cờ cần in ra giấy. Chỉ bỏ khung cuộn 120px (vô nghĩa khi
-// không còn bấm/cuộn được) và tắt hiệu ứng con trỏ/hover — cả 2 nơi (xem
-// preview) lẫn khi in, cùng lý do nhất quán như trên.
+// .move-list (danh sách nước đi + chú giải PGN nếu có — bình luận/NAG/nhánh
+// phụ, xem utils/pgnAnnotated.ts) nằm NGOÀI .chess-nav (xem ChessBoardDisplay.vue)
+// nên KHÔNG bị ẩn bởi luật trên — đây là nội dung sách cờ cần in ra giấy. Chỉ
+// bỏ khung cuộn 120px (vô nghĩa khi không còn bấm/cuộn được) và tắt hiệu ứng
+// con trỏ/hover — cả 2 nơi (xem preview) lẫn khi in, cùng lý do nhất quán như trên.
 :deep(.move-list) {
   max-height: none;
   overflow: visible;
@@ -311,7 +315,15 @@ onMounted(async () => {
   cursor: default;
 
   &:hover { background: none; }
+
+  // Nền navy của nước "đang xem" vô nghĩa trên giấy — in đậm thay vì tô nền.
+  &.active {
+    background: none !important;
+    font-weight: 700;
+  }
 }
+// Bình luận dài không mồ côi 1 dòng đầu/cuối khi bị ngắt qua trang/cột.
+:deep(.move-comment) { orphans: 2; widows: 2; }
 
 // Dialog "Chọn chương" — teleport ra ngoài .bkp nhưng CSS scoped vẫn áp dụng
 // qua data-v attribute nên style bình thường như mọi nơi khác trong file.
@@ -346,5 +358,15 @@ onMounted(async () => {
   .bkp-part { color: #000 !important; }
   :deep(.chess-caption) { color: #000 !important; }
   .bkp-description { background: transparent !important; border: 1px solid #ccc; }
+
+  // Chú giải PGN (bình luận/số hiệu nước/ký hiệu NAG/dấu ngoặc nhánh phụ) —
+  // cùng lý do :root{color-scheme:light} ở trên: chế độ tối sẽ in ra chữ trắng
+  // trên giấy trắng nếu không ép lại theo danh sách selector cụ thể này.
+  :deep(.move-comment),
+  :deep(.move-item),
+  :deep(.move-no),
+  :deep(.move-nag),
+  :deep(.move-paren),
+  :deep(.move-var) { color: #000 !important; }
 }
 </style>
