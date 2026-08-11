@@ -43,6 +43,7 @@
          phải positions) để PGN chỉ có bình luận, không nước nào, vẫn hiện được. -->
     <div v-if="tokens.length" class="move-list" :class="{ 'move-list--annotated': hasAnnotations }">
       <template v-for="(tk, i) in displayTokens" :key="i">
+        <span v-if="tk.sep" class="move-sep">{{ ' ' }}</span>
         <span v-if="tk.kind === 'comment'" class="move-comment" :class="varClass(tk.depth)">{{ tk.text }}</span>
         <span v-else-if="tk.kind === 'open'" class="move-paren move-paren--open" :class="varClass(tk.depth)">(</span>
         <span v-else-if="tk.kind === 'close'" class="move-paren move-paren--close" :class="varClass(tk.depth)">)</span>
@@ -67,7 +68,7 @@ import piecesUrl from 'cm-chessboard/assets/pieces/standard.svg?url';
 import 'cm-chessboard/assets/chessboard.css';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
-  buildAnnotatedPgn, tokensFromPositions,
+  buildAnnotatedPgn, needsSpaceBefore, tokensFromPositions,
   type AnnotatedPos, type PgnToken,
 } from '@/utils/pgnAnnotated';
 
@@ -136,16 +137,21 @@ interface DisplayToken {
   posIndex: number | null;
   depth: number;
   text: string; // nội dung bình luận — rỗng với token không phải comment
+  sep: boolean; // có chèn khoảng trắng THẬT trước token này không (xem needsSpaceBefore)
 }
-const displayTokens = computed<DisplayToken[]>(() => tokens.value.map((tk) => ({
-  kind: tk.kind,
-  num: tk.kind === 'move' ? tk.num : '',
-  san: tk.kind === 'move' ? tk.san : '',
-  glyph: tk.kind === 'move' ? tk.glyph : '',
-  posIndex: tk.kind === 'move' ? tk.posIndex : null,
-  depth: tk.depth,
-  text: tk.kind === 'comment' ? tk.text : '',
-})));
+const displayTokens = computed<DisplayToken[]>(() => {
+  const src = tokens.value;
+  return src.map((tk, i) => ({
+    kind: tk.kind,
+    num: tk.kind === 'move' ? tk.num : '',
+    san: tk.kind === 'move' ? tk.san : '',
+    glyph: tk.kind === 'move' ? tk.glyph : '',
+    posIndex: tk.kind === 'move' ? tk.posIndex : null,
+    depth: tk.depth,
+    text: tk.kind === 'comment' ? tk.text : '',
+    sep: needsSpaceBefore(i > 0 ? src[i - 1] : null, tk),
+  }));
+});
 
 function varClass(depth: number) {
   return depth > 0 ? ['move-var', `move-var--d${Math.min(depth, 2)}`] : undefined;
@@ -381,24 +387,26 @@ defineExpose({ currentFen, currentIndex, currentLabel });
     overflow: visible;
   }
 
+  // Khoảng trắng giữa các nước PHẢI là text node thật (span này) chứ không phải
+  // margin: trình biên dịch Vue xoá sạch whitespace giữa các thẻ anh em trong
+  // template (chế độ condense mặc định — đã xác minh bằng cách biên dịch thật),
+  // mà margin thì KHÔNG tạo điểm ngắt dòng. Thiếu nó, cả chuỗi nước đi dài
+  // thành MỘT dòng không ngắt được → tràn khỏi cột và tràn ngang khỏi khổ giấy
+  // khi in (trình duyệt sinh thêm trang trắng). Xem needsSpaceBefore().
+  .move-sep { white-space: normal; }
+
   .move-group {
     display: inline;
-    white-space: nowrap;
-    margin-left: 4px;
+    white-space: nowrap; // "7." và "a3" không bị tách qua 2 dòng
   }
-  > :first-child { margin-left: 0; }
 
   .move-no {
     font-family: var(--app-font-family-mono);
     font-size: 12px;
     color: var(--td-text-color-placeholder);
     user-select: none;
-    margin-left: 6px;   // 2(pad move-item trước) + 4(move-group) + 6 = 12px giữa 2 nhóm
-    margin-right: 4px;  // 4 + 2(pad) = 6px giữa "7." và "a3"
+    margin-right: 4px; // 4 + 2(pad move-item) = 6px giữa "7." và "a3"
   }
-  .move-group:first-child .move-no,
-  .move-paren--open + .move-group .move-no { margin-left: 0; }
-  .move-paren--open + .move-group { margin-left: 0; }
 
   .move-item {
     font-family: var(--app-font-family-mono);
@@ -442,13 +450,13 @@ defineExpose({ currentFen, currentIndex, currentLabel });
     text-align: justify;
   }
 
+  // Ngoặc nhánh phụ dính sát nước bên trong — "(7. O-O O-O 8. a3)" chứ không
+  // phải "( 7. O-O O-O 8. a3 )"; do needsSpaceBefore() bỏ khoảng trắng ở 2 chỗ đó.
   .move-paren {
     font-family: var(--app-font-family-mono);
     font-size: 12px;
     color: var(--td-text-color-placeholder);
   }
-  .move-paren--open { margin-left: 4px; }
-  .move-paren--close { margin-left: 0; }
 
   // Nhánh phụ: nghiêng + nhạt màu để phân biệt mainline. Bình luận NẰM TRONG
   // nhánh phụ thì hiện inline (không xuống dòng riêng) — đúng cách sách in.

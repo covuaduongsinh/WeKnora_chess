@@ -63,6 +63,33 @@ export type PgnToken =
   | { kind: 'comment'; text: string; depth: number }
   | { kind: 'open' | 'close'; depth: number }; // "(" và ")"
 
+/** Bình luận ở mainline hiển thị dạng KHỐI (xuống dòng riêng); bình luận nằm
+ * trong nhánh phụ hiển thị INLINE — xem CSS .move-comment / .move-var.move-comment. */
+function isBlockComment(tk: PgnToken): boolean {
+  return tk.kind === 'comment' && tk.depth === 0;
+}
+
+/**
+ * Có cần chèn một khoảng trắng THẬT (text node) trước token này không.
+ *
+ * BẮT BUỘC phải là text node chứ không dùng margin: trình biên dịch Vue xoá
+ * sạch whitespace giữa các thẻ anh em trong template (chế độ `condense` mặc
+ * định — đã xác minh bằng cách biên dịch thật), mà `margin` thì KHÔNG tạo điểm
+ * ngắt dòng. Thiếu khoảng trắng thật, cả chuỗi nước đi dài trở thành MỘT dòng
+ * không ngắt được → tràn khỏi cột và (khi in) tràn ngang khỏi khổ giấy, làm
+ * trình duyệt sinh thêm trang trắng.
+ *
+ * Quy tắc theo lối trình bày sách cờ: không có khoảng trắng trước ")" và ngay
+ * sau "(" — để nhánh phụ đọc là "(7. O-O O-O 8. a3)" chứ không phải "( 7. ... )".
+ */
+export function needsSpaceBefore(prev: PgnToken | null, cur: PgnToken): boolean {
+  if (!prev) return false;
+  if (isBlockComment(prev) || isBlockComment(cur)) return false; // khối tự xuống dòng
+  if (cur.kind === 'close') return false;
+  if (prev.kind === 'open') return false;
+  return true;
+}
+
 export interface AnnotatedPgn {
   /** KHÔNG gồm thế cờ ban đầu — caller tự chèn vào vị trí 0. */
   positions: AnnotatedPos[];

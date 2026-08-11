@@ -325,6 +325,19 @@ onMounted(async () => {
 // Bình luận dài không mồ côi 1 dòng đầu/cuối khi bị ngắt qua trang/cột.
 :deep(.move-comment) { orphans: 2; widows: 2; }
 
+// LƯỚI AN TOÀN chống tràn ngang: khổ in chỉ rộng 180mm (2 cột × 86mm), bất kỳ
+// nội dung nào không ngắt được mà rộng hơn cột sẽ tràn NGANG khỏi trang giấy —
+// trình duyệt xử lý bằng cách sinh thêm trang (trang thừa gần như trắng). Ràng
+// mọi khối bàn cờ vào đúng bề rộng cột và cho phép bẻ chữ khi cùng đường.
+:deep(.chess-board-display) { max-width: 100%; }
+:deep(.move-list) { overflow-wrap: break-word; }
+
+// Lề dưới thừa ở phần tử CUỐI có thể tràn quá đáy cột cuối → đẩy sang trang mới
+// chỉ để chứa vài pixel lề. Bỏ lề dưới ở cuối luồng.
+.bkp-chapter:last-child { margin-bottom: 0; }
+.bkp-chapter > :last-child { margin-bottom: 0; }
+:deep(.chess-board-display:last-child) { margin-bottom: 0; }
+
 // Dialog "Chọn chương" — teleport ra ngoài .bkp nhưng CSS scoped vẫn áp dụng
 // qua data-v attribute nên style bình thường như mọi nơi khác trong file.
 .bkp-picker-actions { display: flex; gap: 4px; margin-bottom: 8px; }

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildAnnotatedPgn, cleanComment, glyphOf, tokensFromPositions, type PgnToken } from './pgnAnnotated.ts'
+import {
+  buildAnnotatedPgn, cleanComment, glyphOf, needsSpaceBefore, tokensFromPositions,
+  type PgnToken,
+} from './pgnAnnotated.ts'
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -144,6 +147,25 @@ test('cleanComment: lọc [%evp]/[%clk], giữ nguyên chữ; rỗng sau khi l�
   assert.equal(cleanComment('[%evp 0,15,7,-4]'), '')
   assert.equal(cleanComment(undefined), '')
   assert.equal(cleanComment('  nhiều   khoảng   trắng  '), 'nhiều khoảng trắng')
+})
+
+test('needsSpaceBefore: có khoảng trắng giữa các nước, KHÔNG có quanh ngoặc nhánh phụ', () => {
+  const move = (depth = 0): PgnToken => ({ kind: 'move', num: '', san: 'e4', glyph: '', posIndex: 1, depth })
+  const open = (depth = 1): PgnToken => ({ kind: 'open', depth })
+  const close = (depth = 1): PgnToken => ({ kind: 'close', depth })
+  const comment = (depth = 0): PgnToken => ({ kind: 'comment', text: 'x', depth })
+
+  assert.equal(needsSpaceBefore(null, move()), false)          // token đầu tiên
+  assert.equal(needsSpaceBefore(move(), move()), true)         // giữa 2 nước
+  assert.equal(needsSpaceBefore(move(), open()), true)         // trước "(" vẫn có
+  assert.equal(needsSpaceBefore(open(), move(1)), false)       // ngay sau "(" thì không
+  assert.equal(needsSpaceBefore(move(1), close()), false)      // trước ")" thì không
+  assert.equal(needsSpaceBefore(close(), move()), true)        // sau ")" có lại
+  // Bình luận mainline là KHỐI (tự xuống dòng) → không cần khoảng trắng hai bên
+  assert.equal(needsSpaceBefore(move(), comment()), false)
+  assert.equal(needsSpaceBefore(comment(), move()), false)
+  // Bình luận TRONG nhánh phụ hiển thị inline → vẫn cần khoảng trắng
+  assert.equal(needsSpaceBefore(move(1), comment(1)), true)
 })
 
 test('tokensFromPositions: sinh token khớp hiển thị hiện có cho nhánh plies (không chú giải)', () => {
