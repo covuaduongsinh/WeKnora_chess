@@ -71,9 +71,14 @@
           <div class="atb-header">
             <h3 class="atb-header-title">{{ selected.title || '(không tiêu đề)' }}</h3>
             <div class="atb-header-actions">
-              <t-button v-if="!editing" size="small" variant="outline" @click="startEdit">
-                <template #icon><t-icon name="edit-1" /></template>Sửa
-              </t-button>
+              <template v-if="!editing">
+                <t-button size="small" variant="outline" @click="openHistory">
+                  <template #icon><t-icon name="history" /></template>Lịch sử
+                </t-button>
+                <t-button size="small" variant="outline" @click="startEdit">
+                  <template #icon><t-icon name="edit-1" /></template>Sửa
+                </t-button>
+              </template>
               <template v-else>
                 <t-button size="small" variant="outline" @click="cancelEdit">Hủy</t-button>
                 <t-button size="small" theme="primary" @click="saveEdit">Lưu</t-button>
@@ -142,6 +147,8 @@
               <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
                 style="display:none" @change="onImageInputChange" />
               <ChessWikiLinkSuggest :textarea="contentTextareaEl" v-model="editDraft.content" />
+              <label>Ghi chú thay đổi (tùy chọn — chỉ lưu lịch sử khi tiêu đề/nội dung thực sự đổi)</label>
+              <t-input v-model="editDraft.revisionNote" placeholder="VD: Bổ sung ví dụ minh họa" />
             </div>
           </template>
         </template>
@@ -160,6 +167,7 @@
 
     <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
     <ChessArticleTopicManager v-model:visible="topicManagerVisible" @changed="loadTopics" />
+    <ChessArticleHistory v-model:visible="historyVisible" :article-id="historyArticleId" @restored="onRestored" />
   </div>
 </template>
 
@@ -174,6 +182,7 @@ import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import ChessArticleTopicManager from '@/views/chess/components/ChessArticleTopicManager.vue';
+import ChessArticleHistory from '@/views/chess/components/ChessArticleHistory.vue';
 import {
   listArticles, getArticleBySlug, createArticle, updateArticle, deleteArticle,
   renameArticleSlug, exportArticles, importArticles, type ChessArticle,
@@ -297,11 +306,11 @@ async function confirmCreate() {
 // ---- Sửa (inline trong khung phải, không dùng modal — bài viết là văn bản dài) ----
 interface ArticleEditDraft {
   title: string; summary: string; aliases: string; category: string; level: string;
-  tags: string; status: string; cover_url: string; content: string;
+  tags: string; status: string; cover_url: string; content: string; revisionNote: string;
 }
 const editDraft = reactive<ArticleEditDraft>({
   title: '', summary: '', aliases: '', category: '', level: '',
-  tags: '', status: 'draft', cover_url: '', content: '',
+  tags: '', status: 'draft', cover_url: '', content: '', revisionNote: '',
 });
 function startEdit() {
   if (!selected.value) return;
@@ -314,6 +323,7 @@ function startEdit() {
   editDraft.status = selected.value.status || 'draft';
   editDraft.cover_url = selected.value.cover_url || '';
   editDraft.content = selected.value.content || '';
+  editDraft.revisionNote = '';
   editing.value = true;
 }
 function cancelEdit() { editing.value = false; }
@@ -322,7 +332,8 @@ async function saveEdit() {
   if (!editDraft.title.trim()) { MessagePlugin.warning('Nhập tiêu đề bài viết'); return; }
   try {
     const id = selected.value.id;
-    const res: any = await updateArticle(id, { ...editDraft });
+    const { revisionNote, ...fields } = editDraft;
+    const res: any = await updateArticle(id, { ...fields, revision_note: revisionNote });
     await load();
     const updated = articles.value.find((a) => a.id === id) || res?.data;
     if (updated) selected.value = updated;
@@ -331,6 +342,19 @@ async function saveEdit() {
   } catch (e: any) {
     MessagePlugin.error(e?.error || e?.message || 'Lưu thất bại');
   }
+}
+
+// ---- Lịch sử phiên bản ----
+const historyVisible = ref(false);
+const historyArticleId = ref('');
+function openHistory() {
+  if (!selected.value) return;
+  historyArticleId.value = selected.value.id;
+  historyVisible.value = true;
+}
+function onRestored(article: ChessArticle) {
+  selected.value = article;
+  load();
 }
 
 // Đổi slug bài viết (power-feature cho HLV): link cũ [[article/<cũ>]] vẫn sống nhờ alias.

@@ -568,6 +568,9 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		articles.PUT("/:id", g.Contributor(), h.UpdateArticle)
 		articles.PUT("/:id/slug", g.Contributor(), h.RenameArticleSlug)
 		articles.POST("/:id/images", g.Contributor(), h.UploadArticleImage)
+		articles.GET("/:id/revisions", g.Viewer(), h.ListArticleRevisions)
+		articles.GET("/:id/revisions/:rev_id", g.Viewer(), h.GetArticleRevision)
+		articles.POST("/:id/revisions/:rev_id/restore", g.Contributor(), h.RestoreArticleRevision)
 		articles.DELETE("/:id", g.Contributor(), h.DeleteArticle)
 	}
 	// Chuyên mục bài viết — cây tối đa 2 tầng, KHÔNG phải đích wikilink (chỉ

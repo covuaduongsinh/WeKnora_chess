@@ -165,3 +165,40 @@ func (r *chessLibraryRepository) ListArticleImagesByArticle(ctx context.Context,
 func (r *chessLibraryRepository) DeleteArticleImage(ctx context.Context, tenantID uint64, id string) error {
 	return r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&types.ChessArticleImage{}).Error
 }
+
+// ---- Lịch sử phiên bản bài viết (sao y chess_book.go phần lịch sử chương) ----
+
+func (r *chessLibraryRepository) CreateArticleRevision(ctx context.Context, rev *types.ChessArticleRevision) error {
+	return r.db.WithContext(ctx).Create(rev).Error
+}
+
+func (r *chessLibraryRepository) ListArticleRevisions(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleRevision, error) {
+	var revs []*types.ChessArticleRevision
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND article_id = ?", tenantID, articleID).
+		Order("revision_number DESC").
+		Find(&revs).Error
+	return revs, err
+}
+
+func (r *chessLibraryRepository) GetArticleRevision(ctx context.Context, tenantID uint64, revisionID string) (*types.ChessArticleRevision, error) {
+	var rev types.ChessArticleRevision
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, revisionID).First(&rev).Error; err != nil {
+		return nil, err
+	}
+	return &rev, nil
+}
+
+// CountArticleRevisions phục vụ tính revision_number tiếp theo (bắt đầu từ 1).
+func (r *chessLibraryRepository) CountArticleRevisions(ctx context.Context, tenantID uint64, articleID string) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&types.ChessArticleRevision{}).
+		Where("tenant_id = ? AND article_id = ?", tenantID, articleID).Count(&count).Error
+	return count, err
+}
+
+// DeleteArticleRevisionsByArticle xóa toàn bộ lịch sử của một bài viết (khi xóa bài viết).
+func (r *chessLibraryRepository) DeleteArticleRevisionsByArticle(ctx context.Context, tenantID uint64, articleID string) error {
+	return r.db.WithContext(ctx).Where("tenant_id = ? AND article_id = ?", tenantID, articleID).
+		Delete(&types.ChessArticleRevision{}).Error
+}

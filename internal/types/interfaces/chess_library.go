@@ -66,11 +66,21 @@ type ChessLibraryService interface {
 	// khác trỏ tới bài viết này.
 	GetArticleBacklinks(ctx context.Context, tenantID uint64, slug string) ([]types.ChessBacklink, error)
 	CreateArticle(ctx context.Context, article *types.ChessArticle) (*types.ChessArticle, error)
-	UpdateArticle(ctx context.Context, article *types.ChessArticle) (*types.ChessArticle, error)
+	// UpdateArticle cập nhật bài viết; nếu Title/Content thực sự đổi thì lưu
+	// bản TRƯỚC khi ghi đè vào lịch sử phiên bản (revisionNote là ghi chú
+	// thay đổi, tùy chọn).
+	UpdateArticle(ctx context.Context, article *types.ChessArticle, revisionNote string) (*types.ChessArticle, error)
 	// RenameArticleSlug đổi slug bài viết sang newSlug + ghi alias slug-cũ→mới.
 	RenameArticleSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessArticle, error)
 	// DeleteArticle xóa bài viết VÀ cascade: ref 2 chiều + gỡ khỏi KB tri thức cờ.
 	DeleteArticle(ctx context.Context, tenantID uint64, id string) error
+
+	// ---- Bài viết: Lịch sử phiên bản ----
+	ListArticleRevisions(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleRevision, error)
+	GetArticleRevision(ctx context.Context, tenantID uint64, revisionID string) (*types.ChessArticleRevision, error)
+	// RestoreArticleRevision ghi nội dung một bản cũ trở lại làm bản hiện tại
+	// (bản thân thao tác khôi phục CŨNG tạo một bản phiên bản mới trước đó).
+	RestoreArticleRevision(ctx context.Context, tenantID uint64, articleID, revisionID string) (*types.ChessArticle, error)
 	// ExportArticles xuất các bài viết (theo filter) để sao lưu/chia sẻ.
 	ExportArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) ([]types.ChessArticleBundle, error)
 	// ImportArticles nhập danh sách bài viết (luôn tạo mới); trả số bài đã thêm.
@@ -245,6 +255,15 @@ type ChessLibraryRepository interface {
 	// UpdateArticleSlug chỉ đổi cột slug (tách riêng như UpdateGameSlug).
 	UpdateArticleSlug(ctx context.Context, tenantID uint64, id, slug string) error
 	DeleteArticle(ctx context.Context, tenantID uint64, id string) error
+
+	// ---- Bài viết: Lịch sử phiên bản ----
+	CreateArticleRevision(ctx context.Context, rev *types.ChessArticleRevision) error
+	ListArticleRevisions(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleRevision, error)
+	GetArticleRevision(ctx context.Context, tenantID uint64, revisionID string) (*types.ChessArticleRevision, error)
+	// CountArticleRevisions phục vụ tính revision_number tiếp theo.
+	CountArticleRevisions(ctx context.Context, tenantID uint64, articleID string) (int64, error)
+	// DeleteArticleRevisionsByArticle xóa toàn bộ lịch sử của một bài viết (khi xóa bài viết).
+	DeleteArticleRevisionsByArticle(ctx context.Context, tenantID uint64, articleID string) error
 
 	// ---- Bài viết: Chuyên mục (cây tối đa 2 tầng) ----
 	ListArticleTopics(ctx context.Context, tenantID uint64, f types.ChessArticleTopicFilter) ([]*types.ChessArticleTopic, error)
