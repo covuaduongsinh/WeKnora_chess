@@ -361,6 +361,17 @@ onMounted(async () => {
   .no-print { display: none !important; }
   .bkp { padding: 0; overflow-x: visible; }
 
+  // Vùng in A4 rộng ĐÚNG 180mm (210 − 2×15mm lề @page) mà .bkp-page cũng rộng
+  // đúng 180mm — bằng chằn chặn, KHÔNG dư một chút sai số nào. Chỉ cần làm tròn
+  // mm→px lệch nửa pixel là tràn NGANG → Chrome sinh thêm một trang trắng. Thêm
+  // trần này để phần dư bị cắt thay vì đẻ ra trang mới; vùng in đúng 180mm thì
+  // quy tắc này KHÔNG đổi gì (bàn cờ không bị co, giữ đúng bất biến "xem trước
+  // khớp bản in" ghi ở comment .bkp-page phía trên).
+  .bkp-page { max-width: 100%; }
+
+  // Lề dưới của phần tử cuối cùng cũng đủ đẩy vài pixel qua đáy trang → trang thừa.
+  .bkp-page > :last-child { margin-bottom: 0; }
+
   // index.html đặt màu nền/chữ theo theme đã lưu (kể cả tối) lên html/body —
   // không ép lại thì chế độ tối in ra chữ trắng trên giấy trắng. Ép theo
   // danh sách selector cụ thể (không wildcard) để không phá màu SVG bàn cờ.
@@ -381,5 +392,42 @@ onMounted(async () => {
   :deep(.move-nag),
   :deep(.move-paren),
   :deep(.move-var) { color: #000 !important; }
+}
+</style>
+
+<!--
+  Khối style KHÔNG scoped — bắt buộc, vì <style scoped> không thể nhắm tới
+  html/body/#app (chúng nằm NGOÀI component và bị gắn thuộc tính data-v-*).
+
+  App.vue đặt cho html/body/#app: `height: 100%` + `#app { transform:
+  translateZ(0); isolation: isolate; backface-visibility: hidden }`. Trên màn
+  hình đó là chủ ý (chống xé hình khi WebView vẽ lại) và KHÔNG được sửa ở
+  App.vue vì ảnh hưởng toàn ứng dụng. Nhưng khi IN thì hai thứ đó sinh trang
+  trắng thừa:
+    · `height: 100%` khi in = ĐÚNG chiều cao 1 trang giấy (A4 297 − 2×15mm =
+      267mm). Ba hộp lồng nhau đều bằng chằn chặn khổ giấy ⇒ chỉ cần lệch dưới
+      1px do làm tròn là tràn xuống trang 2 (trang đó rỗng nên in ra trắng).
+    · `transform` ép #app thành lớp composited; Chrome coi phần tử có transform
+      là khối KHÔNG cắt trang được — nguồn lỗi phân trang khi in đã biết từ lâu.
+
+  Chỉ có tác dụng trong @media print. Route /book-print/:id là route độc lập mở
+  ở tab riêng nên thực tế không rò sang màn hình khác; kể cả có rò thì thứ nó
+  làm — cho phép nội dung cắt trang tự nhiên khi in — vẫn đúng cho mọi trang.
+-->
+<style lang="less">
+@media print {
+  html,
+  body,
+  #app {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  #app {
+    transform: none !important;
+    isolation: auto !important;
+    backface-visibility: visible !important;
+  }
 }
 </style>
