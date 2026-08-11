@@ -294,3 +294,37 @@ export const deleteArticle = (id: string) => del(`/api/v1/chess/articles/${id}`)
 export const exportArticles = (f: Partial<{ category: string; level: string; status: string }> = {}) =>
   get(`/api/v1/chess/articles/export${qs(f as Record<string, string>)}`);
 export const importArticles = (articles: any[]) => post("/api/v1/chess/articles/import", { articles });
+
+// ---- Ảnh chèn trong bài viết ----
+// Upload ảnh (multipart) → {id, url}. url là đường dẫn ổn định
+// (GET /api/v1/chess/articles/images/:id), dùng trực tiếp trong markdown bài —
+// KHÔNG phải presigned URL có hạn dùng.
+export const uploadArticleImage = (articleId: string, file: File, onProgress?: (e: any) => void) => {
+  const form = new FormData();
+  form.append("file", file);
+  return postUpload(`/api/v1/chess/articles/${articleId}/images`, form, onProgress);
+};
+export const articleImageURL = (imageId: string) => `/api/v1/chess/articles/images/${imageId}`;
+
+// ---- Chuyên mục bài viết (cây tối đa 2 tầng, KHÔNG phải đích wikilink) ----
+export interface ChessArticleTopic {
+  id: string;
+  title: string; parent_id: string; description: string; sort_order: number;
+  article_count?: number;
+  slug?: string;
+  created_at?: string; updated_at?: string;
+}
+export const listArticleTopics = (f: Partial<{ parent_id: string; q: string }> = {}) =>
+  get(`/api/v1/chess/article-topics${qs(f as Record<string, string>)}`);
+export const getArticleTopic = (id: string) => get(`/api/v1/chess/article-topics/${id}`);
+export const getArticleTopicBySlug = (slug: string) =>
+  get(`/api/v1/chess/article-topics/by-slug/${encodeURIComponent(slug)}`);
+export const createArticleTopic = (data: Partial<ChessArticleTopic>) => post("/api/v1/chess/article-topics", data);
+export const updateArticleTopic = (id: string, data: Partial<ChessArticleTopic>) =>
+  put(`/api/v1/chess/article-topics/${id}`, data);
+export const renameArticleTopicSlug = (id: string, slug: string) =>
+  put(`/api/v1/chess/article-topics/${id}/slug`, { slug });
+export const deleteArticleTopic = (id: string) => del(`/api/v1/chess/article-topics/${id}`);
+// Ghi đè toàn bộ bài viết trong MỘT chuyên mục (nhiều-nhiều) theo đúng thứ tự truyền vào.
+export const setTopicArticles = (topicId: string, articleIds: string[]) =>
+  put(`/api/v1/chess/article-topics/${topicId}/articles`, { article_ids: articleIds });

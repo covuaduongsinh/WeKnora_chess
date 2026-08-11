@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+	"mime"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -178,4 +180,60 @@ func (h *ChessLibraryHandler) ImportArticles(c *gin.Context) {
 		return
 	}
 	chessOK(c, gin.H{"imported": count})
+}
+
+// ---- Ảnh chèn trong bài viết ----
+
+// UploadArticleImage POST /chess/articles/:id/images (multipart form field
+// "file") → {id, url}. url là đường dẫn ổn định GET /chess/articles/images/:id
+// (KHÔNG phải presigned URL có hạn dùng — nội dung bài viết lưu URL này lâu dài).
+func (h *ChessLibraryHandler) UploadArticleImage(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	fh, err := c.FormFile("file")
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	f, err := fh.Open()
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	mimeType := fh.Header.Get("Content-Type")
+	img, err := h.service.UploadArticleImage(ctx, tenantID, c.Param("id"), fh.Filename, mimeType, data)
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, gin.H{"id": img.ID, "url": "/api/v1/chess/articles/images/" + img.ID})
+}
+
+// GetArticleImage GET /chess/articles/images/:imageId — stream ảnh (inline).
+func (h *ChessLibraryHandler) GetArticleImage(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	img, rc, err := h.service.GetArticleImage(ctx, tenantID, c.Param("imageId"))
+	if err != nil {
+		chessFail(c, http.StatusNotFound, err)
+		return
+	}
+	defer rc.Close()
+	contentType := img.Mime
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": img.FileName}))
+	c.Header("Cache-Control", "private, max-age=3600")
+	c.Stream(func(w io.Writer) bool {
+		_, _ = io.Copy(w, rc)
+		return false
+	})
 }

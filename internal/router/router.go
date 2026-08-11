@@ -558,13 +558,32 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		articles.POST("", g.Contributor(), h.CreateArticle)
 		articles.GET("/export", g.Viewer(), h.ExportArticles)
 		articles.POST("/import", g.Contributor(), h.ImportArticles)
+		// Route tĩnh "images/:imageId" đặt trước param ":id" — phục vụ ảnh chèn
+		// trong bài qua URL ổn định (KHÔNG phải presigned URL có hạn dùng).
+		articles.GET("/images/:imageId", g.Viewer(), h.GetArticleImage)
 		// Route tĩnh "by-slug" đặt trước param ":id" (giải mã wikilink [[article/<slug>]]).
 		articles.GET("/by-slug/:slug", g.Viewer(), h.GetArticleBySlug)
 		articles.GET("/by-slug/:slug/backlinks", g.Viewer(), h.GetArticleBacklinks)
 		articles.GET("/:id", g.Viewer(), h.GetArticle)
 		articles.PUT("/:id", g.Contributor(), h.UpdateArticle)
 		articles.PUT("/:id/slug", g.Contributor(), h.RenameArticleSlug)
+		articles.POST("/:id/images", g.Contributor(), h.UploadArticleImage)
 		articles.DELETE("/:id", g.Contributor(), h.DeleteArticle)
+	}
+	// Chuyên mục bài viết — cây tối đa 2 tầng, KHÔNG phải đích wikilink (chỉ
+	// điều hướng UI, giống kệ sách).
+	articleTopics := r.Group("/chess/article-topics")
+	{
+		articleTopics.GET("", g.Viewer(), h.ListArticleTopics)
+		articleTopics.POST("", g.Contributor(), h.CreateArticleTopic)
+		// Route tĩnh "by-slug" đặt trước param ":id".
+		articleTopics.GET("/by-slug/:slug", g.Viewer(), h.GetArticleTopicBySlug)
+		articleTopics.GET("/:id", g.Viewer(), h.GetArticleTopic)
+		articleTopics.PUT("/:id", g.Contributor(), h.UpdateArticleTopic)
+		articleTopics.PUT("/:id/slug", g.Contributor(), h.RenameArticleTopicSlug)
+		// SetTopicArticles ghi đè toàn bộ bài viết trong chuyên mục (nhiều-nhiều).
+		articleTopics.PUT("/:id/articles", g.Contributor(), h.SetTopicArticles)
+		articleTopics.DELETE("/:id", g.Contributor(), h.DeleteArticleTopic)
 	}
 	// Thư viện sách cờ vua — Kệ → Sách → Chương. Biên soạn NỘI BỘ (markdown +
 	// FEN + ván cờ + ảnh), KHÔNG phải kho ebook PDF/EPUB để đọc. Chỉ sách

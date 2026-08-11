@@ -76,6 +76,26 @@ type ChessLibraryService interface {
 	// ImportArticles nhập danh sách bài viết (luôn tạo mới); trả số bài đã thêm.
 	ImportArticles(ctx context.Context, tenantID uint64, items []types.ChessArticleBundle) (int, error)
 
+	// ---- Bài viết: Chuyên mục (cây tối đa 2 tầng) ----
+	ListArticleTopics(ctx context.Context, tenantID uint64, f types.ChessArticleTopicFilter) ([]*types.ChessArticleTopic, error)
+	GetArticleTopic(ctx context.Context, tenantID uint64, id string) (*types.ChessArticleTopic, error)
+	GetArticleTopicBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticleTopic, error)
+	CreateArticleTopic(ctx context.Context, topic *types.ChessArticleTopic) (*types.ChessArticleTopic, error)
+	UpdateArticleTopic(ctx context.Context, topic *types.ChessArticleTopic) (*types.ChessArticleTopic, error)
+	// RenameArticleTopicSlug đổi slug chuyên mục sang newSlug.
+	RenameArticleTopicSlug(ctx context.Context, tenantID uint64, id, newSlug string) (*types.ChessArticleTopic, error)
+	// DeleteArticleTopic xóa chuyên mục — chặn nếu còn chuyên mục con.
+	DeleteArticleTopic(ctx context.Context, tenantID uint64, id string) error
+	// SetTopicArticles GHI ĐÈ toàn bộ danh sách bài viết trong một chuyên mục
+	// theo đúng thứ tự truyền vào (xóa-rồi-chèn-lại trong transaction).
+	SetTopicArticles(ctx context.Context, tenantID uint64, topicID string, articleIDs []string) error
+
+	// ---- Bài viết: Ảnh chèn trong bài ----
+	// UploadArticleImage lưu file qua FileService rồi ghi bản ghi ChessArticleImage.
+	UploadArticleImage(ctx context.Context, tenantID uint64, articleID, fileName, mime string, data []byte) (*types.ChessArticleImage, error)
+	// GetArticleImage trả metadata + luồng đọc nội dung ảnh (caller PHẢI Close()).
+	GetArticleImage(ctx context.Context, tenantID uint64, imageID string) (*types.ChessArticleImage, io.ReadCloser, error)
+
 	// ---- Thư viện sách: Kệ ----
 	ListShelves(ctx context.Context, tenantID uint64, f types.ChessShelfFilter) ([]*types.ChessShelf, error)
 	GetShelf(ctx context.Context, tenantID uint64, id string) (*types.ChessShelf, error)
@@ -225,6 +245,35 @@ type ChessLibraryRepository interface {
 	// UpdateArticleSlug chỉ đổi cột slug (tách riêng như UpdateGameSlug).
 	UpdateArticleSlug(ctx context.Context, tenantID uint64, id, slug string) error
 	DeleteArticle(ctx context.Context, tenantID uint64, id string) error
+
+	// ---- Bài viết: Chuyên mục (cây tối đa 2 tầng) ----
+	ListArticleTopics(ctx context.Context, tenantID uint64, f types.ChessArticleTopicFilter) ([]*types.ChessArticleTopic, error)
+	GetArticleTopic(ctx context.Context, tenantID uint64, id string) (*types.ChessArticleTopic, error)
+	GetArticleTopicBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticleTopic, error)
+	ArticleTopicSlugs(ctx context.Context, tenantID uint64) ([]string, error)
+	ArticleTopicSlugExists(ctx context.Context, tenantID uint64, slug string) (bool, error)
+	CreateArticleTopic(ctx context.Context, topic *types.ChessArticleTopic) error
+	// UpdateArticleTopic cố ý KHÔNG đụng slug/parent_id (tách riêng).
+	UpdateArticleTopic(ctx context.Context, topic *types.ChessArticleTopic) error
+	UpdateArticleTopicSlug(ctx context.Context, tenantID uint64, id, slug string) error
+	UpdateArticleTopicParent(ctx context.Context, tenantID uint64, id, parentID string) error
+	DeleteArticleTopic(ctx context.Context, tenantID uint64, id string) error
+	CountArticlesOnTopic(ctx context.Context, tenantID uint64, topicID string) (int64, error)
+	// CountArticleTopicChildren đếm chuyên mục CON — chặn xóa/lồng khi còn con.
+	CountArticleTopicChildren(ctx context.Context, tenantID uint64, parentID string) (int64, error)
+	// SetTopicArticles GHI ĐÈ toàn bộ bài viết trong một chuyên mục (nhiều-nhiều).
+	SetTopicArticles(ctx context.Context, tenantID uint64, topicID string, articleIDs []string) error
+	// RemoveArticleFromAllTopics gỡ một bài viết khỏi mọi chuyên mục (khi xóa bài viết).
+	RemoveArticleFromAllTopics(ctx context.Context, tenantID uint64, articleID string) error
+	// RemoveTopicItems xóa toàn bộ liên kết của một chuyên mục (khi xóa chuyên mục).
+	RemoveTopicItems(ctx context.Context, tenantID uint64, topicID string) error
+
+	// ---- Bài viết: Ảnh chèn trong bài ----
+	CreateArticleImage(ctx context.Context, img *types.ChessArticleImage) error
+	GetArticleImage(ctx context.Context, tenantID uint64, id string) (*types.ChessArticleImage, error)
+	// ListArticleImagesByArticle phục vụ xóa file vật lý khi cascade delete bài viết.
+	ListArticleImagesByArticle(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleImage, error)
+	DeleteArticleImage(ctx context.Context, tenantID uint64, id string) error
 
 	// ---- Thư viện sách: Kệ ----
 	ListShelves(ctx context.Context, tenantID uint64, f types.ChessShelfFilter) ([]*types.ChessShelf, error)
