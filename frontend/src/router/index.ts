@@ -90,6 +90,14 @@ const router = createRouter({
       component: () => import("../views/chess/BookPrint.vue"),
       meta: { requiresInit: true, requiresAuth: true }
     },
+    // Trang in bài viết (Ngân hàng bài viết) — cùng lý do route ĐỘC LẬP như
+    // chessBookPrint ở trên.
+    {
+      path: "/article-print/:id",
+      name: "chessArticlePrint",
+      component: () => import("../views/chess/ArticlePrint.vue"),
+      meta: { requiresInit: true, requiresAuth: true }
+    },
     {
       path: "/platform",
       name: "Platform",

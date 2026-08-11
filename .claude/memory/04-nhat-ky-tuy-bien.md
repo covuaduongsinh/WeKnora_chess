@@ -233,10 +233,20 @@ Sao y cơ chế `chess_chapter_revisions` cho bài viết (`chess_article_revisi
 - **Frontend:** `ChessArticleHistory.vue` (chép nguyên khuôn `ChessChapterHistory.vue`) + nút "Lịch sử" trong header khung xem (khi KHÔNG ở chế độ sửa) + ô "Ghi chú thay đổi (tùy chọn)" trong form sửa, gửi kèm `revision_note` khi lưu.
 - **RAG (Phase 1, xác nhận lại — không có code mới đợt này):** `reindexArticle`/`IndexArticle`/khối `articles` trong `ReindexAll` đã hoàn chỉnh từ Phase 1. Việc "chạy thật" (bật `CHESS_KB_INDEX=true` trên production + gọi `POST /chess/library/reindex` + xác nhận qua `GET /chess/library/index-status`) là thao tác VẬN HÀNH trên server, ngoài phạm vi tác động của agent — Thầy làm theo `docs/chess-rag-enable.md` khi sẵn sàng.
 - **Kiểm chứng:** `gofmt -l`/`go build`/`go vet` sạch (scope mọi package đã sửa). `npm run build` sạch. `npm test` 123/123 pass. `npm run type-check` giữ nguyên **111 lỗi**, lọc riêng xác nhận 0 lỗi rơi vào file đợt này.
-- **Backlog Phase 4 (đã thiết kế trong plan, chưa code):**
-  - [ ] `ArticlePrint.vue` (chép CSS `BookPrint.vue`, không refactor chung) + route `/article-print/:id` + export/import bundle qua UI (API đã có) + `scripts/seed_chess_article_demo.mjs`.
-  - [ ] (Nợ, thấp ưu tiên, từ Phase 2) Toast báo "bí danh X bị bỏ qua vì trùng slug thật của bài khác" — hiện chỉ âm thầm bỏ qua ở backend, an toàn nhưng không thân thiện.
-  - [ ] (Nợ vận hành) Bật `CHESS_KB_INDEX` + reindex + xác nhận `index-status` trên production để RAG bài viết chạy thật.
+### Ngân hàng bài viết — Phase 4: trang in + demo (2026-08-11) — HOÀN TẤT 4 PHA
+`ArticlePrint.vue` route độc lập `/article-print/:id` (ngoài `/platform`, khuôn `chessBookPrint`) + nút "Trang in" trong `ArticleBank.vue` (`openPrintView`, khuôn `openPrintView` của `BookLibrary.vue`).
+
+- **Rút gọn so với `BookPrint.vue`, không phải tách dùng chung:** bài viết là VĂN BẢN ĐƠN (không có khái niệm chương/phần) nên bỏ hẳn dialog "Chọn chương", tùy chọn "phần đầu sách", và `chapterGroups`/`groupByPart` — chỉ còn toggle 1/2 cột + nút in. Toàn bộ cơ chế in (khối `@page`, break rules cho `.chess-board-display`/`.move-list`, `@media print` ép màu đen, khối style KHÔNG scoped sửa `html/body/#app` chống trang trắng thừa) **CHÉP NGUYÊN** từ `BookPrint.vue` — không refactor tách chung, giữ đúng quyết định đã ghi trong plan (đụng vào CSS đã dò tay kỹ ở đợt trước để tiết kiệm dòng là đổi rủi ro hồi quy lấy code đẹp).
+- **`scripts/seed_chess_article_demo.mjs`** (khuôn `seed_chess_book_print_demo.mjs`): tạo 1 bài "Ghim (Pin) là gì?" — có bí danh ("Pin, Đóng đinh"), khối ` ```chess ` minh họa thế cờ ghim tuyệt đối, và wikilink mẫu ra `[[article/xien|...]]` — dùng kiểm tra tay CRUD/resolve bí danh/wikilink/backlinks/in ấn trong một lượt.
+- **Không có thay đổi backend** ở pha này (thuần frontend + script demo).
+- **Kiểm chứng:** `npm run build` sạch. `npm test` 123/123 pass. `npm run type-check` giữ nguyên **111 lỗi**, lọc riêng xác nhận 0 lỗi rơi vào file đợt này.
+
+**Tổng kết toàn bộ tính năng (Phase 1–4, PR #10/#11/#12/#13, đều đã merge vào `main`):** Ngân hàng bài viết là thực thể cờ thứ 7, đầy đủ CRUD + wikilink 2 chiều + chuyên mục 2 tầng + bí danh thật + ảnh chèn bài + lịch sử phiên bản + RAG (code xong, cần bật vận hành) + trang in + script demo. Backlog còn lại (không chặn dùng được, ưu tiên thấp):
+- [ ] (Nợ, thấp ưu tiên, từ Phase 2) Toast báo "bí danh X bị bỏ qua vì trùng slug thật của bài khác" — hiện chỉ âm thầm bỏ qua ở backend, an toàn nhưng không thân thiện.
+- [ ] (Nợ vận hành) Bật `CHESS_KB_INDEX` + reindex + xác nhận `index-status` trên production để RAG bài viết chạy thật — xem `docs/chess-rag-enable.md`.
+- [ ] (Nợ, từ Phase 2) Chuyển `BookLibrary.vue` sang dùng `useChessEditor.ts` (gỡ trùng lặp với toolbar soạn thảo nội bộ của nó) — làm khi có thể chạy app kiểm thử runtime, tránh hồi quy.
+- [ ] Wikilink `[[topic/...]]` cho chuyên mục bài viết (hiện chỉ điều hướng UI, như `shelf`).
+- [ ] Export/Import UI cho bundle bài viết đã có API (`exportArticles`/`importArticles`, nút đã có trong `ArticleBank.vue` từ Phase 1) — chỉ cần kiểm thử tay round-trip thực tế.
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
