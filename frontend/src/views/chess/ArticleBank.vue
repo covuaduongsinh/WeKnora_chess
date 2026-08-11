@@ -72,6 +72,9 @@
             <h3 class="atb-header-title">{{ selected.title || '(không tiêu đề)' }}</h3>
             <div class="atb-header-actions">
               <template v-if="!editing">
+                <t-button size="small" variant="outline" @click="openPrintView">
+                  <template #icon><t-icon name="print" /></template>Trang in
+                </t-button>
                 <t-button size="small" variant="outline" @click="openHistory">
                   <template #icon><t-icon name="history" /></template>Lịch sử
                 </t-button>
@@ -174,6 +177,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { marked } from 'marked';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
@@ -197,6 +201,7 @@ import {
 import { useChessEditor } from '@/views/chess/composables/useChessEditor';
 
 const { t } = useI18n();
+const router = useRouter();
 
 // Deep-link "Mở trong thư viện": chọn sẵn bài viết theo slug (từ [[article/<slug>]]).
 const props = defineProps<{ focusSlug?: string }>();
@@ -342,6 +347,13 @@ async function saveEdit() {
   } catch (e: any) {
     MessagePlugin.error(e?.error || e?.message || 'Lưu thất bại');
   }
+}
+
+// ---- Trang in (mở tab mới rồi Ctrl+P — khuôn openPrintView của BookLibrary.vue) ----
+function openPrintView() {
+  if (!selected.value) return;
+  const routeData = router.resolve({ name: 'chessArticlePrint', params: { id: selected.value.id } });
+  window.open(routeData.href, '_blank');
 }
 
 // ---- Lịch sử phiên bản ----
