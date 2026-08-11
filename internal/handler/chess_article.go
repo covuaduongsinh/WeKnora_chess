@@ -77,6 +77,10 @@ type articleBody struct {
 	Status   string `json:"status"`
 	CoverURL string `json:"cover_url"`
 	Content  string `json:"content"`
+	// RevisionNote là ghi chú thay đổi (tùy chọn) — chỉ dùng khi PUT, lưu kèm
+	// bản phiên bản mới nếu title/content đổi. KHÔNG phải Summary (tóm tắt
+	// ngắn của bài, một trường persisted khác hẳn).
+	RevisionNote string `json:"revision_note"`
 }
 
 func articleFromBody(id string, tenantID uint64, b articleBody) *types.ChessArticle {
@@ -113,7 +117,7 @@ func (h *ChessLibraryHandler) UpdateArticle(c *gin.Context) {
 		chessFail(c, http.StatusBadRequest, err)
 		return
 	}
-	a, err := h.service.UpdateArticle(ctx, articleFromBody(c.Param("id"), tenantID, b))
+	a, err := h.service.UpdateArticle(ctx, articleFromBody(c.Param("id"), tenantID, b), b.RevisionNote)
 	if err != nil {
 		chessFail(c, http.StatusBadRequest, err)
 		return
@@ -236,4 +240,42 @@ func (h *ChessLibraryHandler) GetArticleImage(c *gin.Context) {
 		_, _ = io.Copy(w, rc)
 		return false
 	})
+}
+
+// ---- Lịch sử phiên bản bài viết ----
+
+// ListArticleRevisions GET /chess/articles/:id/revisions
+func (h *ChessLibraryHandler) ListArticleRevisions(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	revs, err := h.service.ListArticleRevisions(ctx, tenantID, c.Param("id"))
+	if err != nil {
+		chessFail(c, http.StatusInternalServerError, err)
+		return
+	}
+	chessOK(c, revs)
+}
+
+// GetArticleRevision GET /chess/articles/:id/revisions/:rev_id
+func (h *ChessLibraryHandler) GetArticleRevision(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	rev, err := h.service.GetArticleRevision(ctx, tenantID, c.Param("rev_id"))
+	if err != nil {
+		chessFail(c, http.StatusNotFound, err)
+		return
+	}
+	chessOK(c, rev)
+}
+
+// RestoreArticleRevision POST /chess/articles/:id/revisions/:rev_id/restore
+func (h *ChessLibraryHandler) RestoreArticleRevision(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID := types.MustTenantIDFromContext(ctx)
+	a, err := h.service.RestoreArticleRevision(ctx, tenantID, c.Param("id"), c.Param("rev_id"))
+	if err != nil {
+		chessFail(c, http.StatusBadRequest, err)
+		return
+	}
+	chessOK(c, a)
 }

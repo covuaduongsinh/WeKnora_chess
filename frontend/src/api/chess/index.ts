@@ -286,7 +286,9 @@ export const getArticle = (id: string) => get(`/api/v1/chess/articles/${id}`);
 export const getArticleBySlug = (slug: string) => get(`/api/v1/chess/articles/by-slug/${encodeURIComponent(slug)}`);
 export const getArticleBacklinks = (slug: string) => get(`/api/v1/chess/articles/by-slug/${encodeURIComponent(slug)}/backlinks`);
 export const createArticle = (data: Partial<ChessArticle>) => post("/api/v1/chess/articles", data);
-export const updateArticle = (id: string, data: Partial<ChessArticle>) => put(`/api/v1/chess/articles/${id}`, data);
+// revision_note (tùy chọn): ghi chú thay đổi, lưu kèm bản phiên bản mới nếu title/content đổi.
+export const updateArticle = (id: string, data: Partial<ChessArticle> & { revision_note?: string }) =>
+  put(`/api/v1/chess/articles/${id}`, data);
 // Đổi slug bài viết (giữ link cũ qua alias).
 export const renameArticleSlug = (id: string, slug: string) => put(`/api/v1/chess/articles/${id}/slug`, { slug });
 export const deleteArticle = (id: string) => del(`/api/v1/chess/articles/${id}`);
@@ -328,3 +330,14 @@ export const deleteArticleTopic = (id: string) => del(`/api/v1/chess/article-top
 // Ghi đè toàn bộ bài viết trong MỘT chuyên mục (nhiều-nhiều) theo đúng thứ tự truyền vào.
 export const setTopicArticles = (topicId: string, articleIds: string[]) =>
   put(`/api/v1/chess/article-topics/${topicId}/articles`, { article_ids: articleIds });
+
+// ---- Lịch sử phiên bản bài viết ----
+export interface ChessArticleRevision {
+  id: string; article_id: string; revision_number: number;
+  title: string; content: string; summary: string; created_by: string; created_at: string;
+}
+export const listArticleRevisions = (articleId: string) => get(`/api/v1/chess/articles/${articleId}/revisions`);
+export const getArticleRevision = (articleId: string, revId: string) =>
+  get(`/api/v1/chess/articles/${articleId}/revisions/${revId}`);
+export const restoreArticleRevision = (articleId: string, revId: string) =>
+  post(`/api/v1/chess/articles/${articleId}/revisions/${revId}/restore`, {});

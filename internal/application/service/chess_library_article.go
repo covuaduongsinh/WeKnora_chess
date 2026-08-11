@@ -83,12 +83,25 @@ func (s *chessLibraryService) CreateArticle(ctx context.Context, article *types.
 	return article, nil
 }
 
-func (s *chessLibraryService) UpdateArticle(ctx context.Context, article *types.ChessArticle) (*types.ChessArticle, error) {
-	if _, err := s.repo.GetArticle(ctx, article.TenantID, article.ID); err != nil {
+// UpdateArticle cập nhật bài viết; nếu Title/Content thực sự đổi thì lưu bản
+// TRƯỚC khi ghi đè vào lịch sử phiên bản (revisionNote là ghi chú thay đổi,
+// tùy chọn — cùng khuôn UpdateChapter, tránh rác lịch sử khi chỉ sửa các
+// trường phân loại như category/level/status/tags).
+func (s *chessLibraryService) UpdateArticle(ctx context.Context, article *types.ChessArticle, revisionNote string) (*types.ChessArticle, error) {
+	old, err := s.repo.GetArticle(ctx, article.TenantID, article.ID)
+	if err != nil {
 		return nil, err
 	}
 	if article.Status == "" {
 		article.Status = types.ChessArticleStatusDraft
+	}
+	if old.Title != article.Title || old.Content != article.Content {
+		next, _ := s.repo.CountArticleRevisions(ctx, old.TenantID, old.ID)
+		_ = s.repo.CreateArticleRevision(ctx, &types.ChessArticleRevision{
+			ID: uuid.New().String(), TenantID: old.TenantID, ArticleID: old.ID,
+			RevisionNumber: int(next) + 1, Title: old.Title, Content: old.Content,
+			Summary: revisionNote, CreatedBy: userIDOrEmpty(ctx),
+		})
 	}
 	if err := s.repo.UpdateArticle(ctx, article); err != nil {
 		return nil, err
@@ -172,6 +185,7 @@ func (s *chessLibraryService) DeleteArticle(ctx context.Context, tenantID uint64
 		return err
 	}
 	_ = s.repo.RemoveArticleFromAllTopics(ctx, tenantID, id)
+	_ = s.repo.DeleteArticleRevisionsByArticle(ctx, tenantID, id)
 	if a != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeArticle, a.Slug)
 		if s.chessRefRepo != nil && a.Slug != "" {
@@ -234,6 +248,36 @@ func (s *chessLibraryService) syncArticleAliases(ctx context.Context, a *types.C
 		candidates = append(candidates, slug)
 	}
 	_ = s.aliasRepo.ReplaceSynonyms(ctx, a.TenantID, types.ChessRefTypeArticle, a.Slug, candidates)
+}
+
+// ---- Lịch sử phiên bản bài viết ----
+
+func (s *chessLibraryService) ListArticleRevisions(ctx context.Context, tenantID uint64, articleID string) ([]*types.ChessArticleRevision, error) {
+	return s.repo.ListArticleRevisions(ctx, tenantID, articleID)
+}
+
+func (s *chessLibraryService) GetArticleRevision(ctx context.Context, tenantID uint64, revisionID string) (*types.ChessArticleRevision, error) {
+	return s.repo.GetArticleRevision(ctx, tenantID, revisionID)
+}
+
+// RestoreArticleRevision ghi nội dung một bản cũ trở lại làm bản hiện tại.
+// Tái dùng UpdateArticle để đi đúng luồng: bản ĐANG CÓ (trước khi khôi phục)
+// cũng được lưu thành một phiên bản mới, đồng bộ ref/bí danh/index như sửa thường.
+func (s *chessLibraryService) RestoreArticleRevision(ctx context.Context, tenantID uint64, articleID, revisionID string) (*types.ChessArticle, error) {
+	rev, err := s.repo.GetArticleRevision(ctx, tenantID, revisionID)
+	if err != nil {
+		return nil, err
+	}
+	if rev.ArticleID != articleID {
+		return nil, fmt.Errorf("bản phiên bản không thuộc bài viết này")
+	}
+	a, err := s.repo.GetArticle(ctx, tenantID, articleID)
+	if err != nil {
+		return nil, err
+	}
+	a.Title = rev.Title
+	a.Content = rev.Content
+	return s.UpdateArticle(ctx, a, fmt.Sprintf("Khôi phục từ bản #%d", rev.RevisionNumber))
 }
 
 // ---- Ảnh chèn trong bài viết ----
