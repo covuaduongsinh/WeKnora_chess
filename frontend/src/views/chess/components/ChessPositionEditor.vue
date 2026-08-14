@@ -188,4 +188,17 @@ onBeforeUnmount(destroyBoard);
   background: var(--td-bg-color-secondarycontainer); word-break: break-all; text-align: center;
 }
 .cpe-actions { display: flex; gap: 8px; justify-content: flex-end; width: 100%; }
+
+/* ── Điện thoại ─────────────────────────────────────────────────────────────
+   Bàn cờ đã co được sẵn (`max-width: 360px` + cm-chessboard `responsive: true`);
+   chỉ quân trong bảng chọn là 36px, dưới ngưỡng chạm 44px.
+
+   `gap: 5px` chứ không 6: 6 quân × 44 + 5 khoảng × 5 = 289px. Hộp thoại ở chế độ
+   điện thoại có padding 14px mỗi bên (khối C trong duongsinh-responsive.css) nên
+   ở cỡ chữ "Lớn" (zoom 1.125 → còn ~320 CSS px) chỗ trống chỉ là 292px. */
+@media screen and (max-width: 767px) {
+  .cpe-palette-row { gap: 5px; }
+  .cpe-piece { width: 44px; height: 44px; font-size: 26px; }
+  .cpe-eraser { min-height: 44px; }
+}
 </style>

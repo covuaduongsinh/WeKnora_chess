@@ -1,5 +1,6 @@
 <template>
-  <div class="bkl">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai cột (danh sách sách ↔ chương) -->
+  <div class="bkl" :class="{ 'is-detail': !!selectedBook }">
     <div class="bkl-left">
       <div class="bkl-toolbar">
         <t-select v-model="filter.shelf_id" :options="shelfSelectOptions" placeholder="Kệ" clearable
@@ -16,7 +17,7 @@
         <t-button variant="outline" size="small" @click="shelfManagerVisible = true">
           <template #icon><t-icon name="layers" /></template>Quản lý kệ
         </t-button>
-        <div style="flex:1"></div>
+        <div class="bkl-spacer"></div>
         <t-button variant="outline" size="small" @click="doExportBooks">
           <template #icon><t-icon name="download" /></template>Export
         </t-button>
@@ -56,6 +57,7 @@
     </div>
 
     <div class="bkl-right">
+      <t-button class="bkl-back" size="small" variant="text" @click="selectedBook = null">‹ Danh sách sách</t-button>
       <template v-if="selectedBook">
         <div class="bkl-header">
           <div>
@@ -918,4 +920,57 @@ loadBooks().then(() => {
 }
 .bkl-picker-label { font-weight: 600; color: var(--td-text-color-primary); flex: 1; }
 .bkl-picker-slug { font-size: 12px; color: var(--td-text-color-placeholder); font-family: monospace; }
+.bkl-spacer { flex: 1; }
+.bkl-back { display: none; }
+
+/* Nội dung chương do markdown sinh: ảnh Thầy tải lên từ máy ảnh có thể rộng vài
+   nghìn px và sẽ phá layout ngang. Đúng ở MỌI kích thước nên để ngoài media query.
+   (Trang in `BookPrint.vue` đã có luật tương đương; khung xem trong app thì chưa.) */
+.bkl-chapter-content, .bkl-description {
+  overflow-wrap: break-word;
+  :deep(img) { max-width: 100%; height: auto; }
+  :deep(pre), :deep(code) { overflow-x: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+  :deep(table) { display: block; overflow-x: auto; max-width: 100%; }
+}
+
+/* ── Điện thoại (xem PuzzleBank.vue để biết lý do `screen and` + breakpoint) ──
+   Ở đây root `.bkl` CHÍNH LÀ hàng flex (không có lớp `-body` trung gian). */
+@media screen and (max-width: 767px) {
+  .bkl { flex-direction: column; gap: 0; padding: 10px 12px; }
+  .bkl-left { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .bkl-right { display: none; }
+  .bkl.is-detail .bkl-left { display: none; }
+  .bkl.is-detail .bkl-right { display: block; flex: 1 1 auto; min-height: 0; }
+  .bkl-back { display: inline-flex; margin-bottom: 8px; }
+
+  /* Hai thanh toolbar chứa 5 filter width-inline (~680px) + 4 nút. Lưới 2 cột
+     hạ từ ~9 hàng xuống ~4. !important vì width là style inline. */
+  .bkl-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .bkl-toolbar > * { width: auto !important; min-width: 0; }
+  .bkl-toolbar > .bkl-spacer { display: none; }
+
+  .bkl-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .bkl-header-actions { width: 100%; }
+  .bkl-header-meta { flex-wrap: wrap; gap: 6px; }
+
+  .bkl-row-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  /* 8 nút icon trên đầu chương → cho xuống 2 hàng thay vì tràn */
+  .bkl-chapter-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .bkl-chapter-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .bkl-chapter-content { font-size: 16px; line-height: 1.7; }
+
+  /* Dialog picker wikilink: 2 cột (danh sách | xem trước) không vừa màn hẹp */
+  .bkl-picker-body { flex-direction: column; }
+  .bkl-picker-preview {
+    flex: 1 1 auto; max-width: none; max-height: 220px;
+    border-left: none; padding-left: 0;
+    border-top: 1px solid var(--td-component-stroke); padding-top: 10px;
+  }
+  .bkl-picker-list { max-height: 240px; }
+  .bkl-picker-bar { flex-wrap: wrap; }
+  .bkl-row2 { flex-direction: column; gap: 6px; }
+  .bkl-editor-toolbar { flex-wrap: wrap; }
+  /* font-size 16px: dưới ngưỡng này iOS tự phóng to trang khi focus ô nhập */
+  .bkl-form :deep(.t-textarea__inner) { font-size: 16px; }
+}
 </style>

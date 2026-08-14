@@ -109,4 +109,13 @@ watch(
 .cm-tabs :deep(.t-tabs__content) { flex: 1; min-height: 0; }
 .cm-tabs :deep(.t-tab-panel) { height: 100%; }
 .cm-pane { height: 100%; min-height: 0; }
+
+/* ── Điện thoại ─────────────────────────────────────────────────────────────
+   `screen and` là BẮT BUỘC (xem PuzzleBank.vue). Thanh 6 tab nhãn tiếng Việt dài
+   sẽ tự cuộn ngang — TDesign đã hỗ trợ sẵn, chỉ cần thu nhỏ tiêu đề + lề. */
+@media screen and (max-width: 767px) {
+  .chess-manage { padding: 8px 0 0; }
+  .cm-title { font-size: 17px; margin: 0 12px 6px; }
+  .cm-tabs :deep(.t-tabs__nav-item) { font-size: 14px; }
+}
 </style>

@@ -1,5 +1,6 @@
 <template>
-  <div class="chess-courses">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai cột (danh sách ↔ bài học) -->
+  <div class="chess-courses" :class="{ 'is-detail': !!selectedCourse }">
     <!-- Cột trái: danh sách khóa học -->
     <div class="cc-left">
       <div class="cc-header">
@@ -37,6 +38,7 @@
 
     <!-- Cột phải: bài học của khóa đang chọn -->
     <div class="cc-right">
+      <t-button class="cc-back" size="small" variant="text" @click="selectedCourse = null">‹ Danh sách khóa học</t-button>
       <template v-if="selectedCourse">
         <div class="cc-header">
           <div>
@@ -669,5 +671,44 @@ loadCourses().then(initFromWikiDraft).then(() => {
   padding: 0 6px; border-radius: 4px; text-decoration: none; font-weight: 600;
   &::before { content: '♟ '; }
   &:hover { text-decoration: underline; }
+}
+
+/* Nội dung bài giảng: chặn ảnh/bảng/chuỗi dài phá layout ngang (đúng ở mọi kích thước) */
+.cc-lesson-content {
+  overflow-wrap: break-word;
+  :deep(img) { max-width: 100%; height: auto; }
+  :deep(pre), :deep(code) { overflow-x: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+  :deep(table) { display: block; overflow-x: auto; max-width: 100%; }
+}
+
+.cc-back { display: none; }
+
+/* ── Điện thoại (xem PuzzleBank.vue để biết lý do `screen and` + breakpoint) ──
+   Ở đây root `.chess-courses` CHÍNH LÀ hàng flex (không có lớp `-body` trung gian). */
+@media screen and (max-width: 767px) {
+  .chess-courses { flex-direction: column; gap: 0; padding: 10px 12px; }
+  .cc-left { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .cc-right { display: none; }
+  .chess-courses.is-detail .cc-left { display: none; }
+  .chess-courses.is-detail .cc-right { display: block; flex: 1 1 auto; min-height: 0; }
+  .cc-back { display: inline-flex; margin-bottom: 8px; }
+
+  .cc-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .cc-header-actions { width: 100%; }
+  .cc-header-actions > * { flex: 1 1 auto; min-width: 0; }
+
+  .cc-course-actions :deep(.t-button),
+  .cc-lesson-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .cc-lesson-content { font-size: 16px; line-height: 1.7; }
+
+  /* Dialog picker wikilink: 2 cột (danh sách | xem trước) không vừa màn hẹp */
+  .cc-picker-body { flex-direction: column; }
+  .cc-picker-preview {
+    flex: 1 1 auto; max-width: none; max-height: 220px;
+    border-left: none; padding-left: 0;
+    border-top: 1px solid var(--td-component-stroke); padding-top: 10px;
+  }
+  .cc-picker-list { max-height: 240px; }
+  .cc-picker-bar { flex-wrap: wrap; }
 }
 </style>

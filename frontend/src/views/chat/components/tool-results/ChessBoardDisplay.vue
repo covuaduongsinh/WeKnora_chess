@@ -475,4 +475,37 @@ defineExpose({ currentFen, currentIndex, currentLabel });
   }
   .move-var--d2 { font-size: 11px; }
 }
+
+/* ── Điện thoại ─────────────────────────────────────────────────────────────
+   `screen and` là BẮT BUỘC ở đây: component này được nhúng trong BookPrint.vue /
+   ArticlePrint.vue, thiếu chữ `screen` thì luật rò vào bản in.
+
+   Bàn cờ tự co sẵn (cm-chessboard chạy `responsive: true` + `.chess-board`
+   `width:100%`) nên không phải đụng tới; chỉ cần nới trần 420px và nâng vùng
+   chạm của thanh điều hướng — mặc định `padding: 2px 8px` chỉ cao ~24px,
+   dưới ngưỡng 44px khuyến nghị cho ngón tay. */
+@media screen and (max-width: 767px) {
+  .chess-board-display { max-width: 100%; }
+
+  .chess-nav-controls { flex-wrap: wrap; gap: 8px; }
+
+  .nav-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 16px;
+  }
+
+  /* Nhãn nước đi xuống hàng riêng để 5 nút 44px vừa một hàng (5×44 + 4×8 = 252px) */
+  .nav-label {
+    order: 9;
+    flex: 0 0 100%;
+    text-align: left;
+  }
+
+  /* CỐ Ý không đụng `.move-list { max-height }`: `BookPrint.vue` đặt
+     `:deep(.move-list){max-height:none}` cho trang in với CÙNG specificity (0,2,0),
+     nên ai thắng phụ thuộc thứ tự chunk — nới khung cuộn ở đây có thể vô tình
+     bóp lại danh sách nước đi khi Thầy xem trang in trên điện thoại. */
+}
 </style>

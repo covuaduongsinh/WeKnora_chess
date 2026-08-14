@@ -1,5 +1,7 @@
 <template>
-  <div class="atb">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai khung (danh sách ↔ bài viết);
+       cột chuyên mục biến thành dải chip cuộn ngang trên đầu, luôn thấy. -->
+  <div class="atb" :class="{ 'is-detail': !!selected }">
     <div class="atb-toolbar">
       <t-select v-model="filter.category" :options="articleCategoryOptions" placeholder="Thể loại" clearable
         style="width:170px" @change="load" />
@@ -8,7 +10,7 @@
       <t-select v-model="filter.status" :options="articleStatusOptions" placeholder="Trạng thái" clearable
         style="width:150px" @change="load" />
       <t-input v-model="filter.q" placeholder="Tìm theo tên/bí danh/tag…" clearable style="width:200px" @change="load" />
-      <div style="flex:1"></div>
+      <div class="atb-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export
       </t-button>
@@ -67,6 +69,10 @@
       </div>
 
       <div class="atb-viewer">
+        <!-- `v-if="!editing"`: khung sửa là INLINE (khác BookLibrary dùng hộp thoại),
+             nên nếu cho bấm "‹ Danh sách" giữa chừng thì nội dung đang gõ mất im lặng.
+             Khi đang sửa đã có sẵn nút Hủy/Lưu trong form. -->
+        <t-button v-if="!editing" class="atb-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
         <template v-if="selected">
           <div class="atb-header">
             <h3 class="atb-header-title">{{ selected.title || '(không tiêu đề)' }}</h3>
@@ -507,4 +513,59 @@ loadTopics();
 .atb-content-label { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; }
 .atb-editor-toolbar { display: flex; gap: 2px; }
 .atb-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
+.atb-spacer { flex: 1; }
+.atb-back { display: none; }
+
+/* Nội dung bài viết do markdown sinh: chặn ảnh/bảng/chuỗi dài phá layout ngang.
+   Đúng ở MỌI kích thước nên cố ý để ngoài media query. */
+.atb-content {
+  overflow-wrap: break-word;
+  :deep(img) { max-width: 100%; height: auto; }
+  :deep(pre), :deep(code) { overflow-x: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+  :deep(table) { display: block; overflow-x: auto; max-width: 100%; }
+}
+
+/* ── Điện thoại (xem PuzzleBank.vue để biết lý do `screen and` + breakpoint) ──
+   Đây là trang 3 cột: 220 + 320 + gap = ~570px trước khi khung đọc có 1px nào. */
+@media screen and (max-width: 767px) {
+  .atb-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .atb-toolbar > * { width: auto !important; min-width: 0; }
+  .atb-toolbar > .atb-spacer { display: none; }
+
+  .atb-body { flex-direction: column; gap: 8px; }
+
+  /* Cột chuyên mục → dải chip cuộn ngang: giữ điều hướng 1 chạm, không cần dialog,
+     không phải nhân đôi state (vẫn dùng `filter.topic_id` sẵn có). */
+  .atb-topics {
+    flex: none; width: auto; overflow-x: auto; overflow-y: visible;
+    display: flex; gap: 6px; padding: 0 0 8px;
+    border-right: none; border-bottom: 1px solid var(--td-component-stroke);
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .atb-topics::-webkit-scrollbar { display: none; }
+  .atb-topic-row {
+    flex: 0 0 auto; white-space: nowrap; margin-bottom: 0; min-height: 36px;
+    border: 1px solid var(--td-component-stroke); border-radius: 999px; padding: 6px 12px;
+  }
+  /* Thụt lề dọc vô nghĩa khi nằm ngang → đánh dấu cấp con bằng ký tự dẫn */
+  .atb-topic-row--child { padding-left: 12px; }
+  .atb-topic-row--child > span:first-child::before { content: '· '; opacity: 0.6; }
+  .atb-topic-count { margin-left: 6px; }
+
+  .atb-list { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .atb-viewer { display: none; }
+  .atb.is-detail .atb-list { display: none; }
+  .atb.is-detail .atb-viewer { display: block; flex: 1 1 auto; min-height: 0; }
+  .atb-back { display: inline-flex; margin-bottom: 8px; }
+
+  .atb-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .atb-header-actions { width: 100%; flex-wrap: wrap; }
+  .atb-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .atb-row { padding: 10px; }
+  .atb-row2 { flex-direction: column; gap: 6px; }
+  .atb-content { font-size: 16px; line-height: 1.7; }
+  .atb-editor-toolbar { flex-wrap: wrap; }
+  /* font-size 16px: dưới ngưỡng này iOS tự phóng to trang khi focus ô nhập */
+  .atb-form :deep(.t-textarea__inner) { font-size: 16px; }
+}
 </style>

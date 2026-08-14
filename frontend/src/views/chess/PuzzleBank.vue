@@ -1,11 +1,12 @@
 <template>
-  <div class="pb">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai khung (danh sách ↔ chi tiết) -->
+  <div class="pb" :class="{ 'is-detail': !!selected }">
     <div class="pb-toolbar">
       <t-select v-model="filter.theme" :options="themeOptions" placeholder="Chủ đề" clearable
         style="width:160px" @change="load" />
       <t-select v-model="filter.difficulty" :options="diffOptions" placeholder="Độ khó" clearable
         style="width:140px" @change="load" />
-      <div style="flex:1"></div>
+      <div class="pb-spacer"></div>
       <t-button variant="outline" size="small" @click="practice">
         <template #icon><t-icon name="play-circle" /></template>Luyện ngẫu nhiên
       </t-button>
@@ -43,6 +44,7 @@
         </div>
       </div>
       <div class="pb-viewer">
+        <t-button class="pb-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
         <template v-if="selected">
           <ChessBacklinks v-if="selected.slug" ref-type="puzzle" :slug="selected.slug" show-empty class="pb-backlinks" />
           <ChessBoardDisplay :key="selected.id + revealKey" :data="viewerData" />
@@ -265,11 +267,38 @@ load();
   &:hover { background: var(--td-bg-color-container-hover); }
   &.active { background: var(--td-bg-color-secondarycontainer); border-color: var(--td-brand-color); } }
 .pb-title { font-weight: 600; color: var(--td-text-color-primary); }
-.pb-meta { display: flex; gap: 6px; margin-top: 4px; }
+/* flex-wrap: các trang cờ khác đều có, riêng đây thiếu → tag tràn khi khung hẹp */
+.pb-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pb-spacer { flex: 1; }
+.pb-back { display: none; }
 .pb-tag { background: var(--td-brand-color-light); color: var(--td-brand-color); padding: 0 6px; border-radius: 4px; font-size: 12px; }
 .pb-tag--diff { background: var(--td-warning-color-light, #fff3e0); color: var(--td-warning-color, #e37318); }
 .pb-actions { display: flex; }
 .pb-solution { margin-top: 10px; }
 .pb-solution-text { color: var(--td-text-color-primary); font-size: 14px; }
 .pb-form { display: flex; flex-direction: column; gap: 6px; label { font-size: 13px; color: var(--td-text-color-secondary); margin-top: 6px; } }
+
+/* ── Điện thoại ─────────────────────────────────────────────────────────────
+   `screen and` là BẮT BUỘC: thiếu chữ đó thì luật rò sang bản in của
+   BookPrint/ArticlePrint. Breakpoint 767px khớp `BP.mobile` trong
+   composables/useBreakpoint.ts (có test khoá). */
+@media screen and (max-width: 767px) {
+  /* Toolbar: các control mang style="width:NNNpx" inline (specificity 1,0,0,0)
+     nên cần !important — nhưng chỉ MỘT luật cho cả cụm, không phải mỗi control. */
+  .pb-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .pb-toolbar > * { width: auto !important; min-width: 0; }
+  .pb-toolbar > .pb-spacer { display: none; }
+
+  /* Danh sách ↔ chi tiết: chỉ hiện một khung mỗi lúc */
+  .pb-body { flex-direction: column; gap: 0; }
+  .pb-list { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .pb-viewer { display: none; }
+  .pb.is-detail .pb-list { display: none; }
+  .pb.is-detail .pb-viewer { display: block; flex: 1 1 auto; min-height: 0; }
+  .pb-back { display: inline-flex; margin-bottom: 8px; }
+
+  /* Vùng chạm: nút icon trong hàng mặc định chỉ ~24px */
+  .pb-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .pb-row { padding: 10px; }
+}
 </style>

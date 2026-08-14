@@ -118,4 +118,17 @@ watch(() => props.visible, (v) => { if (v) load(); });
 .cah-preview-body { line-height: 1.6; color: var(--td-text-color-primary); }
 .cah-preview-actions { margin-top: 16px; }
 .cah-empty { color: var(--td-text-color-placeholder); font-size: 14px; padding: 16px 4px; }
+
+/* ── Điện thoại ─────────────────────────────────────────────────────────────
+   Bỏ `height: 60vh` (đơn vị viewport sai dưới CSS zoom của <html>) và xếp dọc —
+   để chính `.t-dialog__wrap` lo việc cuộn, như mọi hộp thoại khác. */
+@media screen and (max-width: 767px) {
+  .cah { flex-direction: column; height: auto; gap: 8px; }
+  .cah-list {
+    width: auto; flex: none; max-height: 200px;
+    border-right: none; padding-right: 0;
+    border-bottom: 1px solid var(--td-component-stroke); padding-bottom: 8px;
+  }
+  .cah-preview-body { font-size: 16px; line-height: 1.7; }
+}
 </style>

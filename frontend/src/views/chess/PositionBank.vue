@@ -1,5 +1,6 @@
 <template>
-  <div class="pob">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai khung (danh sách ↔ chi tiết) -->
+  <div class="pob" :class="{ 'is-detail': !!selected }">
     <div class="pob-toolbar">
       <t-select v-model="filter.category" :options="positionCategoryOptions" placeholder="Phân loại" clearable
         style="width:170px" @change="load" />
@@ -7,7 +8,7 @@
         style="width:120px" @change="load" />
       <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
       <t-input v-model="filter.q" placeholder="Tìm theo tên/thẻ…" clearable style="width:180px" @change="load" />
-      <div style="flex:1"></div>
+      <div class="pob-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export
       </t-button>
@@ -44,6 +45,7 @@
       </div>
 
       <div class="pob-viewer">
+        <t-button class="pob-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
         <template v-if="selected">
           <ChessBacklinks v-if="selected.slug" ref-type="position" :slug="selected.slug" show-empty class="pob-backlinks" />
           <div v-if="sourceGame" class="pob-source">
@@ -410,4 +412,34 @@ load();
 .pob-fen-label { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; label { margin-top: 0; } }
 .pob-content-label { margin-top: 6px; }
 .pob-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
+.pob-spacer { flex: 1; }
+.pob-back { display: none; }
+
+/* ── Điện thoại (xem PuzzleBank.vue để biết lý do `screen and` + breakpoint) ── */
+@media screen and (max-width: 767px) {
+  .pob-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .pob-toolbar > * { width: auto !important; min-width: 0; }
+  .pob-toolbar > .pob-spacer { display: none; }
+
+  .pob-body { flex-direction: column; gap: 0; }
+  .pob-list { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .pob-viewer { display: none; }
+  .pob.is-detail .pob-list { display: none; }
+  .pob.is-detail .pob-viewer { display: block; flex: 1 1 auto; min-height: 0; }
+  .pob-back { display: inline-flex; margin-bottom: 8px; }
+
+  .pob-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .pob-row { padding: 10px; }
+  .pob-row2 { flex-direction: column; gap: 6px; }
+  .pob-annotation { font-size: 16px; line-height: 1.7; }
+}
+
+/* Nội dung do markdown sinh: chặn ảnh/bảng/chuỗi FEN dài phá layout ngang.
+   Đúng ở MỌI kích thước nên cố ý để ngoài media query. */
+.pob-annotation {
+  :deep(img) { max-width: 100%; height: auto; }
+  :deep(pre), :deep(code) { overflow-x: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+  :deep(table) { display: block; overflow-x: auto; max-width: 100%; }
+  :deep(p), :deep(li) { overflow-wrap: break-word; }
+}
 </style>

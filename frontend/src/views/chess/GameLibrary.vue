@@ -1,12 +1,13 @@
 <template>
-  <div class="gl">
+  <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai khung (danh sách ↔ chi tiết) -->
+  <div class="gl" :class="{ 'is-detail': !!selected }">
     <div class="gl-toolbar">
       <t-input v-model="filter.white" placeholder="Trắng" clearable style="width:140px" @change="load" />
       <t-input v-model="filter.black" placeholder="Đen" clearable style="width:140px" @change="load" />
       <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
       <t-select v-model="filter.result" :options="resultOptions" placeholder="Kết quả" clearable
         style="width:120px" @change="load" />
-      <div style="flex:1"></div>
+      <div class="gl-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export PGN
       </t-button>
@@ -40,6 +41,7 @@
         </div>
       </div>
       <div class="gl-viewer">
+        <t-button class="gl-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
         <template v-if="selected">
           <ChessBacklinks v-if="selected.slug" ref-type="game" :slug="selected.slug" show-empty class="gl-backlinks" />
           <div class="gl-viewer-actions">
@@ -294,4 +296,24 @@ load();
   &:hover { color: var(--td-brand-color); }
 }
 .gl-extracted-ply { color: var(--td-text-color-placeholder); font-size: 11px; }
+.gl-spacer { flex: 1; }
+.gl-back { display: none; }
+
+/* ── Điện thoại (xem PuzzleBank.vue để biết lý do `screen and` + breakpoint) ── */
+@media screen and (max-width: 767px) {
+  .gl-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .gl-toolbar > * { width: auto !important; min-width: 0; }
+  .gl-toolbar > .gl-spacer { display: none; }
+
+  .gl-body { flex-direction: column; gap: 0; }
+  .gl-list { width: auto; flex: 1 1 auto; min-width: 0; min-height: 0; border-right: none; padding-right: 0; }
+  .gl-viewer { display: none; }
+  .gl.is-detail .gl-list { display: none; }
+  .gl.is-detail .gl-viewer { display: block; flex: 1 1 auto; min-height: 0; }
+  .gl-back { display: inline-flex; margin-bottom: 8px; }
+
+  .gl-row-actions :deep(.t-button) { min-height: 40px; min-width: 40px; }
+  .gl-row { padding: 10px; }
+  .gl-meta { flex-wrap: wrap; }
+}
 </style>
