@@ -400,6 +400,7 @@ func (h *ChessLibraryHandler) ReindexKB(c *gin.Context) {
 		"articles_total":  res.ArticlesTotal,
 		"enqueued":        res.Enqueued,
 		"failed":          res.Failed,
+		"purged":          res.Purged,
 		"errors":          res.Errors,
 		// Tương thích ngược với client/runbook cũ:
 		"games_indexed":   res.GamesTotal,

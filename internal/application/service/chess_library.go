@@ -494,6 +494,26 @@ func (s *chessLibraryService) ReindexAll(ctx context.Context, tenantID uint64) (
 			record("chapter", ch.Slug, s.indexer.IndexChapter(ctx, b, ch))
 		}
 	}
+
+	// Dọn sách BẢN THẢO còn sót trong KB. Cần thiết vì Remove() early-return khi
+	// CHESS_KB_INDEX tắt: sách từng published (đã index) rồi bị hạ draft trong lúc
+	// gate tắt sẽ nằm lại kho vĩnh viễn — agent vẫn trích được nội dung chưa duyệt.
+	drafts, err := s.repo.ListBooks(ctx, tenantID, types.ChessBookFilter{Status: types.ChessBookStatusDraft})
+	if err != nil {
+		return res, err
+	}
+	for _, b := range drafts {
+		s.indexer.Remove(ctx, tenantID, types.ChessRefTypeBook, b.Slug)
+		res.Purged++
+		chapters, cerr := s.repo.ListChapters(ctx, tenantID, b.ID)
+		if cerr != nil {
+			continue
+		}
+		for _, ch := range chapters {
+			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeChapter, ch.Slug)
+			res.Purged++
+		}
+	}
 	return res, nil
 }
 

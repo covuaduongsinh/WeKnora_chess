@@ -217,8 +217,15 @@ func (s *chessLibraryService) CreateBook(ctx context.Context, book *types.ChessB
 }
 
 func (s *chessLibraryService) UpdateBook(ctx context.Context, book *types.ChessBook) (*types.ChessBook, error) {
-	if _, err := s.repo.GetBook(ctx, book.TenantID, book.ID); err != nil {
+	current, err := s.repo.GetBook(ctx, book.TenantID, book.ID)
+	if err != nil {
 		return nil, err
+	}
+	// Status rỗng = "không đổi", KHÔNG phải "hạ về bản thảo". Repo ghi cột status
+	// tường minh (không phải partial update), nên ép draft ở đây sẽ âm thầm gỡ cả
+	// sách lẫn mọi chương khỏi KB khi client quên gửi trường này.
+	if book.Status == "" {
+		book.Status = current.Status
 	}
 	if book.Status == "" {
 		book.Status = types.ChessBookStatusDraft
@@ -259,6 +266,28 @@ func (s *chessLibraryService) reindexBookAndChapters(ctx context.Context, book *
 	for _, ch := range chapters {
 		s.indexer.Remove(ctx, book.TenantID, types.ChessRefTypeChapter, ch.Slug)
 	}
+}
+
+// reindexBookTOC nạp lại RIÊNG tài liệu sách (mục lục do buildBookKnowledgeText
+// dựng từ Title/Part/thứ tự chương) sau khi danh sách chương đổi.
+//
+// Cố ý KHÔNG index lại từng chương — đó là việc của reindexBookAndChapters, chỉ
+// dùng khi Status sách đổi. Sách 50 chương mà sửa 1 chương thì không được embed
+// lại cả 50. Best-effort, không chặn CRUD.
+func (s *chessLibraryService) reindexBookTOC(ctx context.Context, tenantID uint64, bookID string) {
+	// Enabled() chặn sớm để khỏi tốn 2 truy vấn khi CHESS_KB_INDEX đang tắt.
+	if s.indexer == nil || !s.indexer.Enabled() {
+		return
+	}
+	book, err := s.repo.GetBook(ctx, tenantID, bookID)
+	if err != nil || book == nil {
+		return
+	}
+	chapters, err := s.repo.ListChapters(ctx, tenantID, bookID)
+	if err != nil {
+		return
+	}
+	_ = s.indexer.IndexBook(ctx, book, chapters) // no-op nếu sách đang draft
 }
 
 // RenameBookSlug đổi slug sách sang newSlug + ghi alias slug-cũ→mới.
@@ -374,6 +403,17 @@ func (s *chessLibraryService) GetChapterBacklinks(ctx context.Context, tenantID 
 }
 
 func (s *chessLibraryService) CreateChapter(ctx context.Context, chapter *types.ChessBookChapter) (*types.ChessBookChapter, error) {
+	created, err := s.createChapter(ctx, chapter)
+	if err != nil {
+		return nil, err
+	}
+	s.reindexBookTOC(ctx, created.TenantID, created.BookID) // mục lục sách phải có chương mới
+	return created, nil
+}
+
+// createChapter là phần lõi của CreateChapter, KHÔNG làm mới mục lục sách — để
+// ImportBooks tạo hàng loạt chương rồi chỉ làm mới mục lục MỘT lần cho cả sách.
+func (s *chessLibraryService) createChapter(ctx context.Context, chapter *types.ChessBookChapter) (*types.ChessBookChapter, error) {
 	if strings.TrimSpace(chapter.Title) == "" {
 		return nil, fmt.Errorf("tên chương không được để trống")
 	}
@@ -427,6 +467,11 @@ func (s *chessLibraryService) UpdateChapter(ctx context.Context, chapter *types.
 	}
 	s.syncChapterChessRefs(ctx, updated)
 	s.reindexChapter(ctx, updated)
+	// Mục lục sách chỉ gồm Title/Part/thứ tự — sửa NỘI DUNG (thao tác thường
+	// xuyên nhất) không đụng tới nó, nên đừng embed lại tài liệu sách vô ích.
+	if old.Title != updated.Title || old.Part != updated.Part || old.SortOrder != updated.SortOrder {
+		s.reindexBookTOC(ctx, updated.TenantID, updated.BookID)
+	}
 	return updated, nil
 }
 
@@ -473,6 +518,8 @@ func (s *chessLibraryService) RenameChapterSlug(ctx context.Context, tenantID ui
 	}
 	s.syncChapterChessRefs(ctx, updated)
 	s.reindexChapter(ctx, updated)
+	// Mục lục hiển thị slug khi chương chưa có tiêu đề → đổi slug có thể đổi mục lục.
+	s.reindexBookTOC(ctx, updated.TenantID, updated.BookID)
 	return updated, nil
 }
 
@@ -494,6 +541,7 @@ func (s *chessLibraryService) DeleteChapter(ctx context.Context, tenantID uint64
 			s.indexer.Remove(ctx, tenantID, types.ChessRefTypeChapter, ch.Slug)
 		}
 	}
+	s.reindexBookTOC(ctx, tenantID, ch.BookID) // mục lục không được còn chương đã xóa
 	return nil
 }
 
@@ -502,7 +550,11 @@ func (s *chessLibraryService) ReorderChapters(ctx context.Context, tenantID uint
 	if _, err := s.repo.GetBook(ctx, tenantID, bookID); err != nil {
 		return fmt.Errorf("sách không tồn tại")
 	}
-	return s.repo.ReorderChapters(ctx, tenantID, bookID, chapterIDs)
+	if err := s.repo.ReorderChapters(ctx, tenantID, bookID, chapterIDs); err != nil {
+		return err
+	}
+	s.reindexBookTOC(ctx, tenantID, bookID) // mục lục phải theo đúng thứ tự mới
+	return nil
 }
 
 // syncChapterChessRefs đồng bộ wiki_chess_refs theo nội dung chương (nguồn
@@ -658,10 +710,15 @@ func (s *chessLibraryService) ImportBooks(ctx context.Context, tenantID uint64, 
 			if strings.TrimSpace(c.Title) == "" {
 				continue
 			}
-			_, _ = s.CreateChapter(ctx, &types.ChessBookChapter{
+			// createChapter (không phải CreateChapter): làm mới mục lục MỘT lần sau
+			// vòng lặp thay vì mỗi chương một lần.
+			_, _ = s.createChapter(ctx, &types.ChessBookChapter{
 				TenantID: tenantID, BookID: book.ID, Part: c.Part, Title: c.Title,
 				Content: c.Content, FEN: c.FEN, Level: c.Level, SortOrder: c.SortOrder,
 			})
+		}
+		if len(it.Chapters) > 0 {
+			s.reindexBookTOC(ctx, tenantID, book.ID) // CreateBook index với chapters=nil → mục lục rỗng
 		}
 		created++
 	}
