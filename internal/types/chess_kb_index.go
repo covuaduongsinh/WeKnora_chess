@@ -40,6 +40,16 @@ type ChessIndexStatus struct {
 	EnabledDocs    int    `json:"enabled_docs"`  // enable_status=enabled (truy hồi được)
 	DisabledDocs   int    `json:"disabled_docs"` // enable_status≠enabled (KHÔNG truy hồi)
 	SampleError    string `json:"sample_error"`  // mẫu error_message của bản ghi failed
+	// ByType: số mapping đã ĐẨY VÀO KB theo từng loại thực thể cờ, vd
+	// {"article":12,"book":3,"chapter":40}. Đếm từ bảng chess_kb_index.
+	//
+	// ⚠️ KHÁC HẲN Completed/Pending/Failed ở trên: ByType nói "đã đẩy đi bao
+	// nhiêu", còn Completed nói "đã EMBED XONG bao nhiêu" (gộp mọi loại, vì
+	// bản ghi Knowledge không mang chess_type). ByType.article=12 mà
+	// Pending=12 nghĩa là 12 bài đã đẩy nhưng CHƯA embed xong → agent chưa
+	// tìm thấy. Dùng map (không phải 7 field rời) để thêm loại thứ 8 về sau
+	// không phải sửa struct lẫn frontend.
+	ByType map[string]int64 `json:"by_type"`
 }
 
 // ChessReindexResult báo cáo TRUNG THỰC kết quả reindex (POST /chess/library/reindex).

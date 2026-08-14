@@ -386,12 +386,18 @@ func (h *ChessLibraryHandler) ReindexKB(c *gin.Context) {
 		chessFail(c, http.StatusBadRequest, err)
 		return
 	}
+	// ⚠️ gin.H dựng THỦ CÔNG (không serialize thẳng res) để giữ 2 khóa tương
+	// thích ngược bên dưới — hệ quả: mỗi khi thêm field vào ChessReindexResult
+	// PHẢI thêm một dòng ở đây, nếu không field đó im lặng biến mất khỏi API.
+	// (Đã dính đúng lỗi này: articles_total tính đúng ở service nhưng rơi mất
+	// suốt từ đợt Ngân hàng bài viết Phase 1 tới khi phát hiện.)
 	chessOK(c, gin.H{
 		"games_total":     res.GamesTotal,
 		"puzzles_total":   res.PuzzlesTotal,
 		"positions_total": res.PositionsTotal,
 		"books_total":     res.BooksTotal,
 		"chapters_total":  res.ChaptersTotal,
+		"articles_total":  res.ArticlesTotal,
 		"enqueued":        res.Enqueued,
 		"failed":          res.Failed,
 		"errors":          res.Errors,

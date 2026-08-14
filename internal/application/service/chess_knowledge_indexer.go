@@ -240,6 +240,27 @@ func (ix *ChessKnowledgeIndexer) IndexStatus(ctx context.Context) (*types.ChessI
 			st.DisabledDocs++
 		}
 	}
+
+	// Tách theo loại thực thể từ bảng mapping chess_kb_index — con số duy nhất
+	// cho biết "bài viết/sách/ván đã vào kho chưa", vì bản ghi Knowledge KHÔNG
+	// mang chess_type (upsert chỉ ghi Title/Content/Status/Channel) nên không
+	// suy ra được từ danh sách document ở trên.
+	//
+	// BEST-EFFORT: lỗi ở đây chỉ làm mất phần tách loại, KHÔNG được làm hỏng cả
+	// báo cáo chẩn đoán — endpoint này tồn tại chính để dùng LÚC hệ thống đang trục trặc.
+	st.ByType = map[string]int64{}
+	if ix.idxRepo != nil {
+		if tenantID, ok := types.TenantIDFromContext(ctx); ok {
+			counts, err := ix.idxRepo.CountByType(ctx, tenantID)
+			if err != nil {
+				logger.Warnf(ctx, "Không đếm được index theo loại: %v", err)
+			} else if counts != nil {
+				// counts != nil: giữ map rỗng đã khởi tạo thay vì gán nil —
+				// JSON phải ra {} chứ không phải null.
+				st.ByType = counts
+			}
+		}
+	}
 	return st, nil
 }
 

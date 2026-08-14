@@ -90,3 +90,43 @@ func TestBuildLessonKnowledgeText_ExpandsWikilinks(t *testing.T) {
 		t.Errorf("nội dung embed mất nhãn wikilink:\n%s", content)
 	}
 }
+
+func TestBuildArticleKnowledgeText(t *testing.T) {
+	a := &types.ChessArticle{
+		Title:    "Ghim (Pin) là gì?",
+		Slug:     "ghim-pin-la-gi",
+		Aliases:  "Pin, Đóng đinh",
+		Summary:  "Chiến thuật khiến một quân không thể di chuyển.",
+		Category: "thuat-ngu",
+		Level:    "ma",
+		Tags:     "chien-thuat, co-ban",
+		Content:  "Xem thêm [[position/ghim-tuyet-doi|thế cờ ghim tuyệt đối]].",
+	}
+	title, content := buildArticleKnowledgeText(a)
+	if title != "Bài viết: Ghim (Pin) là gì?" {
+		t.Errorf("title = %q", title)
+	}
+	// Bí danh PHẢI vào văn bản index — đây là thứ giúp RAG bắt trúng khi học
+	// viên hỏi bằng từ tiếng Anh ("pin") thay vì tiêu đề tiếng Việt.
+	if !strings.Contains(content, "Pin, Đóng đinh") {
+		t.Errorf("content thiếu bí danh:\n%s", content)
+	}
+	if !strings.Contains(content, "Chiến thuật khiến một quân") {
+		t.Errorf("content thiếu tóm tắt:\n%s", content)
+	}
+	// Wikilink phải được expand thành nhãn, không để lọt cú pháp thô vào embedding.
+	if strings.Contains(content, "[[") {
+		t.Errorf("nội dung vẫn còn cú pháp wikilink thô:\n%s", content)
+	}
+	if !strings.Contains(content, "thế cờ ghim tuyệt đối") {
+		t.Errorf("nội dung mất nhãn wikilink:\n%s", content)
+	}
+}
+
+func TestBuildArticleKnowledgeText_FallsBackToSlugWhenNoTitle(t *testing.T) {
+	a := &types.ChessArticle{Slug: "khai-niem-x", Content: "nội dung"}
+	title, _ := buildArticleKnowledgeText(a)
+	if title != "Bài viết: khai-niem-x" {
+		t.Errorf("title phải rơi về slug khi thiếu tiêu đề, nhận %q", title)
+	}
+}

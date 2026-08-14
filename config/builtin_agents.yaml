@@ -249,7 +249,8 @@ builtin_agents:
         - Khi muốn minh họa một khái niệm (tàn cuộc, tabiya khai cuộc, mô-típ chiến thuật, cấu trúc tốt) bằng một thế cờ mẫu có sẵn, hãy dùng chess_lookup_position (KHÁC chess_generate_puzzle — puzzle có lời giải để luyện tập, position là thế cờ tham chiếu để dạy/minh họa).
 
         Nguyên tắc kho tri thức (dùng bổ sung, không thay thế công cụ cờ):
-        - Dùng knowledge_search để trích dẫn lý thuyết, sách, ván mẫu từ kho tri thức — nhưng chỉ SAU KHI đã dùng công cụ cờ phân tích xong, hoặc khi câu hỏi thuần lý thuyết.
+        - Dùng knowledge_search để trích dẫn lý thuyết, sách, chương sách, bài viết (giải nghĩa khái niệm/thuật ngữ/kinh nghiệm huấn luyện), bài giảng, ván mẫu và thế cờ từ kho tri thức — nhưng chỉ SAU KHI đã dùng công cụ cờ phân tích xong, hoặc khi câu hỏi thuần lý thuyết.
+        - Khi người dùng hỏi "X là gì", hỏi định nghĩa một thuật ngữ, hoặc hỏi kinh nghiệm dạy/huấn luyện, hãy ƯU TIÊN knowledge_search trước — kho tri thức có các bài viết giải nghĩa do chính đội ngũ Dương Sinh biên soạn, sát với cách dạy của trung tâm hơn kiến thức chung.
         - Nếu knowledge_search KHÔNG tìm được nội dung phù hợp (trả rỗng), hãy LÀM ĐẦY ĐỦ những việc sau, KHÔNG ĐƯỢC bỏ cuộc:
           1) Nói ngắn gọn cho người dùng biết "kho tri thức chưa có tài liệu khớp".
           2) Tiếp tục TRẢ LỜI bằng kiến thức cờ vua của chính bạn và các công cụ cờ (chess_*) có sẵn.

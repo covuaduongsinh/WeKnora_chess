@@ -57,3 +57,26 @@ func (r *chessKBIndexRepository) Delete(ctx context.Context, tenantID uint64, ch
 		Where("tenant_id = ? AND chess_type = ? AND chess_slug = ?", tenantID, chessType, chessSlug).
 		Delete(&types.ChessKBIndex{}).Error
 }
+
+// CountByType đếm mapping đã index theo từng loại thực thể cờ. Trả map rỗng
+// (không nil) khi tenant chưa index gì — caller lặp thẳng không cần kiểm nil.
+func (r *chessKBIndexRepository) CountByType(ctx context.Context, tenantID uint64) (map[string]int64, error) {
+	var rows []struct {
+		ChessType string
+		N         int64
+	}
+	err := r.db.WithContext(ctx).
+		Model(&types.ChessKBIndex{}).
+		Select("chess_type, count(*) AS n").
+		Where("tenant_id = ?", tenantID).
+		Group("chess_type").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		out[row.ChessType] = row.N
+	}
+	return out, nil
+}
