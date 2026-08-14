@@ -68,6 +68,9 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 | `frontend/src/components/menu.vue` | Mục menu cờ | 2× |
 | `frontend/src/stores/menu.ts` | State menu | 1× |
 | `frontend/src/utils/agent-tool-icons.ts` | Icon cho tool cờ | 1× |
+| `frontend/src/main.ts` | **+1 dòng** import `assets/theme/duongsinh-responsive.css`, phải đặt CUỐI khối CSS (cùng khuôn `duongsinh-brand.css`) | — |
+| `frontend/src/views/platform/index.vue` | **+4 dòng** (`import MobileNavBar` + `<MobileNavBar />` đặt TRƯỚC `<Menu>`) — MỚI vào inventory từ đợt giao diện điện thoại | — |
+| `frontend/src/views/chat/index.vue` | **~8 dòng**: `.chat` bỏ `max-width: calc(100vw - 260px)` + `min-width: 400px` + khối `&.is-sidebar-collapsed` → `max-width: 100%; min-width: 0`. MỚI vào inventory | — |
 
 ### C4 — i18n & prompt templates (Việt hóa + bỏ tiếng Trung)
 - **Bỏ** `frontend/src/i18n/locales/zh-CN.ts` (D) · **Thêm** `locales/vi-VN.ts` (A).
@@ -247,6 +250,38 @@ Sao y cơ chế `chess_chapter_revisions` cho bài viết (`chess_article_revisi
 - [ ] (Nợ, từ Phase 2) Chuyển `BookLibrary.vue` sang dùng `useChessEditor.ts` (gỡ trùng lặp với toolbar soạn thảo nội bộ của nó) — làm khi có thể chạy app kiểm thử runtime, tránh hồi quy.
 - [ ] Wikilink `[[topic/...]]` cho chuyên mục bài viết (hiện chỉ điều hướng UI, như `shelf`).
 - [ ] Export/Import UI cho bundle bài viết đã có API (`exportArticles`/`importArticles`, nút đã có trong `ArticleBank.vue` từ Phase 1) — chỉ cần kiểm thử tay round-trip thực tế.
+
+### Giao diện điện thoại 360–430px (2026-08-14)
+Thầy báo mở phần mềm trên trình duyệt điện thoại thì khó xem/khó dùng. Rà ra: frontend **chưa từng được thiết kế cho mobile** — 3 chốt chặn cứng ở tầng khung khiến mọi thứ bên trong không co được, và cả 6 trang cờ dùng khuôn 2–3 cột `flex: 0 0 Npx`. **Ưu tiên Thầy chọn: ĐỌC nội dung đã soạn** (tra cứu khi ở CLB/lớp), người dùng là HLV/trợ giảng nội bộ.
+
+**Ba quyết định kiến trúc (kiểm chứng bằng code, không suy đoán):**
+1. **`.main` KHÔNG scoped** (`views/platform/index.vue` dùng `<style lang="less">` trần) → chốt chặn `min-width: 600px` gỡ được từ file CSS toàn cục, **0 dòng sửa** file đó.
+2. **`menu.vue` (2069 dòng) + `stores/ui.ts` giữ 0 dòng sửa.** Sidebar → ngăn kéo làm HOÀN TOÀN bằng CSS ngoài nhắm `.main > .aside_box`. `menu.vue` dùng `v-if="!uiStore.sidebarCollapsed"` ở 7 chỗ để ẩn/hiện NỘI DUNG (CSS không cứu được), nên `composables/useMobileNav.ts` **"che" (shadow)** state: vào mobile gán TRỰC TIẾP `ui.sidebarCollapsed = false` (KHÔNG gọi `expandSidebar()` — action đó ghi localStorage, sẽ xoá ưu tiên desktop), ra desktop đọc lại localStorage.
+3. **Width của `t-dialog`/`t-drawer` là style INLINE** → bắt buộc `!important`, và cũng vì thế MỘT luật toàn cục phủ hết **47 chỗ** dialog/drawer, kể cả drawer tính width bằng JS (`doc-content.vue` sàn 480/560px, `SettingDrawer.vue`) → 3 file upstream đó giữ 0 dòng.
+
+⚠️ **CẢNH BÁO KHI MERGE UPSTREAM:** nếu upstream đổi tên class `.main`/`.aside_box`, hoặc đổi `.main` thành `<style scoped>`, thì **ngăn kéo mobile chết CÂM** (không lỗi, chỉ là sidebar 260px quay lại chiếm màn hình). Test `frontend/src/assets/theme/responsive.style.test.mjs` khoá đúng 2 class đó + khoá `menu.vue` không có `@media` — đó là lưới an toàn duy nhất.
+
+- **File mới (fork-own, rủi ro merge 0):** `frontend/src/assets/theme/duongsinh-responsive.css` (khối A shell/ngăn kéo · B vô hiệu hack bù sidebar của `creatChat.vue`+`KnowledgeBase.vue` · C dialog · D drawer · E popup), `composables/useBreakpoint.ts` (`BP.mobile = 767`), `composables/useMobileNav.ts`, `components/MobileNavBar.vue` (thanh cố định 48px nền navy + ☰ + tiêu đề theo `route.name` + backdrop; đóng khi backdrop/✕/Esc/đổi route), `assets/theme/responsive.style.test.mjs`.
+- **BA BẤT BIẾN của CSS mobile (có test khoá, đừng phá):**
+  1. **Mọi `@media` phải có tiền tố `screen and`** — thiếu chữ `screen` là luật rò sang `@media print` của `BookPrint.vue`/`ArticlePrint.vue`, phá `.bkp-page { width: 180mm }` (lệch nửa pixel là Chrome đẻ trang trắng). Đã xác minh trong dist: 16/16 media query đều có `screen and`.
+  2. **CẤM đơn vị viewport** (`vw`/`vh`/`dvh`…) trong CSS mới — `<html>` mang CSS `zoom` do `useFont.ts` ghi vào; dùng `100%` + `min-width: 0`. Cùng lý do `menu.vue` cố ý dùng `height: 100%` thay `100vh`. Riêng breakpoint thì dùng `matchMedia` an toàn (media query đánh giá ở tầng viewport, KHÔNG bị zoom nhân) — khác với ĐO/GHI toạ độ px, chỗ đó vẫn phải dùng `cssViewportSize()` của `utils/zoom.ts`.
+  3. Breakpoint **767px** (không phải 600): khung tối thiểu cũ = sidebar 260 + chat 400 = 660px, đặt 600 thì dải 601–767 vẫn vỡ.
+- **Trang cờ (file fork, 0 rủi ro merge):** khuôn **master–detail** — root nhận `:class="{ 'is-detail': !!selected }"` (state `selected` ĐÃ CÓ SẴN, không thêm state mới), mobile ẩn một trong hai khung + nút "‹ Danh sách". `ArticleBank.vue` 3 cột → cột chuyên mục 220px thành **dải chip cuộn ngang** (giữ điều hướng 1 chạm, vẫn dùng `filter.topic_id` sẵn có). Toolbar: **1 luật `display:grid` + `> * { width:auto !important }` cho cả cụm** thay vì sửa ~19 chỗ `style="width:NNNpx"` inline. Đổi `<div style="flex:1">` đệm → `class="xx-spacer"` để ẩn được trong grid.
+- **Đọc thoải mái (lỗ hổng phát hiện khi làm):** khung xem trong app CHƯA có `img { max-width: 100% }`/`overflow-wrap`/`table` cuộn — trang in `BookPrint.vue` thì đã có. Ảnh Thầy tải lên từ máy ảnh (vài nghìn px) phá layout ngang. Đã thêm cho `.atb-content`/`.bkl-chapter-content`/`.cc-lesson-content`/`.pob-annotation`, **ngoài media query** vì đúng ở mọi kích thước.
+- **Vùng chạm:** `.nav-btn` của `ChessBoardDisplay.vue` từ ~24px → 44px (nhãn nước đi xuống hàng riêng bằng `order:9; flex:0 0 100%` để 5 nút vừa 1 hàng: 5×44 + 4×8 = 252px); `.cpe-piece` của `ChessPositionEditor.vue` 36→44px với **`gap: 5px`** (6×44 + 5×5 = 289px, vừa cả ở cỡ chữ "Lớn" zoom 1.125 → chỉ còn ~292px khả dụng); nút icon trong hàng danh sách → 40px.
+- **Hai va chạm đã phát hiện và né khi làm (đáng nhớ):**
+  - **KHÔNG đụng `.move-list { max-height }`** trong nhánh mobile của `ChessBoardDisplay.vue`: `BookPrint.vue` đặt `:deep(.move-list){max-height:none}` với **CÙNG specificity (0,2,0)** → ai thắng phụ thuộc thứ tự chunk; nới khung cuộn ở đây có thể vô tình bóp lại danh sách nước đi khi xem trang in trên điện thoại.
+  - **`ArticleBank.vue`: nút "‹ Danh sách" phải `v-if="!editing"`** — khung sửa của bài viết là INLINE (khác `BookLibrary.vue` dùng hộp thoại), bấm lùi giữa chừng sẽ **mất nội dung đang gõ mà không cảnh báo**.
+- **Sửa kèm (đúng ở mọi kích thước):** `PuzzleBank.vue` `.pb-meta` thiếu `flex-wrap: wrap` (các trang cờ khác đều có); `ChessChapterHistory.vue`/`ChessArticleHistory.vue` bỏ `height: 60vh` ở mobile (đơn vị viewport sai dưới zoom) và xếp dọc, để `.t-dialog__wrap` lo cuộn.
+- **Cố ý NGOÀI phạm vi:** không thêm `viewport-fit=cover` vào `index.html` (không có nó iOS tự giữ safe area — an toàn, 0 công; vẫn đặt `env(safe-area-inset-*)` phòng thủ trong CSS của ta, giá trị 0 nên vô hại); trang in giữ nguyên `180mm` + `overflow-x: auto` (cuộn ngang là hành vi ĐÚNG cho mô phỏng A4); 4 bảng `t-table` khu quản trị để cuộn ngang trong drawer; KHÔNG nạp lớp mobile vào `embed-main.ts` (widget nhúng đã fluid sẵn qua `.chat.is-embedded`); KHÔNG xoá 78 dòng media query chết ở `creatChat.vue`/`KnowledgeBase.vue` (khối B đã vô hiệu về chức năng, xoá chỉ thêm rủi ro merge).
+- **Kiểm chứng:** `npm test` (`node --test`) **130/130 pass** (123 cũ + 7 mới). `npm run build` (vite) sạch. `vue-tsc --build --force` giữ nguyên **111 lỗi** nợ upstream — lọc riêng: lỗi duy nhất chạm file đợt này là `ChessPositionEditor.vue(56,29) POINTER_EVENTS`, **có sẵn từ commit position bank** (diff của đợt này vào file đó thuần CSS, không thể sinh lỗi import). Xác minh thêm trên **dist đã build**: luật `.main>.aside_box`, `html.ds-nav-open`, `.t-dialog__ctx .t-dialog{width:100%!important}` đều có mặt; 10 media query mobile trong chunk cờ mang đúng `[data-v-*]`.
+- **CHƯA kiểm chứng được ở đây (Thầy phải tự xem):** máy này **không có Playwright/Puppeteer**, không chạy được trình duyệt. Toàn bộ kiểm chứng là TĨNH (test đọc source + soi dist). Cần Thầy mở thật và soi bằng DevTools device emulation: 360×740 · 375×667 · 412×915 · 430×932 · **360px ở cỡ chữ "Lớn"** (zoom 1.125 → chỉ 320 CSS px hiệu dụng, ca khó nhất) · 767 và 768 (biên) · **1440 (hồi quy desktop)**. Kiểm nhanh trong console mỗi route: `document.documentElement.scrollWidth <= document.documentElement.clientWidth`. Hồi quy bắt buộc: desktop bật thu gọn 60px → kéo hẹp xuống 360 → kéo lại 1440 ⇒ sidebar phải về 60px và `localStorage.sidebar_collapsed` không đổi.
+
+**Backlog mới từ đợt này:**
+- [ ] `ChessWikiLinkSuggest.vue:180-189` định vị popup sai dưới zoom (dùng `window.innerWidth` trần thay vì `cssViewportSize()` của `utils/zoom.ts`; `Input-field.vue:1271,1351` đã làm đúng) — lỗi CÓ SẴN, chỉ ảnh hưởng soạn thảo nên không thuộc ưu tiên "đọc".
+- [ ] Tầng `compact` 768–1023px (tablet dọc) — hiện chỉ có 1 breakpoint.
+- [ ] Vuốt cạnh trái để mở ngăn kéo (hiện chỉ bấm ☰).
+- [ ] `t-table` khu quản trị chuyển sang thẻ (card) ở mobile — nếu sau này Thầy quản trị bằng điện thoại.
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).

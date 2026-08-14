@@ -866,12 +866,14 @@ onBeforeRouteUpdate((to, from, next) => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    max-width: calc(100vw - 260px);
-    min-width: 400px;
-
-    &.is-sidebar-collapsed {
-        max-width: calc(100vw - 60px);
-    }
+    // 100% của containing block (.platform-route-outlet — vốn flex:1; min-width:0)
+    // đã CHÍNH LÀ "phần còn lại sau sidebar", nên tự đúng ở cả 3 chế độ sidebar
+    // (260px / thu gọn 60px / ngăn kéo phủ trên điện thoại).
+    // Công thức cũ `calc(100vw - 260px)` sai hai đường: (1) <html> mang CSS zoom
+    // cho cỡ chữ nên 100vw bị nhân lên và tràn ngang ngay trên desktop ở cỡ chữ
+    // "Lớn"; (2) hằng 260/60px là bản sao thủ công bề rộng sidebar.
+    max-width: 100%;
+    min-width: 0;
 
     &.is-embedded {
         max-width: 100%;
