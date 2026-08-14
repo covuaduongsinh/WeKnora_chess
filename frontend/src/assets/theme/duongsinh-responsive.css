@@ -1,0 +1,217 @@
+/*
+ * duongsinh-responsive.css — lớp phủ giao diện điện thoại (Cờ vua Dương Sinh).
+ *
+ * Nạp CUỐI CÙNG trong khối CSS của `main.ts` để thắng hoà specificity theo thứ
+ * tự nguồn. KHÔNG nạp vào `embed-main.ts`: widget nhúng đã fluid sẵn qua nhánh
+ * `.chat.is-embedded` và không có sidebar.
+ *
+ * BA LUẬT BẤT BIẾN CỦA FILE NÀY (có test khoá: `responsive.style.test.mjs`)
+ * ---------------------------------------------------------------------------
+ * 1. MỌI `@media` phải bắt đầu bằng `screen and`. Thiếu chữ `screen` là luật rò
+ *    sang `@media print` của `views/chess/BookPrint.vue` / `ArticlePrint.vue`,
+ *    phá `.bkp-page { width: 180mm }` — lệch nửa pixel là Chrome đẻ trang trắng
+ *    (xem comment BookPrint.vue quanh khối @page).
+ * 2. CẤM đơn vị viewport (vw/vh/dvh/svh/lvh). `<html>` mang CSS `zoom` do
+ *    `composables/useFont.ts` ghi vào để chỉnh cỡ chữ; mọi length viewport bên
+ *    trong vùng zoom bị nhân lên → sai. Dùng `100%` + `min-width: 0`.
+ *    (`menu.vue` đã cố ý dùng `height: 100%` thay `100vh` vì đúng lý do này.)
+ * 3. Breakpoint 767px phải khớp hằng `BP.mobile` trong
+ *    `composables/useBreakpoint.ts`.
+ *
+ * PHẠM VI: file này chỉ chứa luật đè cho **file dùng chung của upstream** và cho
+ * **lớp component TDesign**. Các trang cờ (`views/chess/**`) là file riêng của
+ * fork nên viết media query scoped ngay trong SFC, KHÔNG đưa vào đây.
+ */
+
+/* ==========================================================================
+   KHỐI A — Khung ứng dụng (shell)
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  /*
+   * Chốt chặn #1: `views/platform/index.vue` đặt `.main { min-width: 600px }`.
+   * Style đó KHÔNG scoped nên đè được từ đây — giữ file upstream ở 0 dòng sửa.
+   * Không gỡ dòng này thì mọi media query khác đều vô nghĩa.
+   */
+  .main {
+    min-width: 0 !important;
+  }
+
+  /* Khoá cuộn nền khi ngăn kéo đang mở (class do `composables/useMobileNav.ts` bật) */
+  html.ds-nav-open,
+  html.ds-nav-open body {
+    overflow: hidden;
+  }
+
+  /*
+   * Chốt chặn #2: sidebar `components/menu.vue` rộng cứng 260px và là flex item
+   * TRONG dòng chảy → chiếm 72% màn hình 360px. Đưa nó ra khỏi flow thành ngăn
+   * kéo trượt. Làm ở đây thay vì sửa menu.vue (2069 dòng, file dùng chung) để
+   * giữ 0 dòng sửa upstream; `.aside_box` có style scoped nên cần !important.
+   *
+   * `height: 100%` chứ KHÔNG `100vh` — <html> mang CSS zoom, xem đầu file.
+   */
+  .main > .aside_box {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100% !important;
+    width: 86% !important;
+    max-width: 320px !important;
+    min-width: 0 !important;
+    z-index: 1201 !important;
+    transform: translateX(-101%);
+    /* `visibility` đi kèm `transform` để sidebar đóng không nhận được focus bàn
+       phím — chỉ dịch ra ngoài màn hình thì phần tử vẫn focus được bằng Tab. */
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.28);
+  }
+
+  html.ds-nav-open .main > .aside_box {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.22s ease, visibility 0s;
+  }
+
+  /* Nút thu gọn 60px và tay kéo (chỉ nghe @mousedown) đều vô nghĩa khi chạm tay */
+  .main > .aside_box .sidebar-toggle,
+  .main > .aside_box .sidebar-toggle-item,
+  .main > .aside_box .sidebar-drag-handle {
+    display: none !important;
+  }
+
+  /* Chừa chỗ cho thanh điều hướng cố định `components/MobileNavBar.vue` */
+  .platform-route-outlet {
+    padding-top: calc(48px + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* ==========================================================================
+   KHỐI B — Vô hiệu hack "bù bề rộng sidebar" của upstream
+
+   `views/creatChat/creatChat.vue` và bản sao ở `views/knowledge/KnowledgeBase.vue`
+   có sẵn hai khối `@media (max-width: 750px/600px)` dịch ô nhập sang trái 250px
+   và ép `width: 340px !important`. Ở màn 360px điều đó đẩy ô nhập RA NGOÀI màn
+   hình. Đè từ đây để giữ 2 file upstream ở 0 dòng sửa.
+
+   Trang `/platform/chat/:id` KHÔNG cần khối này — nó đã tự vô hiệu hack bằng
+   luật `.chat:not(.is-embedded) :deep(.answers-input)` sẵn có.
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  .answers-input {
+    transform: none !important;
+  }
+
+  /*
+   * Specificity (0,3,0) để thắng `:deep(.t-textarea__inner)` của upstream — luật
+   * đó biên dịch thành `[data-v-xxx] .t-textarea__inner` = (0,2,0) và đang ép
+   * `width: 340px !important`.
+   */
+  .answers-input .rich-input-container .t-textarea__inner {
+    width: 100% !important;
+  }
+
+  /*
+   * `.chat` để `padding: 20px 0 20px 20px` (chừa lề trái cho sidebar, dính thanh
+   * cuộn bên phải) — trên điện thoại thành lệch hẳn sang phải. Đè bằng !important
+   * vì luật gốc là scoped (`.chat[data-v-xxx]`, specificity cao hơn).
+   */
+  .chat:not(.is-embedded) {
+    padding: 12px 10px !important;
+  }
+}
+
+/* ==========================================================================
+   KHỐI C — Hộp thoại (t-dialog)
+
+   33 chỗ `<t-dialog width="NNNpx">` trong repo đều biến thành style INLINE trên
+   phần tử `.t-dialog`, nên bắt buộc `!important` — và cũng vì thế MỘT luật ở đây
+   phủ hết cả 33 chỗ, không phải sửa từng file.
+
+   KHÔNG đặt `max-height` cho `.t-dialog__body`: `.t-dialog__wrap` vốn đã
+   `position: fixed; height: 100%; overflow: auto` nên hộp thoại dài tự cuộn.
+   Đặt `max-height: calc(100dvh - …)` sẽ tái tạo đúng cạm bẫy đơn vị viewport.
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  .t-dialog__ctx .t-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Padding mặc định 32px mỗi bên → phí 64px trên màn 360px */
+  .t-dialog__ctx .t-dialog--default {
+    padding: 16px 14px !important;
+  }
+
+  .t-dialog__ctx .t-dialog__position {
+    padding: 8px 8px 24px !important;
+  }
+
+  /* `.t-dialog--top` mặc định có `padding-top: 20vh` — đơn vị vh SAI dưới zoom */
+  .t-dialog__ctx .t-dialog__position.t-dialog--top {
+    padding-top: 8px !important;
+    align-items: flex-start !important;
+  }
+
+  /* Nút xác nhận/huỷ chiếm trọn bề ngang, cao đủ ngưỡng chạm 44px */
+  .t-dialog__ctx .t-dialog__footer {
+    display: flex;
+    gap: 8px;
+  }
+
+  .t-dialog__ctx .t-dialog__footer .t-button {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+
+  .t-dialog__ctx .t-dialog__footer .t-button + .t-button {
+    margin-left: 0 !important;
+  }
+
+  .t-dialog__ctx .t-dialog__close {
+    width: 40px !important;
+    height: 40px !important;
+    top: 8px !important;
+    right: 8px !important;
+  }
+}
+
+/* ==========================================================================
+   KHỐI D — Ngăn kéo (t-drawer)
+
+   Phủ cả các drawer tính bề rộng bằng JS (`components/doc-content.vue`,
+   `components/settings/SettingDrawer.vue`) — chúng có sàn cứng 480–560px nhưng
+   ghi ra style inline nên `!important` ở đây thắng, giữ 2 file đó ở 0 dòng sửa.
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  .t-drawer .t-drawer__content-wrapper--left,
+  .t-drawer .t-drawer__content-wrapper--right {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .t-drawer .t-drawer__body,
+  .t-drawer .t-drawer__header {
+    padding: 12px !important;
+  }
+
+  /* Bảng quản trị (500–870px) cuộn ngang TRONG thân drawer thay vì phá trang */
+  .t-drawer .t-drawer__body {
+    overflow-x: auto;
+  }
+}
+
+/* ==========================================================================
+   KHỐI E — Popup (dropdown của t-select, date-picker, tooltip…)
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  .t-popup {
+    max-width: calc(100% - 16px) !important;
+  }
+}

@@ -10,6 +10,8 @@ import "@/assets/theme/theme.css";
 import "@/assets/theme/duongsinh-brand.css"; // override màu brand → navy Dương Sinh
 import "@/assets/dropdown-menu.less";
 import "@/components/css/chat-hljs-dark.less";
+// Lớp phủ giao diện điện thoại — phải nạp SAU mọi CSS trên để thắng hoà specificity
+import "@/assets/theme/duongsinh-responsive.css";
 // vue-virtual-scroller ships its own tiny stylesheet — required for
 // RecycleScroller/DynamicScroller to size their viewport correctly.
 // Without it the scroller computes 0 height and renders no items.

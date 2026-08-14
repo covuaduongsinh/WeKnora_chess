@@ -1,5 +1,8 @@
 <template>
     <div class="main" ref="dropzone">
+        <!-- Thanh điều hướng + ngăn kéo cho điện thoại; đặt TRƯỚC <Menu> để watcher
+             `immediate` trong useMobileNav chạy trước, tránh nhấp nháy 1 frame. -->
+        <MobileNavBar />
         <Menu></Menu>
         <div v-if="isRouterAlive" class="platform-route-outlet">
             <RouterView />
@@ -21,6 +24,7 @@
 </template>
 <script setup lang="ts">
 import Menu from '@/components/menu.vue'
+import MobileNavBar from '@/components/MobileNavBar.vue'
 import { ref, onMounted, onUnmounted, nextTick, provide, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import useKnowledgeBase from '@/hooks/useKnowledgeBase'
