@@ -137,6 +137,7 @@ func (s *chessLibraryService) RenamePositionSlug(ctx context.Context, tenantID u
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypePosition, oldSlug, unique)
 	}
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypePosition, oldSlug)
 	updated, err := s.repo.GetPosition(ctx, tenantID, id)
 	if err != nil || updated == nil {
 		return updated, err

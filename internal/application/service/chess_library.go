@@ -45,6 +45,24 @@ func (s *chessLibraryService) pruneChessRefs(ctx context.Context, tenantID uint6
 	_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, chessType, slug)
 }
 
+// removeStaleIndex gỡ document + mapping KB của slug CŨ khi đổi slug.
+//
+// VÌ SAO CẦN: ChessKnowledgeIndexer.upsert tra mapping theo (tenant, loại,
+// slug). Đổi slug xong, index lại dưới slug MỚI sẽ không tìm thấy mapping nên
+// tạo một document MỚI trong KB — document + mapping của slug CŨ nằm lại vĩnh
+// viễn. Kho tri thức có 2 bản của cùng một nội dung, agent có thể trích dẫn
+// bản đã đổi tên. Gọi hàm này NGAY TRƯỚC lệnh index slug mới.
+//
+// Best-effort như mọi lời gọi indexer khác — không chặn CRUD.
+// KHÔNG áp cho kệ sách/chuyên mục bài viết: hai loại đó không phải đích
+// wikilink nên không bao giờ vào KB.
+func (s *chessLibraryService) removeStaleIndex(ctx context.Context, tenantID uint64, chessType, oldSlug string) {
+	if s.indexer == nil || oldSlug == "" {
+		return
+	}
+	s.indexer.Remove(ctx, tenantID, chessType, oldSlug)
+}
+
 // ---- Ván đấu ----
 
 func (s *chessLibraryService) ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error) {
@@ -147,6 +165,7 @@ func (s *chessLibraryService) RenameGameSlug(ctx context.Context, tenantID uint6
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypeGame, oldSlug, unique)
 	}
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypeGame, oldSlug)
 	updated, err := s.repo.GetGame(ctx, tenantID, id)
 	if err == nil && updated != nil && s.indexer != nil {
 		_ = s.indexer.IndexGame(ctx, updated) // best-effort: không chặn CRUD
@@ -298,6 +317,7 @@ func (s *chessLibraryService) RenamePuzzleSlug(ctx context.Context, tenantID uin
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypePuzzle, oldSlug, unique)
 	}
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypePuzzle, oldSlug)
 	updated, err := s.repo.GetPuzzle(ctx, tenantID, id)
 	if err == nil && updated != nil && s.indexer != nil {
 		_ = s.indexer.IndexPuzzle(ctx, updated) // best-effort: không chặn CRUD

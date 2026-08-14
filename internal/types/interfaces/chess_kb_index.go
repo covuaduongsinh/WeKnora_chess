@@ -14,4 +14,9 @@ type ChessKBIndexRepository interface {
 	Upsert(ctx context.Context, m *types.ChessKBIndex) error
 	// Delete xóa mapping theo (tenant, loại, slug).
 	Delete(ctx context.Context, tenantID uint64, chessType, chessSlug string) error
+	// CountByType đếm số mapping đã index, nhóm theo loại thực thể cờ
+	// ("game"|"puzzle"|"lesson"|"position"|"book"|"chapter"|"article").
+	// Đây là số đã ĐẨY VÀO KB, KHÔNG phải số đã embed xong — trạng thái
+	// embedding nằm ở Completed/Pending/Failed của ChessIndexStatus.
+	CountByType(ctx context.Context, tenantID uint64) (map[string]int64, error)
 }

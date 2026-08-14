@@ -285,6 +285,8 @@ func (s *chessLibraryService) RenameBookSlug(ctx context.Context, tenantID uint6
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypeBook, oldSlug, unique)
 	}
+	// Chỉ gỡ slug SÁCH cũ — chương giữ slug riêng, không đổi theo sách.
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypeBook, oldSlug)
 	updated, err := s.repo.GetBook(ctx, tenantID, id)
 	if err != nil {
 		return nil, err
@@ -464,6 +466,7 @@ func (s *chessLibraryService) RenameChapterSlug(ctx context.Context, tenantID ui
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypeChapter, oldSlug, unique)
 	}
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypeChapter, oldSlug)
 	updated, err := s.repo.GetChapter(ctx, tenantID, id)
 	if err != nil {
 		return nil, err

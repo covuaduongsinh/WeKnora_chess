@@ -331,6 +331,40 @@ export const deleteArticleTopic = (id: string) => del(`/api/v1/chess/article-top
 export const setTopicArticles = (topicId: string, articleIds: string[]) =>
   put(`/api/v1/chess/article-topics/${topicId}/articles`, { article_ids: articleIds });
 
+// ---- Kho tri thức cờ (RAG) — chẩn đoán + bảo trì ----
+// Cả 2 endpoint đều yêu cầu quyền Contributor trở lên (router.go).
+
+export interface ChessIndexStatus {
+  enabled: boolean;            // CHESS_KB_INDEX bật trên máy chủ?
+  kb_exists: boolean;          // KB "Tri thức cờ vua" đã tồn tại?
+  kb_id: string;
+  embedding_model_id: string;
+  embedding_configured: boolean;
+  vector_enabled: boolean;
+  keyword_enabled: boolean;
+  searchable: boolean;         // vector||keyword — false = agent KHÔNG nhìn thấy KB
+  total: number;               // tổng document trong KB (mọi loại)
+  completed: number;           // đã embed xong
+  pending: number;             // đang chờ embed nền
+  failed: number;
+  enabled_docs: number;
+  disabled_docs: number;
+  sample_error: string;
+  // by_type: số đã ĐẨY VÀO KB theo loại, vd {article:12, book:3}.
+  // KHÁC completed/pending — xem comment ChessIndexStatus.ByType ở backend.
+  by_type: Record<string, number>;
+}
+
+export interface ChessReindexResult {
+  games_total: number; puzzles_total: number; positions_total: number;
+  books_total: number; chapters_total: number; articles_total: number;
+  enqueued: number; failed: number; errors?: string[];
+  note?: string;
+}
+
+export const getChessIndexStatus = () => get("/api/v1/chess/library/index-status");
+export const reindexChessKB = () => post("/api/v1/chess/library/reindex", {});
+
 // ---- Lịch sử phiên bản bài viết ----
 export interface ChessArticleRevision {
   id: string; article_id: string; revision_number: number;

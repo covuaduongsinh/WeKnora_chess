@@ -157,6 +157,7 @@ func (s *chessLibraryService) RenameArticleSlug(ctx context.Context, tenantID ui
 	if s.aliasRepo != nil && oldSlug != "" {
 		_ = s.aliasRepo.AddAlias(ctx, tenantID, types.ChessRefTypeArticle, oldSlug, unique)
 	}
+	s.removeStaleIndex(ctx, tenantID, types.ChessRefTypeArticle, oldSlug)
 	updated, err := s.repo.GetArticle(ctx, tenantID, id)
 	if err != nil || updated == nil {
 		return updated, err

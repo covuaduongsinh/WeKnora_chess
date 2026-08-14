@@ -1,6 +1,13 @@
 <template>
   <div class="chess-manage">
-    <h1 class="cm-title">Quản lý cờ vua</h1>
+    <div class="cm-header">
+      <h1 class="cm-title">Quản lý cờ vua</h1>
+      <!-- Kho tri thức phục vụ CẢ 7 loại thực thể (không riêng bài viết) nên nút
+           đặt ở đầu trang, ngoài mọi tab. -->
+      <t-button size="small" variant="outline" @click="kbStatusVisible = true">
+        <template #icon><t-icon name="system-storage" /></template>Kho tri thức
+      </t-button>
+    </div>
     <t-tabs v-model="tab" class="cm-tabs">
       <t-tab-panel value="courses" label="Khóa học">
         <div class="cm-pane"><ChessCourses :focus-lesson-slug="focusLessonSlug" :focus-course-slug="focusCourseSlug" /></div>
@@ -23,6 +30,7 @@
         <div class="cm-pane"><ArticleBank v-if="tab === 'articles'" :focus-slug="focusArticleSlug" /></div>
       </t-tab-panel>
     </t-tabs>
+    <ChessKBStatusDialog v-model:visible="kbStatusVisible" />
   </div>
 </template>
 
@@ -35,9 +43,11 @@ import PuzzleBank from './PuzzleBank.vue';
 import PositionBank from './PositionBank.vue';
 import BookLibrary from './BookLibrary.vue';
 import ArticleBank from './ArticleBank.vue';
+import ChessKBStatusDialog from './components/ChessKBStatusDialog.vue';
 
 const route = useRoute();
 const tab = ref('courses');
+const kbStatusVisible = ref(false);
 
 // Deep-link "Mở trong thư viện": ?ref=game/<slug> | puzzle/<slug> | lesson/<slug>
 // | course/<slug> | position/<slug> | book/<slug> | chapter/<slug> | article/<slug>
@@ -104,7 +114,8 @@ watch(
   background-size: 44px 44px;
   background-position: 0 0, 22px 22px;
 }
-.cm-title { font-size: 20px; margin: 0 0 8px; color: var(--td-text-color-primary); }
+.cm-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.cm-title { font-size: 20px; margin: 0; color: var(--td-text-color-primary); }
 .cm-tabs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cm-tabs :deep(.t-tabs__content) { flex: 1; min-height: 0; }
 .cm-tabs :deep(.t-tab-panel) { height: 100%; }
@@ -115,7 +126,8 @@ watch(
    sẽ tự cuộn ngang — TDesign đã hỗ trợ sẵn, chỉ cần thu nhỏ tiêu đề + lề. */
 @media screen and (max-width: 767px) {
   .chess-manage { padding: 8px 0 0; }
-  .cm-title { font-size: 17px; margin: 0 12px 6px; }
+  .cm-header { margin: 0 12px 6px; }
+  .cm-title { font-size: 17px; }
   .cm-tabs :deep(.t-tabs__nav-item) { font-size: 14px; }
 }
 </style>

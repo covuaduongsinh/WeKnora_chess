@@ -32,13 +32,24 @@ func (s stubKnowService) ListKnowledgeByKnowledgeBaseID(ctx context.Context, kbI
 
 type stubIdxRepo struct {
 	interfaces.ChessKBIndexRepository
+	counts map[string]int64 // CountByType trả về cái này
+}
+
+func (s stubIdxRepo) CountByType(ctx context.Context, tenantID uint64) (map[string]int64, error) {
+	return s.counts, nil
 }
 
 func newTestIndexer(kbs []*types.KnowledgeBase, byKB map[string][]*types.Knowledge) *ChessKnowledgeIndexer {
+	return newTestIndexerWithCounts(kbs, byKB, nil)
+}
+
+func newTestIndexerWithCounts(
+	kbs []*types.KnowledgeBase, byKB map[string][]*types.Knowledge, counts map[string]int64,
+) *ChessKnowledgeIndexer {
 	return NewChessKnowledgeIndexer(
 		stubKBService{kbs: kbs},
 		stubKnowService{byKB: byKB},
-		stubIdxRepo{},
+		stubIdxRepo{counts: counts},
 	)
 }
 
@@ -106,6 +117,53 @@ func TestChessIndexStatus_NoChessKB(t *testing.T) {
 	}
 	if st.KBExists {
 		t.Errorf("không có KB cờ → kb_exists phải false, nhận %+v", st)
+	}
+}
+
+// ByType trả lời câu "bài viết/sách đã vào kho chưa" — không suy ra được từ
+// danh sách document vì bản ghi Knowledge KHÔNG mang chess_type.
+func TestChessIndexStatus_ByType(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	kb := &types.KnowledgeBase{
+		ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1",
+		IndexingStrategy: types.DefaultIndexingStrategy(),
+	}
+	ix := newTestIndexerWithCounts(
+		[]*types.KnowledgeBase{kb},
+		map[string][]*types.Knowledge{},
+		map[string]int64{"article": 12, "book": 3},
+	)
+	// TenantID PHẢI có trong ctx, nếu không nhánh đếm bị bỏ qua hoàn toàn.
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(1))
+
+	st, err := ix.IndexStatus(ctx)
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if st.ByType["article"] != 12 || st.ByType["book"] != 3 {
+		t.Errorf("by_type sai: %+v", st.ByType)
+	}
+}
+
+// Không có tenant trong ctx → bỏ qua phần đếm, nhưng ByType vẫn phải là map
+// RỖNG (không nil) để JSON ra {} chứ không phải null.
+func TestChessIndexStatus_ByTypeEmptyNotNilWithoutTenant(t *testing.T) {
+	t.Setenv("CHESS_KB_INDEX", "true")
+	kb := &types.KnowledgeBase{
+		ID: "kb-chess", Name: chessKBName, EmbeddingModelID: "emb-1",
+		IndexingStrategy: types.DefaultIndexingStrategy(),
+	}
+	ix := newTestIndexer([]*types.KnowledgeBase{kb}, map[string][]*types.Knowledge{})
+
+	st, err := ix.IndexStatus(context.Background())
+	if err != nil {
+		t.Fatalf("IndexStatus lỗi: %v", err)
+	}
+	if st.ByType == nil {
+		t.Errorf("ByType phải là map rỗng, không phải nil")
+	}
+	if len(st.ByType) != 0 {
+		t.Errorf("ByType phải rỗng khi không có tenant, nhận %+v", st.ByType)
 	}
 }
 
