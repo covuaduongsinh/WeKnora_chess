@@ -17,6 +17,10 @@
         <t-button variant="outline" size="small" @click="shelfManagerVisible = true">
           <template #icon><t-icon name="layers" /></template>Quản lý kệ
         </t-button>
+        <t-button variant="outline" size="small" title="Xem sách nào đã vào kho tri thức của HLV AI"
+          @click="kbStatusVisible = true">
+          <template #icon><t-icon name="books" /></template>Kho tri thức
+        </t-button>
         <div class="bkl-spacer"></div>
         <t-button variant="outline" size="small" @click="doExportBooks">
           <template #icon><t-icon name="download" /></template>Export
@@ -36,7 +40,8 @@
           <div class="bkl-row-title">{{ b.title }}</div>
           <div v-if="b.subtitle" class="bkl-row-subtitle">{{ b.subtitle }}</div>
           <div class="bkl-row-meta">
-            <span class="bkl-tag" :class="b.status === 'published' ? 'bkl-tag--published' : 'bkl-tag--draft'">
+            <span class="bkl-tag" :class="b.status === 'published' ? 'bkl-tag--published' : 'bkl-tag--draft'"
+              :title="kbHint(b.status)">
               {{ bookStatusLabel(b.status) }}
             </span>
             <span v-if="b.level" class="bkl-tag">{{ bookLevelLabel(b.level) }}</span>
@@ -64,8 +69,16 @@
             <h2>{{ selectedBook.title }}</h2>
             <div v-if="selectedBook.subtitle" class="bkl-subtitle">{{ selectedBook.subtitle }}</div>
             <div class="bkl-header-meta">
-              <span class="bkl-tag" :class="selectedBook.status === 'published' ? 'bkl-tag--published' : 'bkl-tag--draft'">
+              <span class="bkl-tag" :class="selectedBook.status === 'published' ? 'bkl-tag--published' : 'bkl-tag--draft'"
+                :title="kbHint(selectedBook.status)">
                 {{ bookStatusLabel(selectedBook.status) }}
+              </span>
+              <!-- Nói thẳng hệ quả với kho tri thức: "bản thảo" trước đây không cho
+                   biết vì sao HLV AI không tìm thấy sách. -->
+              <span class="bkl-kb-hint" :class="{ 'is-in': selectedBook.status === 'published' }"
+                @click="kbStatusVisible = true">
+                <t-icon :name="selectedBook.status === 'published' ? 'check-circle' : 'info-circle'" />
+                {{ kbHint(selectedBook.status) }}
               </span>
               <span v-if="selectedBook.author">{{ selectedBook.author }}</span>
               <span v-if="selectedBook.publisher">{{ selectedBook.publisher }}</span>
@@ -249,6 +262,7 @@
 
     <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
     <ChessShelfManager v-model:visible="shelfManagerVisible" @changed="loadShelves" />
+    <ChessKBStatusDialog v-model:visible="kbStatusVisible" />
     <ChessChapterHistory v-model:visible="historyVisible" :chapter-id="historyChapterId" @restored="onRestored" />
   </div>
 </template>
@@ -266,6 +280,7 @@ import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import ChessShelfManager from '@/views/chess/components/ChessShelfManager.vue';
 import ChessChapterHistory from '@/views/chess/components/ChessChapterHistory.vue';
+import ChessKBStatusDialog from '@/views/chess/components/ChessKBStatusDialog.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessContent, renderChessChips, isValidFEN } from '@/utils/chessBlocks';
 import { resolveChessRef } from '@/utils/chessRef';
@@ -335,6 +350,16 @@ const bookShelves = ref<ChessShelf[]>([]);
 const expandedChapters = ref<Set<string>>(new Set());
 const filter = reactive({ shelf_id: '', level: '', phase: '', status: '', q: '' });
 const shelfManagerVisible = ref(false);
+const kbStatusVisible = ref(false);
+
+// Chỉ sách "đã xuất bản" mới được nạp vào KB tri thức cờ (indexer bỏ qua bản thảo
+// HOÀN TOÀN IM LẶNG) — nói thẳng ra để Thầy không phải đoán vì sao HLV AI không
+// tìm thấy sách vừa soạn.
+function kbHint(status: string): string {
+  return status === 'published'
+    ? 'Đã xuất bản — có trong kho tri thức, HLV AI trích dẫn được'
+    : 'Bản thảo — chưa vào kho tri thức, HLV AI không trích dẫn được';
+}
 
 async function loadBooks() {
   try {
@@ -877,6 +902,17 @@ loadBooks().then(() => {
 .bkl-tag--phase { background: #e6f4ff; color: #2275b4; }
 .bkl-tag--draft { background: var(--td-bg-color-secondarycontainer); color: var(--td-text-color-secondary); }
 .bkl-tag--published { background: #e6ffed; color: #18794e; }
+
+/* Câu giải thích hệ quả với kho tri thức — bấm vào mở panel Kho tri thức. */
+.bkl-kb-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--td-warning-color, #e37318);
+  &.is-in { color: #18794e; }
+  &:hover { text-decoration: underline; }
+}
 .bkl-count { color: var(--td-text-color-secondary); font-size: 12px; }
 .bkl-row-actions { display: flex; flex: none; }
 .bkl-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; gap: 12px;

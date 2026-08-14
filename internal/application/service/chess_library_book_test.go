@@ -671,3 +671,135 @@ func TestSetShelfBooks_BookCanBeOnMultipleShelves(t *testing.T) {
 		t.Fatalf("sách phải nằm trên 2 kệ (nhiều-nhiều), có %d", len(shelves))
 	}
 }
+
+// ---- Giữ trạng thái xuất bản khi PUT thiếu trường status ----
+
+// Trước đây UpdateBook ép Status="" về draft. Vì repo ghi cột status TƯỜNG MINH
+// (không phải partial update), mọi PUT thiếu trường này sẽ âm thầm hạ sách xuống
+// bản thảo VÀ gỡ cả sách lẫn mọi chương khỏi KB tri thức. Giao diện có gửi status
+// nên không lộ, nhưng script/curl thì dính.
+func TestUpdateBook_EmptyStatusKeepsCurrentStatus(t *testing.T) {
+	svc := newTestBookService(newFakeBookRepo(), &fakePositionAliasRepo{})
+	ctx := context.Background()
+	created, err := svc.CreateBook(ctx, &types.ChessBook{
+		TenantID: 1, Title: "Tàn cuộc cơ bản", Status: types.ChessBookStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("CreateBook lỗi: %v", err)
+	}
+
+	// PUT không kèm status (client cũ / script quên trường này).
+	updated, err := svc.UpdateBook(ctx, &types.ChessBook{
+		TenantID: 1, ID: created.ID, Title: "Tàn cuộc cơ bản (bản sửa)",
+	})
+	if err != nil {
+		t.Fatalf("UpdateBook lỗi: %v", err)
+	}
+	if updated.Status != types.ChessBookStatusPublished {
+		t.Errorf("status = %q, muốn giữ %q — status rỗng nghĩa là 'không đổi', không phải 'hạ bản thảo'",
+			updated.Status, types.ChessBookStatusPublished)
+	}
+	if updated.Title != "Tàn cuộc cơ bản (bản sửa)" {
+		t.Errorf("tiêu đề chưa được cập nhật: %q", updated.Title)
+	}
+}
+
+func TestUpdateBook_ExplicitStatusStillWins(t *testing.T) {
+	svc := newTestBookService(newFakeBookRepo(), &fakePositionAliasRepo{})
+	ctx := context.Background()
+	created, err := svc.CreateBook(ctx, &types.ChessBook{
+		TenantID: 1, Title: "Sách hạ bản thảo", Status: types.ChessBookStatusPublished,
+	})
+	if err != nil {
+		t.Fatalf("CreateBook lỗi: %v", err)
+	}
+	updated, err := svc.UpdateBook(ctx, &types.ChessBook{
+		TenantID: 1, ID: created.ID, Title: created.Title, Status: types.ChessBookStatusDraft,
+	})
+	if err != nil {
+		t.Fatalf("UpdateBook lỗi: %v", err)
+	}
+	if updated.Status != types.ChessBookStatusDraft {
+		t.Errorf("hạ bản thảo TƯỜNG MINH phải có tác dụng, status = %q", updated.Status)
+	}
+}
+
+// ---- Sắp xếp lại chương ----
+
+func TestReorderChapters_PersistsNewOrder(t *testing.T) {
+	svc := newTestBookService(newFakeBookRepo(), &fakePositionAliasRepo{})
+	ctx := context.Background()
+	book, err := svc.CreateBook(ctx, &types.ChessBook{TenantID: 1, Title: "Sách xếp lại"})
+	if err != nil {
+		t.Fatalf("CreateBook lỗi: %v", err)
+	}
+	var ids []string
+	for _, title := range []string{"Chương A", "Chương B", "Chương C"} {
+		ch, cerr := svc.CreateChapter(ctx, &types.ChessBookChapter{TenantID: 1, BookID: book.ID, Title: title})
+		if cerr != nil {
+			t.Fatalf("CreateChapter %q lỗi: %v", title, cerr)
+		}
+		ids = append(ids, ch.ID)
+	}
+
+	// Đảo ngược: C, B, A
+	reversed := []string{ids[2], ids[1], ids[0]}
+	if err := svc.ReorderChapters(ctx, 1, book.ID, reversed); err != nil {
+		t.Fatalf("ReorderChapters lỗi: %v", err)
+	}
+	for want, id := range reversed {
+		ch, gerr := svc.GetChapter(ctx, 1, id)
+		if gerr != nil {
+			t.Fatalf("GetChapter lỗi: %v", gerr)
+		}
+		if ch.SortOrder != want {
+			t.Errorf("chương %q sort_order = %d, muốn %d", ch.Title, ch.SortOrder, want)
+		}
+	}
+}
+
+func TestReorderChapters_RejectsUnknownBook(t *testing.T) {
+	svc := newTestBookService(newFakeBookRepo(), &fakePositionAliasRepo{})
+	if err := svc.ReorderChapters(context.Background(), 1, "khong-ton-tai", nil); err == nil {
+		t.Fatal("phải báo lỗi khi sách không tồn tại")
+	}
+}
+
+// ---- Nhập sách ----
+
+// Chống hồi quy cho việc ImportBooks đổi sang gọi createChapter (bản lõi, không
+// làm mới mục lục từng lần) thay vì CreateChapter.
+func TestImportBooks_CreatesChaptersUnderNewBook(t *testing.T) {
+	svc := newTestBookService(newFakeBookRepo(), &fakePositionAliasRepo{})
+	ctx := context.Background()
+	n, err := svc.ImportBooks(ctx, 1, []types.ChessBookBundle{{
+		Title: "Sách nhập", Author: "Thầy Tường",
+		Chapters: []types.ChessChapterBundle{
+			{Title: "Mở đầu", Content: "nội dung 1"},
+			{Title: "Kết", Content: "nội dung 2"},
+			{Title: "   ", Content: "bỏ qua vì không có tiêu đề"},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("ImportBooks lỗi: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("số sách nhập = %d, muốn 1", n)
+	}
+	books, err := svc.ListBooks(ctx, 1, types.ChessBookFilter{})
+	if err != nil || len(books) != 1 {
+		t.Fatalf("phải có đúng 1 sách, có %d (err=%v)", len(books), err)
+	}
+	chapters, err := svc.ListChapters(ctx, 1, books[0].ID)
+	if err != nil {
+		t.Fatalf("ListChapters lỗi: %v", err)
+	}
+	if len(chapters) != 2 {
+		t.Fatalf("phải có 2 chương (chương không tiêu đề bị bỏ), có %d", len(chapters))
+	}
+	for _, ch := range chapters {
+		if ch.Slug == "" {
+			t.Errorf("chương %q thiếu slug — createChapter phải sinh slug như CreateChapter", ch.Title)
+		}
+	}
+}
