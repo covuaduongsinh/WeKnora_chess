@@ -139,23 +139,29 @@
               <t-input v-model="editDraft.aliases" placeholder="Pin, Đóng đinh" />
               <label>Ảnh bìa (URL, tùy chọn)</label>
               <t-input v-model="editDraft.cover_url" placeholder="https://…" />
-              <div class="atb-content-label">
-                <label>Nội dung (markdown — gõ [[ để chèn liên kết ván/thế cờ/bài giảng/sách; dán/kéo-thả ảnh)</label>
-                <div class="atb-editor-toolbar">
-                  <t-button v-for="btn in editor.toolbarButtons" :key="btn.key" size="small" variant="text"
-                    :title="btn.title" @click="btn.action">
-                    <t-icon :name="btn.icon" />
-                  </t-button>
-                  <t-button size="small" variant="text" title="Chèn ảnh" @click="imageInputEl?.click()">
-                    <t-icon name="image" />
-                  </t-button>
+              <!-- Hai cột: ô soạn bên trái, bàn cờ bám con trỏ bên phải. -->
+              <div class="atb-editor-split">
+                <div class="atb-editor-main">
+                  <div class="atb-content-label">
+                    <label>Nội dung (markdown — gõ [[ để chèn liên kết ván/thế cờ/bài giảng/sách; dán/kéo-thả ảnh)</label>
+                    <div class="atb-editor-toolbar">
+                      <t-button v-for="btn in editor.toolbarButtons" :key="btn.key" size="small" variant="text"
+                        :title="btn.title" @click="btn.action">
+                        <t-icon :name="btn.icon" />
+                      </t-button>
+                      <t-button size="small" variant="text" title="Chèn ảnh" @click="imageInputEl?.click()">
+                        <t-icon name="image" />
+                      </t-button>
+                    </div>
+                  </div>
+                  <t-textarea ref="contentRef" v-model="editDraft.content" :autosize="{ minRows: 10, maxRows: 18 }"
+                    placeholder="Viết nội dung bài… Gõ [[ để gợi ý ván/thế cờ/bài tập/sách/chương. Dán/kéo-thả ảnh vào đây." />
+                  <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+                    style="display:none" @change="onImageInputChange" />
+                  <ChessWikiLinkSuggest :textarea="contentTextareaEl" v-model="editDraft.content" />
                 </div>
+                <ChessEditorBoards :content="editDraft.content" :textarea="contentTextareaEl" />
               </div>
-              <t-textarea ref="contentRef" v-model="editDraft.content" :autosize="{ minRows: 10 }"
-                placeholder="Viết nội dung bài… Gõ [[ để gợi ý ván/thế cờ/bài tập/sách/chương. Dán/kéo-thả ảnh vào đây." />
-              <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
-                style="display:none" @change="onImageInputChange" />
-              <ChessWikiLinkSuggest :textarea="contentTextareaEl" v-model="editDraft.content" />
               <label>Ghi chú thay đổi (tùy chọn — chỉ lưu lịch sử khi tiêu đề/nội dung thực sự đổi)</label>
               <t-input v-model="editDraft.revisionNote" placeholder="VD: Bổ sung ví dụ minh họa" />
             </div>
@@ -191,6 +197,7 @@ import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
+import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import ChessArticleTopicManager from '@/views/chess/components/ChessArticleTopicManager.vue';
 import ChessArticleHistory from '@/views/chess/components/ChessArticleHistory.vue';
 import {
@@ -512,6 +519,8 @@ loadTopics();
 .atb-form { display: flex; flex-direction: column; gap: 6px; label { font-size: 13px; color: var(--td-text-color-secondary); margin-top: 6px; } }
 .atb-content-label { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; }
 .atb-editor-toolbar { display: flex; gap: 2px; }
+.atb-editor-split { display: flex; gap: 12px; align-items: flex-start; }
+.atb-editor-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .atb-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
 .atb-spacer { flex: 1; }
 .atb-back { display: none; }
@@ -565,6 +574,7 @@ loadTopics();
   .atb-row2 { flex-direction: column; gap: 6px; }
   .atb-content { font-size: 16px; line-height: 1.7; }
   .atb-editor-toolbar { flex-wrap: wrap; }
+  .atb-editor-split { flex-direction: column; }
   /* font-size 16px: dưới ngưỡng này iOS tự phóng to trang khi focus ô nhập */
   .atb-form :deep(.t-textarea__inner) { font-size: 16px; }
 }

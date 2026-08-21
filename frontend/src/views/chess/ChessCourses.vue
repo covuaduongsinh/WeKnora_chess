@@ -98,24 +98,31 @@
 
     <!-- Dialog bài học -->
     <t-dialog v-model:visible="lessonDialog.visible" :header="lessonDialog.id ? 'Sửa bài học' : 'Thêm bài học'"
-      :on-confirm="saveLesson" width="640px">
+      :on-confirm="saveLesson" width="960px">
       <div class="cc-form">
         <label>Tên bài học *</label>
         <t-input v-model="lessonDialog.title" />
-        <div class="cc-content-label">
-          <label>Nội dung (văn bản/markdown)</label>
-          <t-button size="small" variant="outline" @click="openPicker">
-            <template #icon><t-icon name="chess" /></template>
-            {{ t('chess.ref.insert') }}
-          </t-button>
+        <!-- Hai cột: mọi ô nhập nội dung/FEN/PGN bên trái, bàn cờ bám con trỏ bên phải. -->
+        <div class="cc-editor-split">
+          <div class="cc-editor-main">
+            <div class="cc-content-label">
+              <label>Nội dung (văn bản/markdown)</label>
+              <t-button size="small" variant="outline" @click="openPicker">
+                <template #icon><t-icon name="chess" /></template>
+                {{ t('chess.ref.insert') }}
+              </t-button>
+            </div>
+            <t-textarea ref="lessonContentRef" v-model="lessonDialog.content" :autosize="{ minRows: 4, maxRows: 14 }"
+              placeholder="Nội dung bài giảng... Gõ [[ để gợi ý ván/thế cờ/bài/khóa." />
+            <ChessWikiLinkSuggest :textarea="lessonTextareaEl" v-model="lessonDialog.content" />
+            <label>Thế cờ FEN (tùy chọn — sẽ hiện bàn cờ)</label>
+            <t-input v-model="lessonDialog.fen" placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1" />
+            <label>Ván minh họa PGN (tùy chọn)</label>
+            <t-textarea v-model="lessonDialog.pgn" :autosize="{ minRows: 2 }" placeholder="1. e4 e5 2. Nf3 Nc6 ..." />
+          </div>
+          <ChessEditorBoards :content="lessonDialog.content" :fen="lessonDialog.fen" :pgn="lessonDialog.pgn"
+            :textarea="lessonTextareaEl" />
         </div>
-        <t-textarea ref="lessonContentRef" v-model="lessonDialog.content" :autosize="{ minRows: 4 }"
-          placeholder="Nội dung bài giảng... Gõ [[ để gợi ý ván/thế cờ/bài/khóa." />
-        <ChessWikiLinkSuggest :textarea="lessonTextareaEl" v-model="lessonDialog.content" />
-        <label>Thế cờ FEN (tùy chọn — sẽ hiện bàn cờ)</label>
-        <t-input v-model="lessonDialog.fen" placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1" />
-        <label>Ván minh họa PGN (tùy chọn)</label>
-        <t-textarea v-model="lessonDialog.pgn" :autosize="{ minRows: 2 }" placeholder="1. e4 e5 2. Nf3 Nc6 ..." />
         <label>Thứ tự</label>
         <t-input-number v-model="lessonDialog.sort_order" />
       </div>
@@ -176,6 +183,7 @@ import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
+import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessContent, renderChessChips, isValidFEN } from '@/utils/chessBlocks';
 import { resolveChessRef } from '@/utils/chessRef';
@@ -649,6 +657,9 @@ loadCourses().then(initFromWikiDraft).then(() => {
 }
 .cc-picker { display: flex; flex-direction: column; gap: 10px; }
 .cc-picker-bar { display: flex; align-items: center; gap: 12px; }
+.cc-editor-split { display: flex; gap: 12px; align-items: flex-start; }
+/* Cột trái là flex column để các <label> giữ đúng khoảng cách như trong .cc-form */
+.cc-editor-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .cc-picker-body { display: flex; gap: 12px; align-items: stretch; }
 .cc-picker-list { flex: 1 1 0; min-width: 0; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .cc-picker-preview {
@@ -702,6 +713,7 @@ loadCourses().then(initFromWikiDraft).then(() => {
   .cc-lesson-content { font-size: 16px; line-height: 1.7; }
 
   /* Dialog picker wikilink: 2 cột (danh sách | xem trước) không vừa màn hẹp */
+  .cc-editor-split { flex-direction: column; }
   .cc-picker-body { flex-direction: column; }
   .cc-picker-preview {
     flex: 1 1 auto; max-width: none; max-height: 220px;

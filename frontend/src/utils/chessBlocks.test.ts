@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { extractChessBlocks, isValidFEN, parseFenLine } from './chessBlocks.ts'
+import {
+  extractChessBlocks, findChessBlockIndexAt, findChessBlocks, isValidFEN, parseFenLine,
+} from './chessBlocks.ts'
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -116,4 +118,117 @@ test('PGN trần (chỉ nước đi, không thẻ) vẫn vào nhánh PGN', () =>
 test('PGN bắt đầu từ thế cờ giữa ván: thẻ FEN quyết định, không phải nhánh FEN', () => {
   const b = firstBoard('[SetUp "1"]\n[FEN "8/8/8/4k3/8/8/4P3/4K3 w - - 0 24"]\n\n24. e4 Kd5')
   assert.ok(b.pgn?.includes('24. e4'), 'phải giữ nguyên PGN để hiện được chuỗi nước đi')
+})
+
+// ─── Nhiều khối trong một tài liệu ─────────────────────────────────────────
+// Dải xem trước khi soạn (ChessEditorBoards.vue) dựng danh sách bàn cờ bằng
+// extractChessBlocks, nên hành vi nhiều-khối là hợp đồng của nó.
+
+test('nhiều khối ```chess cho ra đúng số bàn cờ, đúng thứ tự', () => {
+  const md = [
+    'Mở đầu.',
+    '```chess',
+    'fen: 8/8/8/4k3/8/8/4P3/4K3 w - - 0 1',
+    '```',
+    'Giữa bài.',
+    '```chessboard',
+    START_FEN,
+    '```',
+    'Cuối bài.',
+    '```chess',
+    '[Event "Opera Game"]',
+    '',
+    '1. e4 e5',
+    '```',
+  ].join('\n')
+
+  const boards = extractChessBlocks(md)
+  assert.equal(boards.length, 3)
+  assert.equal(boards[0].fen, '8/8/8/4k3/8/8/4P3/4K3 w - - 0 1')
+  assert.equal(boards[1].fen, START_FEN)
+  assert.ok(boards[2].pgn?.includes('1. e4 e5'), 'khối thứ ba phải là PGN')
+})
+
+test('một khối hỏng giữa chừng KHÔNG nuốt mất các khối còn lại', () => {
+  const md = [
+    '```chess',
+    START_FEN,
+    '```',
+    '```chess',
+    'rnbqkbnr/pppppppp/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    '```',
+    '```chess',
+    '8/8/8/4k3/8/8/4P3/4K3 w - - 0 1',
+    '```',
+  ].join('\n')
+
+  const boards = extractChessBlocks(md)
+  assert.equal(boards.length, 3, 'vẫn phải đủ 3 mục')
+  assert.equal(boards[0].fen_invalid, undefined)
+  assert.equal(boards[1].fen_invalid, true, 'mục hỏng được đánh dấu để hiện hộp lỗi đúng vị trí')
+  assert.equal(boards[2].fen_invalid, undefined)
+})
+
+test('khối CHƯA đóng ba backtick thì chưa tính là bàn cờ', () => {
+  // Khoá hành vi "bàn cờ chỉ hiện sau khi gõ xong dấu đóng" — đúng như dòng
+  // hướng dẫn hiển thị trong ChessEditorBoards.vue.
+  const closed = '```chess\n' + START_FEN + '\n```'
+  const open = '```chess\n' + START_FEN
+  assert.equal(extractChessBlocks(closed).length, 1)
+  assert.equal(extractChessBlocks(open).length, 0)
+})
+
+// ─── Vị trí khối + tra theo con trỏ ────────────────────────────────────────
+// Panel bàn cờ cạnh ô soạn dùng hai hàm này để biết con trỏ đang ở khối nào.
+
+const DOC = [
+  'Đoạn mở đầu.',            // 0
+  '',
+  '```chess',
+  START_FEN,
+  '```',
+  '',
+  'Đoạn giữa hai khối.',
+  '',
+  '```chess',
+  '8/8/8/4k3/8/8/4P3/4K3 w - - 0 1',
+  '```',
+  '',
+  'Đoạn kết.',
+].join('\n')
+
+test('findChessBlocks trả khoảng ký tự bao đúng khối', () => {
+  const blocks = findChessBlocks(DOC)
+  assert.equal(blocks.length, 2)
+  for (const b of blocks) {
+    const slice = DOC.slice(b.start, b.end)
+    assert.ok(slice.startsWith('```chess'), `khoảng phải bắt đầu tại dấu mở: ${JSON.stringify(slice.slice(0, 12))}`)
+    assert.ok(slice.trimEnd().endsWith('```'), 'khoảng phải kết thúc sau dấu đóng')
+  }
+  assert.ok(DOC.slice(blocks[0].start, blocks[0].end).includes(START_FEN))
+  assert.ok(DOC.slice(blocks[1].start, blocks[1].end).includes('4k3'))
+})
+
+test('findChessBlockIndexAt: con trỏ giữa khối trả đúng chỉ số', () => {
+  const blocks = findChessBlocks(DOC)
+  const mid0 = Math.floor((blocks[0].start + blocks[0].end) / 2)
+  const mid1 = Math.floor((blocks[1].start + blocks[1].end) / 2)
+  assert.equal(findChessBlockIndexAt(DOC, mid0), 0)
+  assert.equal(findChessBlockIndexAt(DOC, mid1), 1)
+})
+
+test('findChessBlockIndexAt: ranh giới đầu/cuối vẫn tính là trong khối', () => {
+  const blocks = findChessBlocks(DOC)
+  assert.equal(findChessBlockIndexAt(DOC, blocks[0].start), 0)
+  assert.equal(findChessBlockIndexAt(DOC, blocks[0].end), 0)
+})
+
+test('findChessBlockIndexAt: con trỏ ngoài mọi khối trả -1', () => {
+  assert.equal(findChessBlockIndexAt(DOC, 0), -1, 'đầu tài liệu')
+  assert.equal(findChessBlockIndexAt(DOC, DOC.indexOf('Đoạn giữa') + 3), -1, 'đoạn văn giữa hai khối')
+  assert.equal(findChessBlockIndexAt(DOC, DOC.length), -1, 'cuối tài liệu')
+})
+
+test('extractChessBlocks vẫn khớp findChessBlocks sau khi viết lại', () => {
+  assert.deepEqual(extractChessBlocks(DOC), findChessBlocks(DOC).map((b) => b.data))
 })

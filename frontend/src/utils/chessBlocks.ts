@@ -101,17 +101,46 @@ function parseChessSource(src: string): ChessBoardData | null {
   return null;
 }
 
-/** Bóc tất cả khối ```chess đã đóng trong markdown thành danh sách dữ liệu bàn cờ. */
-export function extractChessBlocks(markdown: string): ChessBoardData[] {
+/** Một bàn cờ kèm KHOẢNG ký tự nó chiếm trong chuỗi markdown gốc. */
+export interface ChessBlockAt {
+  data: ChessBoardData;
+  /** Chỉ số ký tự đầu của khối (tại dấu ``` mở). */
+  start: number;
+  /** Chỉ số ngay SAU dấu ``` đóng. */
+  end: number;
+}
+
+/**
+ * Bóc mọi khối ```chess đã đóng KÈM vị trí. Biết vị trí mới trả lời được câu
+ * "con trỏ đang đứng trong khối nào" — thứ mà vùng xem trước bám con trỏ cần.
+ */
+export function findChessBlocks(markdown: string): ChessBlockAt[] {
   if (!markdown || typeof markdown !== 'string' || !markdown.includes('chess')) return [];
-  const boards: ChessBoardData[] = [];
+  const out: ChessBlockAt[] = [];
+  // CHESS_BLOCK_RE mang cờ `g` nên `lastIndex` là trạng thái dùng chung giữa các
+  // hàm — phải đặt lại trước mỗi vòng, nếu không lần gọi sau sẽ bắt đầu từ giữa.
   CHESS_BLOCK_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = CHESS_BLOCK_RE.exec(markdown)) !== null) {
     const data = parseChessSource(m[1]);
-    if (data) boards.push(data);
+    if (data) out.push({ data, start: m.index, end: CHESS_BLOCK_RE.lastIndex });
   }
-  return boards;
+  return out;
+}
+
+/**
+ * Chỉ số (trong danh sách findChessBlocks) của khối chứa con trỏ, hoặc -1 nếu
+ * con trỏ đang ở ngoài mọi khối. Ranh giới tính là ĐÓNG cả hai đầu để đặt con
+ * trỏ sát mép khối vẫn nhận.
+ */
+export function findChessBlockIndexAt(markdown: string, caret: number): number {
+  const blocks = findChessBlocks(markdown);
+  return blocks.findIndex((b) => caret >= b.start && caret <= b.end);
+}
+
+/** Bóc tất cả khối ```chess đã đóng trong markdown thành danh sách dữ liệu bàn cờ. */
+export function extractChessBlocks(markdown: string): ChessBoardData[] {
+  return findChessBlocks(markdown).map((b) => b.data);
 }
 
 /** Loại bỏ các khối ```chess đã đóng khỏi markdown (để không hiện thành code block trùng). */

@@ -124,6 +124,11 @@
               </span>
             </div>
             <div v-if="expandedChapters.has(ch.id)" class="bkl-chapter-body">
+              <!-- Thế cờ minh họa của chương đứng ĐẦU, trước phần chữ — nó là hình
+                   mở đầu chương. Trước đây điều kiện là `ch.fen && !ch.content`, tức
+                   chương có chữ thì bàn cờ này KHÔNG BAO GIỜ hiện: người soạn điền ô
+                   "Thế cờ FEN minh họa" rồi chẳng thấy đâu, không báo lỗi gì. -->
+              <ChessBoardDisplay v-if="ch.fen" :data="chapterBoardData(ch)" />
               <div class="bkl-chapter-content" v-if="ch.content" @click="onChapterContentClick">
                 <template v-for="(seg, si) in chapterSegments(ch)" :key="si">
                   <ChessBoardDisplay v-if="seg.type === 'board'" :data="seg.board" />
@@ -131,7 +136,6 @@
                   <div v-else class="bkl-md-segment" v-html="seg.html"></div>
                 </template>
               </div>
-              <ChessBoardDisplay v-if="ch.fen && !ch.content" :data="chapterBoardData(ch)" />
               <ChessBacklinks v-if="ch.slug" ref-type="chapter" :slug="ch.slug" />
             </div>
           </div>
@@ -184,7 +188,7 @@
 
     <!-- Dialog chương -->
     <t-dialog v-model:visible="chapterDialog.visible" :header="chapterDialog.id ? 'Sửa chương' : 'Thêm chương'"
-      :on-confirm="saveChapter" width="720px">
+      :on-confirm="saveChapter" width="1000px">
       <div class="bkl-form">
         <div class="bkl-row2">
           <div><label>Phần (tùy chọn, để gộp hiển thị)</label><t-input v-model="chapterDialog.part" placeholder="VD: Phần I — Tàn cuộc Tốt" /></div>
@@ -203,15 +207,24 @@
             </t-button>
           </div>
         </div>
-        <div class="bkl-editor-toolbar">
-          <t-button v-for="btn in toolbarButtons" :key="btn.key" size="small" variant="text" :title="btn.title" @click="btn.action">
-            <t-icon :name="btn.icon" />
-          </t-button>
-          <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImageInputChange" />
+        <!-- Hai cột: ô soạn bên trái, bàn cờ bám con trỏ bên phải. Thanh công cụ
+             PHẢI nằm cùng cột với textarea — nó có `border-bottom: none` +
+             bo góc trên, được thiết kế dán liền mép trên ô soạn. -->
+        <div class="bkl-editor-split">
+          <div class="bkl-editor-main">
+            <div class="bkl-editor-toolbar">
+              <t-button v-for="btn in toolbarButtons" :key="btn.key" size="small" variant="text" :title="btn.title" @click="btn.action">
+                <t-icon :name="btn.icon" />
+              </t-button>
+              <input ref="imageInputEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImageInputChange" />
+            </div>
+            <t-textarea ref="chapterContentRef" v-model="chapterDialog.content" :autosize="{ minRows: 10, maxRows: 14 }"
+              placeholder="Nội dung chương… Gõ [[ để gợi ý liên kết. Dán/kéo-thả ảnh để chèn trực tiếp." />
+            <ChessWikiLinkSuggest :textarea="chapterTextareaEl" v-model="chapterDialog.content" />
+          </div>
+          <ChessEditorBoards :content="chapterDialog.content" :fen="chapterDialog.fen"
+            :textarea="chapterTextareaEl" />
         </div>
-        <t-textarea ref="chapterContentRef" v-model="chapterDialog.content" :autosize="{ minRows: 10 }"
-          placeholder="Nội dung chương… Gõ [[ để gợi ý liên kết. Dán/kéo-thả ảnh để chèn trực tiếp." />
-        <ChessWikiLinkSuggest :textarea="chapterTextareaEl" v-model="chapterDialog.content" />
 
         <template v-if="chapterDialog.id">
           <label>Ghi chú thay đổi (tùy chọn — lưu kèm bản phiên bản mới)</label>
@@ -278,6 +291,7 @@ import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
+import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import ChessShelfManager from '@/views/chess/components/ChessShelfManager.vue';
 import ChessChapterHistory from '@/views/chess/components/ChessChapterHistory.vue';
 import ChessKBStatusDialog from '@/views/chess/components/ChessKBStatusDialog.vue';
@@ -942,6 +956,8 @@ loadBooks().then(() => {
 .bkl-content-label { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; label { margin-top: 0; } }
 .bkl-content-actions { display: flex; gap: 6px; }
 .bkl-editor-toolbar { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--td-component-stroke); border-bottom: none; border-radius: 6px 6px 0 0; background: var(--td-bg-color-container); }
+.bkl-editor-split { display: flex; gap: 12px; align-items: flex-start; }
+.bkl-editor-main { flex: 1 1 0; min-width: 0; }
 .bkl-picker { display: flex; flex-direction: column; gap: 10px; }
 .bkl-picker-bar { display: flex; align-items: center; gap: 12px; }
 .bkl-picker-body { display: flex; gap: 12px; align-items: stretch; }
@@ -996,6 +1012,7 @@ loadBooks().then(() => {
   .bkl-chapter-content { font-size: 16px; line-height: 1.7; }
 
   /* Dialog picker wikilink: 2 cột (danh sách | xem trước) không vừa màn hẹp */
+  .bkl-editor-split { flex-direction: column; }
   .bkl-picker-body { flex-direction: column; }
   .bkl-picker-preview {
     flex: 1 1 auto; max-width: none; max-height: 220px;
