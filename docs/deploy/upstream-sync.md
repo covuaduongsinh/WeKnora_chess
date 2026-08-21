@@ -56,6 +56,24 @@ git switch -c chore/upstream-sync
 git merge v0.6.3      # rồi v0.7.0 → v0.7.1 → v0.7.2
 ```
 
+### Bốn bước kiểm BẮT BUỘC mỗi chặng (rút từ lần merge 0.6.2→0.7.2)
+
+Bốn lỗi dưới đây đều **không hiện trong danh sách conflict của git** — chỉ lộ khi build/test:
+
+1. **`grep -rn "locales/zh-CN" frontend/src`** — upstream liên tục thêm test/helper đọc `zh-CN.ts`,
+   file mà fork đã xoá. Đã gặp **3 lần** trong 4 chặng (`TagEditDialog.test.ts`,
+   `workspaceTerminology.test.ts`, `BatchTagDialog.test.ts` + `localeKeyAudit.ts`).
+   Triệu chứng: `ENOENT` / `ERR_MODULE_NOT_FOUND`. Chuyển tham chiếu sang `vi-VN`.
+2. **Constructor dùng chung mà fork đã chèn tham số** — `NewWikiPageService`,
+   `NewAgentService`, `NewChessLibraryService`… Khi upstream chèn thêm tham số của họ,
+   **test của upstream vẫn truyền số cũ** → lỗi biên dịch test. Đã gặp 2 lần.
+3. **Chạy `npm run build` sau MỌI sửa file i18n** — `npm test` và `vue-tsc` **không parse**
+   file locale, nên thiếu dấu phẩy hoặc nháy lồng sai chỉ esbuild mới bắt.
+   Khi chèn khoá vào cuối một container, luôn thêm `,` vào dòng cuối trước đó.
+4. **`go test ./internal/agent/tools/`** — 0.7.2 đặt ra hợp đồng "mọi tool lộ ra UI phải khai
+   model-handle policy". Tool cờ khai ở `internal/modelcontext/tool_policy_chess.go` (file riêng,
+   dùng `init()`). Thêm tool cờ mới thì **phải thêm tên vào đó**, nếu không test đỏ.
+
 ### File luôn phải kiểm bằng tay sau merge
 
 | File | Vì sao |
@@ -67,6 +85,9 @@ git merge v0.6.3      # rồi v0.7.0 → v0.7.1 → v0.7.2
 | `frontend/src/i18n/locales/zh-CN.ts` | Fork **cố ý xoá** file này. Merge sẽ báo modify/delete → chọn giữ xoá |
 | `frontend/src/views/chat/components/ToolResultRenderer.vue`, `types/tool-results.ts` | Nhánh render `chess_board` + cờ `fen_invalid` |
 | `go.sum`, `frontend/package-lock.json` | Đừng resolve tay — lấy bản upstream rồi `go mod tidy` / `npm install` |
+| `internal/router/routes_chess.go` | 4 nhóm route cờ nằm ở đây (tách ra từ 0.7.2). `router.go` chỉ còn 4 field `Chess*Handler` + 4 dòng gọi — nếu upstream đổi `RouterParams` thì nối lại 2 chỗ đó |
+| `internal/modelcontext/tool_policy_chess.go` | Policy cho 7 tool cờ, bơm bằng `init()`. 0 dòng sửa `tool_policy.go` của upstream |
+| `mcp-server/**` | **Cố ý lấy nguyên bản upstream** — đây là CLI phụ trợ, giữ bản Việt hoá chỉ tạo nợ merge lặp lại |
 
 ## 4. Runbook DB production — chạy cho MỖI chặng deploy
 
@@ -101,6 +122,18 @@ git merge v0.6.3      # rồi v0.7.0 → v0.7.1 → v0.7.2
 Migration lỗi giữa chừng: app **vẫn khởi động được** (thiết kế của WeKnora), trang
 System Info hiện lỗi — xem [migration-troubleshooting.md](../migration-troubleshooting.md).
 Rollback = restore backup bước 1 + `git revert` chặng đó.
+
+## 4b. Gộp nhiều chặng vào MỘT lần deploy
+
+Nếu merge liền 4 chặng trong git rồi mới deploy (đúng cách đã làm ở đợt 0.6.2→0.7.2),
+**chỉ cần đặt lại version MỘT lần** về mốc trước nhóm migration upstream sớm nhất:
+
+```sql
+UPDATE schema_migrations SET version = 61, dirty = false;
+```
+
+Runner sẽ chạy tuần tự 62 → 79 (upstream, lần đầu) rồi 900 → 912 (cờ, no-op vì idempotent).
+Nghiệm thu vẫn là `912 / false`.
 
 ## 5. Sau mỗi chặng
 
