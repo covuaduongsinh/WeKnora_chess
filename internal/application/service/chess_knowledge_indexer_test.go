@@ -39,6 +39,25 @@ func (s stubIdxRepo) CountByType(ctx context.Context, tenantID uint64) (map[stri
 	return s.counts, nil
 }
 
+// Get/Delete/Upsert: stub embed interface (nil) nên MỌI method không override
+// sẽ panic nil-pointer khi bị gọi. Remove() gọi Get rồi Delete, nên thiếu hai
+// method này là panic — lỗi từng ẩn lâu vì test tầng service không chạy được
+// trên Windows (crash gojieba), chỉ lộ ra khi đưa lên CI Linux.
+// Trả mapping rỗng = kịch bản "chưa từng index", đúng điều các test giả định.
+func (s stubIdxRepo) Get(
+	ctx context.Context, tenantID uint64, chessType, chessSlug string,
+) (*types.ChessKBIndex, error) {
+	return nil, nil
+}
+
+func (s stubIdxRepo) Delete(ctx context.Context, tenantID uint64, chessType, chessSlug string) error {
+	return nil
+}
+
+func (s stubIdxRepo) Upsert(ctx context.Context, m *types.ChessKBIndex) error {
+	return nil
+}
+
 func newTestIndexer(kbs []*types.KnowledgeBase, byKB map[string][]*types.Knowledge) *ChessKnowledgeIndexer {
 	return newTestIndexerWithCounts(kbs, byKB, nil)
 }
