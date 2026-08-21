@@ -17,11 +17,13 @@ import { AUDIT_ACTION_LOCALE_DEFAULTS, getAuditActionLocaleDefault } from './aud
 import { writeLocaleModule } from './localeSerialize.ts'
 
 import enUS from './locales/en-US.ts'
+import viVN from './locales/vi-VN.ts'
 import koKR from './locales/ko-KR.ts'
 import ruRU from './locales/ru-RU.ts'
 
 export const LOCALE_BUNDLES = {
   'en-US': enUS,
+  'vi-VN': viVN,
   'ko-KR': koKR,
   'ru-RU': ruRU,
 } as const
@@ -509,12 +511,10 @@ export function findAllLocaleMessageCompileErrors(
 
 type LocaleTree = Record<string, unknown>
 
-// vi-VN CỐ Ý chưa nằm trong danh sách gác: upstream 0.7.0/0.7.2 thêm ~700 khoá
-// (system admin, integrations, agentEditor…) mà bản Việt chưa dịch xong. Chúng
-// KHÔNG hiện key thô nhờ fallbackLocale ['en-US','vi-VN'] trong i18n/index.ts —
-// người dùng thấy tiếng Anh. Khi dịch xong, THÊM 'vi-VN' vào đây để nó được gác
-// như 3 locale còn lại (xem backlog trong 04-nhat-ky-tuy-bien.md).
-const LOCALE_ORDER: LocaleName[] = ['en-US', 'ko-KR', 'ru-RU']
+// vi-VN nằm trong lưới gác từ 22/8/2026, sau khi dịch xong 1182 khoá mà
+// upstream 0.6.3→0.7.2 thêm vào. Từ giờ mỗi chặng merge upstream mà quên dịch
+// khoá mới sẽ bị test này bắt ngay, thay vì lặng lẽ rơi về tiếng Anh.
+const LOCALE_ORDER: LocaleName[] = ['en-US', 'vi-VN', 'ko-KR', 'ru-RU']
 const LOCALES_DIR = join(dirname(fileURLToPath(import.meta.url)), 'locales')
 
 function getLocaleValueAtPathParts(current: unknown, parts: string[]): unknown {

@@ -570,6 +570,17 @@ Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merg
 - [ ] `go test` tầng service/modelcontext cần CI hoặc Linux (SIGSEGV gojieba trên Windows).
 - [ ] Việt hoá lại `mcp-server/` nếu sau này thực sự dùng (đợt này cố ý bỏ).
 
+### Dịch trọn bộ i18n tiếng Việt sau merge upstream (2026-08-22)
+Dịch **1182 khoá** mà upstream 0.6.3→0.7.2 thêm vào (`system` 249, `integrations` 212, `knowledgeEditor` 202, `knowledgeBase` 80, `agentEditor` 72, `settings` 51, `organization`/`datasource`/`platformApiKeys` mỗi nhóm 44…). Sau đó **bật `'vi-VN'` vào `LOCALE_ORDER` của `localeKeyAudit.ts`** — từ nay chặng merge nào quên dịch khoá mới sẽ bị test bắt ngay thay vì lặng lẽ rơi về tiếng Anh.
+
+- **Đo bằng cách IMPORT module, không parse bằng regex.** Lần đầu tôi viết parser regex đếm ra "1374 khoá riêng của vi-VN" — sai, vì stack container lệch khi gặp cấu trúc lồng phức tạp. Viết một script `tsx` import thẳng hai file locale rồi flatten mới ra số đúng. **Bài học: với file TS/JS có cấu trúc, luôn để runtime parse hộ.**
+- **Phát hiện nhờ đo đúng:** en-US hiện KHÔNG còn `menu.chat`, `menu.integrations`… — upstream đã dọn khoá chết ở 0.7.x. Nên trong 1341 khoá vi-VN "thừa" thì **1274 là rác upstream đã bỏ**, chỉ 67 là khoá riêng của fork (`chess.*`…). Rác vô hại vì không gì tham chiếu tới.
+- **Đã thử dọn 1274 khoá rác rồi HOÀN TÁC.** Xoá theo dòng bằng regex trên file 6500 dòng vỡ cú pháp hai lần (giá trị trải nhiều dòng; dấu đóng container bị ăn mất). Đổi hướng: giữ nguyên file, **miễn kiểm chiều `extra` cho vi-VN** trong test và ghi rõ lý do tại chỗ — chiều `missing` (cái gây lỗi thật) vẫn gác đầy đủ. Đúng nguyên tắc: không đánh đổi rủi ro thật lấy sự gọn gàng.
+- ⚠️ **Bẫy khoá PHẲNG có dấu chấm trong tên.** en-US viết `'kb.created': '…'` (một khoá tên `kb.created`), không phải `kb: { created: … }`. Script chèn của tôi tạo container lồng → test báo `missing flat knowledgeEditor.activity.actions.kb.created`. Phải chuyển 42 khoá (8 ở `audit.action`, 34 ở `activity.actions`) về đúng dạng phẳng. **Khi thêm khoá i18n, phải nhìn CẤU TRÚC của en-US chứ không chỉ đường dẫn.**
+- ⚠️ **`@` trong chuỗi vue-i18n phải escape.** Ký tự `@` mở đầu cú pháp *linked message* (`@:key`), nên `"Nhấn @ để…"` và `"your@example.com"` làm test biên dịch báo `Invalid linked format`. Escape bằng literal `{'@'}` — tiền lệ fork đã có ở `integrations.claw`. Đây là lỗi CÓ SẴN trong vi-VN, chỉ lộ ra khi vi-VN được đưa vào lưới gác.
+- Công cụ dùng lại được: `i18n_apply.py` (chèn theo đường dẫn, tự tạo container thiếu, tự thêm dấu phẩy, chống trùng khoá) — giữ nguyên format và 39 comment của file thay vì sinh lại.
+- **Kiểm chứng:** `npm test` **385/385** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch · khoá thiếu **0/4778**. 73 khoá giữ nguyên tiếng Anh là **cố ý**: tên nhà cung cấp (Tencent COS, Alibaba OSS…), tham số kỹ thuật (`chat_template_kwargs`), URL mẫu, ID model.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.

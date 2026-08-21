@@ -39,6 +39,13 @@ test('locale bundles expose the same translation keys', () => {
     if (localeName === REFERENCE_LOCALE) continue
     const { missing, extra } = diffLocaleKeys(referenceKeys, keys)
     for (const key of missing) mismatches.push(`${localeName}: missing ${key}`)
+    // vi-VN CỐ Ý được miễn kiểm chiều "extra". Fork Dương Sinh (a) có khoá riêng
+    // mà upstream không có (`chess.*` cho lớp cờ vua — xem tiền lệ trong
+    // .claude/memory/04-nhat-ky-tuy-bien.md mục C4), và (b) còn giữ lại khoá của
+    // các phiên bản upstream cũ mà upstream đã dọn. Khoá THỪA vô hại: không có
+    // gì tham chiếu nên không hiển thị ở đâu. Khoá THIẾU mới là lỗi thật (hiện
+    // key thô hoặc rơi về tiếng Anh) nên chiều đó vẫn được gác đầy đủ.
+    if (localeName === 'vi-VN') continue
     for (const key of extra) mismatches.push(`${localeName}: extra ${key}`)
   }
 
