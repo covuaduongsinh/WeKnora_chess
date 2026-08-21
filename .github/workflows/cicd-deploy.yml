@@ -113,10 +113,28 @@ jobs:
         with:
           go-version: "1.26"
           cache-dependency-path: go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: go vet (chess)
         run: go vet ./internal/chess/... ./internal/agent/tools/... ./internal/config/...
       - name: go test (chess)
         run: go test ./internal/chess/... ./internal/agent/tools/...
+      # Tầng service + modelcontext KHÔNG chạy được trên máy Windows của Thầy:
+      # `internal/types.init()` gọi gojieba.NewJieba (cgo) và crash SIGSEGV
+      # TRƯỚC khi hàm test nào chạy. Trên Linux thì bình thường, nên đây là nơi
+      # DUY NHẤT các test lớp cờ ở tầng service (chess_library_*, indexer, tag…)
+      # thực sự được chạy runtime. Xem 04-nhat-ky-tuy-bien.md.
+      - name: go test (service + modelcontext)
+        run: go test ./internal/application/service/... ./internal/modelcontext/...
+      - name: frontend test + type-check
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npx vue-tsc --noEmit
 
   # ---- Deploy: SSH vào VPS, git pull (lấy compose/scripts mới) rồi pull image + up ----
   deploy:
