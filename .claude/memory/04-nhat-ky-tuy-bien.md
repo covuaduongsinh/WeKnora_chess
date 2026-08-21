@@ -515,6 +515,19 @@ Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merg
 
 **Kiểm chứng:** `go build ./...` sạch · `go vet ./internal/...` sạch · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **250/250** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà lại 10 điểm móc nối fork (15 nhóm route cờ, 7 tool, agent HLV, 8 `chessRefPrefixes`, `chessLibraryService` trong DI, bản vá rerank, ChessBoardDisplay ở cả botmsg lẫn AgentStreamDisplay, 13 migration cờ, migration upstream 62–70) — **còn nguyên**.
 
+### G4: merge upstream `v0.7.1` (2026-08-22)
+6 file conflict — nhẹ như dự đoán. Nội dung 0.7.1: Yunzhijia IM, Volcengine Rerank, Zhipu web search, platform API keys, KB activity audit, Langfuse OTLP/OTel, **gỡ Neo4j memory pipeline**, xuất Markdown hội thoại.
+
+- **`wiki_page.go`** (file 39× chess): base RỖNG ở vùng conflict — cả hai bên cùng THÊM code mới vào một chỗ (fork: `chessRefPrefixes`/`splitChessRef`/`syncChessRefs`; upstream: `slugNamespace`/`rewriteDeadWikiLinks`/`resolveDeadSlug`, 144 dòng) → giữ CẢ HAI.
+  - ⚠️ **Bẫy khi nối hai khối:** dấu `}` đóng hàm `syncChessRefs` nằm trong phần bị marker cắt, nối máy móc `head + upstream` làm **mất dấu đóng hàm** → `syntax error: unexpected name slugNamespace, expected (`. Khi resolve kiểu "giữ cả hai khối code", **phải kiểm dấu ngoặc ở ĐIỂM NỐI**, không chỉ nội dung hai khối.
+- **`SystemSettings.vue`**: upstream **XOÁ hẳn 366 dòng** khối platform audit log (chuyển đi nơi khác ở 0.7.1). Fork chỉ sửa 2 dòng trong đó (`Intl.DateTimeFormat(locale.value || 'zh-CN')` → `'vi-VN'`) → theo upstream, bỏ cả khối; đã grep xác nhận không còn `zh-CN` sót trong file.
+- **`go.sum`**: lấy bản upstream rồi `go mod tidy` (đúng nguyên tắc không resolve tay lock-file).
+- **`.env.example`**, **`README_CN.md`**: giữ cả hai / lấy bản upstream rồi áp lại sửa thuật ngữ.
+- **`wiki_page_test.go` (upstream)**: `NewWikiPageService` nay có 6 tham số (fork chèn `chessRefRepo`, upstream 0.7.1 chèn `*redis.Client`) nhưng test upstream vẫn truyền 5 → thêm 1 `nil`. **Đây là loại lỗi sẽ lặp lại mỗi lần upstream thêm tham số vào constructor mà fork cũng đã chèn tham số.**
+- **Test `workspaceTerminology` lại fail — v0.7.1 CŨNG tự fail test của chính nó**: `.env.example` (5 chỗ) và `docker-compose.yml` (3 chỗ) còn `租户`. `upstream/main` đã dọn sạch cả hai → áp cách dọn đó (`租户` → `空间`). *(Ở chặng 0.7.0 test này đã pass; 0.7.1 mang 租户 mới vào — nên phải chạy lại test mỗi chặng, không suy ra từ chặng trước.)*
+
+**Kiểm chứng:** `go build ./...` sạch · `go vet ./internal/...` sạch · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **286/286** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà lại 10 điểm móc nối fork — còn nguyên.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.
