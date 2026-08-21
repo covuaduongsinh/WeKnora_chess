@@ -492,6 +492,29 @@ Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merg
 
 **Chưa làm:** chưa deploy production (theo đúng runbook: chỉ deploy khi kèm bước đặt lại `schema_migrations.version` về 61). Chưa merge 0.7.0/0.7.1/0.7.2.
 
+### G3: merge upstream `v0.7.0` (2026-08-22) — chặng NẶNG NHẤT trên giấy, thực tế vừa phải
+11 file conflict. **`agent_service.go` — file tôi lo nhất — hoá ra chỉ 2 khối, mỗi khối 1 dòng**: fork thêm `chessLibraryService`, upstream thêm `storageResolver` vào cùng constructor → giữ CẢ HAI. `container.go` **0 dòng sửa** (dig tự nối theo kiểu). Build Go sạch ngay lần đầu.
+
+**Conflict và cách giải:**
+- **`errors.go`**: upstream đổi thuật ngữ 租户→空间 VÀ thêm hàm mới `NewTenantCreationDisabledError` nằm LẪN trong khối conflict. Không thể chọn một bên — phải lấy code mới của upstream rồi thay dòng `Message` bằng bản Việt. (Script resolve: khối nào phần upstream >1 dòng thì giữ upstream, chỉ thay dòng đầu bằng HEAD.)
+- **`AgentStreamDisplay.vue`**: upstream thêm khối `attachment_parsing` MỚI và đổi `hasResults` → `hasExpandableResults`; fork có điều kiện tự mở kết quả tool cờ (`tool_name?.startsWith('chess_')`) và `<ChessBoardDisplay>`. Hợp nhất thủ công: giữ khối mới của upstream + điều kiện chess_ + dùng TÊN HÀM MỚI.
+- **`botmsg.vue`**: upstream XOÁ khối loading-indicator, fork thêm `<ChessBoardDisplay>` ngay trước nó → giữ ChessBoardDisplay, bỏ loading-indicator.
+- **`menu.vue` / `stores/menu.ts`**: upstream 0.7.0 **BỎ** mục `integrations` khỏi sidebar (route vẫn còn) → giữ `chess-courses`, bỏ theo upstream.
+- **`feishu/adapter.go`**: upstream thay chuỗi cứng bằng `region.ThinkingText` (i18n theo vùng) → theo upstream, rồi **Việt hoá tại nguồn** `region.go` cho cả 2 region.
+- **`.env.example`**, **`mcp-server/main.py`**: hai bên cùng thêm ở một chỗ → giữ cả hai (main.py: giữ docstring Việt + thêm biến `MCP_SERVER_AUTH_TOKEN` mới).
+
+**i18n — đổi chiến lược, sửa GỐC RỄ thay vì dịch tay từng chặng:** upstream 0.7.0 thêm **700 khoá** vi-VN chưa có (`integrations` 224, `system` 223, `agentEditor` 53…). Dịch tay từng chặng là không khả thi. Nguyên nhân thật của "lỗi key thô" là `frontend/src/i18n/index.ts` đặt `fallbackLocale: 'vi-VN'` — **trỏ fallback về CHÍNH locale mặc định**, nên khoá thiếu hiện `menu.integrations` thay vì rơi về tiếng Anh. Đổi thành `['en-US', 'vi-VN']`: en-US đón khoá upstream chưa dịch, vi-VN đứng cuối để khoá CHỈ fork có (`chess.*`) vẫn hiện khi xem locale khác. (`i18n/embed.ts` vốn đã fallback 'en-US' đúng — chỉ `index.ts` sai.) Dịch đầy đủ 700 khoá để làm MỘT LƯỢT sau khi xong G5.
+
+**Hai test upstream tự hỏng ở chính tag v0.7.0** (không phải do merge, đã xác minh bằng `git show v0.7.0:...`):
+- `workspaceTerminology.test.ts` (test MỚI, gác thuật ngữ tenant→workspace): `README_CN.md` **của chính upstream** còn 2 chỗ `租户`; `en-US`/`ko-KR`/`ru-RU` còn "tenant/테넌트" trong `capabilityManageStorageBackendsHint`. `upstream/main` đã sửa cả 4 → áp bản sửa đó.
+- Test này cũng **import `zh-CN.ts`** (fork đã xoá) → đổi sang `vi-VN` với regex cấm `tenants?`. Và nó **quét cả `mcp-server/.venv/site-packages`** (artifact pip, đầy `租户`) → thêm danh sách bỏ qua `.venv`/`node_modules`/`site-packages`/`*.egg-info`. **File này vào inventory C4.**
+- Nhân đó **Việt hoá 28 chỗ "tenant" → "không gian làm việc"** trong `vi-VN.ts` cho khớp thuật ngữ mới.
+  - ⚠️ **Bẫy đã dính:** regex `tenant` thay cả **TÊN KEY** `tenant:` → vỡ cú pháp TS (`Expected "}" but found "gian"`). Phải loại trừ dòng dạng `^\s*tenant\s*:`. Cùng loại bẫy với escape `\"` ở G2: **sửa file locale xong PHẢI chạy `npm run build`** — `npm test` và `vue-tsc` KHÔNG parse file locale nên không bắt được.
+
+**Ghi nhận:** upstream sửa **migration CŨ `000041`** (đã chạy production) — kiểm ra chỉ đổi **comment SQL** (`COMMENT ON COLUMN` + chú thích), không đổi schema → vô hại, production không cần làm gì.
+
+**Kiểm chứng:** `go build ./...` sạch · `go vet ./internal/...` sạch · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **250/250** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà lại 10 điểm móc nối fork (15 nhóm route cờ, 7 tool, agent HLV, 8 `chessRefPrefixes`, `chessLibraryService` trong DI, bản vá rerank, ChessBoardDisplay ở cả botmsg lẫn AgentStreamDisplay, 13 migration cờ, migration upstream 62–70) — **còn nguyên**.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.

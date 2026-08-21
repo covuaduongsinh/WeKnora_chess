@@ -162,7 +162,7 @@ export default {
         },
         storage: {
           title: "Bộ máy lưu trữ (tùy chọn)",
-          desc: "Nơi lưu file gốc (cục bộ hoặc lưu trữ đối tượng). Mặc định theo cài đặt của tenant là được.",
+          desc: "Nơi lưu file gốc (cục bộ hoặc lưu trữ đối tượng). Mặc định theo cài đặt của không gian làm việc là được.",
         },
         navMultimodal: {
           title: "Đa phương thức / hiểu hình ảnh (tùy chọn)",
@@ -2080,7 +2080,7 @@ export default {
       rerankModel: "Mô hình ReRank",
       rerankModelDesc: "Dùng để xếp hạng lại kết quả truy hồi kho tri thức, nâng cao độ chính xác câu trả lời",
       rerankModelPlaceholder: "Vui lòng chọn mô hình ReRank",
-      rerankModelOptionalHint: "Phạm vi hiện tại chưa có kho tri thức loại RAG, có thể bỏ trống; nếu sau này thêm kho tri thức RAG sẽ tự dùng mô hình xếp hạng lại mặc định của tenant, vẫn nên cấu hình rõ.",
+      rerankModelOptionalHint: "Phạm vi hiện tại chưa có kho tri thức loại RAG, có thể bỏ trống; nếu sau này thêm kho tri thức RAG sẽ tự dùng mô hình xếp hạng lại mặc định của không gian làm việc, vẫn nên cấu hình rõ.",
       maxIterations: "Số vòng lặp tối đa",
       allowedTools: "Công cụ được phép",
       multiTurn: "Trò chuyện nhiều lượt",
@@ -2418,7 +2418,7 @@ export default {
     },
     globalSettings: {
       title: "Cài đặt hệ thống",
-      description: "Cấu hình runtime cấp nền tảng, sau khi lưu có hiệu lực ngay với mọi tenant. Chỉ quản trị viên hệ thống mới thấy và sửa được.",
+      description: "Cấu hình runtime cấp nền tảng, sau khi lưu có hiệu lực ngay với mọi không gian làm việc. Chỉ quản trị viên hệ thống mới thấy và sửa được.",
       loading: "Đang tải...",
       empty: "Chưa có cài đặt hệ thống nào để cấu hình",
       badgeRequiresRestart: "Cần khởi động lại",
@@ -2441,8 +2441,8 @@ export default {
           whitelist: "Danh sách trắng chống SSRF",
         },
         tenant: {
-          max_owned_per_user: "Số tenant tối đa mỗi người dùng",
-          default_storage_quota_gb: "Hạn mức lưu trữ mặc định cho tenant mới (GB)",
+          max_owned_per_user: "Số không gian làm việc tối đa mỗi người dùng",
+          default_storage_quota_gb: "Hạn mức lưu trữ mặc định cho không gian làm việc mới (GB)",
         },
         asynq: {
           concurrency: "Số tác vụ bất đồng bộ chạy song song",
@@ -2461,11 +2461,11 @@ export default {
         },
         tenant: {
           max_owned_per_user:
-            "Số tenant tối đa mà mỗi người dùng không phải siêu quản trị có thể tự tạo. Đọc theo thời gian thực mỗi khi tạo tenant, " +
+            "Số không gian làm việc tối đa mà mỗi người dùng không phải siêu quản trị có thể tự tạo. Đọc theo thời gian thực mỗi khi tạo không gian làm việc, " +
             "có hiệu lực ngay sau khi sửa. 0 nghĩa là dùng giá trị mặc định cài sẵn 10; số âm nghĩa là tắt hoàn toàn giới hạn (không khuyến nghị cho triển khai công khai).",
           default_storage_quota_gb:
-            "Hạn mức lưu trữ (GB) phân bổ mặc định khi tạo tenant mới, gồm vector, văn bản gốc, văn bản, chỉ mục... " +
-            "Chỉ đọc khi tạo, sau khi sửa chỉ áp dụng cho tenant tạo mới về sau, không ghi lại cho tenant đã tồn tại. " +
+            "Hạn mức lưu trữ (GB) phân bổ mặc định khi tạo không gian làm việc mới, gồm vector, văn bản gốc, văn bản, chỉ mục... " +
+            "Chỉ đọc khi tạo, sau khi sửa chỉ áp dụng cho không gian làm việc tạo mới về sau, không ghi lại cho không gian làm việc đã tồn tại. " +
             "0 hoặc số âm nghĩa là dùng giá trị mặc định cài sẵn 10GB.",
         },
         asynq: {
@@ -2530,7 +2530,7 @@ export default {
         confirm: {
           promote: {
             header: "Nâng lên quản trị viên hệ thống",
-            body: "Xác nhận nâng {email} lên quản trị viên hệ thống? Người dùng này sẽ có quyền cấp nền tảng, truy cập được mọi tenant, sửa cài đặt hệ thống, quản lý các quản trị viên khác.",
+            body: "Xác nhận nâng {email} lên quản trị viên hệ thống? Người dùng này sẽ có quyền cấp nền tảng, truy cập được mọi không gian làm việc, sửa cài đặt hệ thống, quản lý các quản trị viên khác.",
             confirmBtn: "Xác nhận nâng",
           },
           revoke: {
@@ -2541,12 +2541,12 @@ export default {
         },
       },
       bulkApply: {
-        label: "Áp dụng cho tất cả tenant hiện có",
-        tooltip: "Giá trị đã lưu mặc định chỉ áp dụng cho tenant tạo mới về sau; nhấn nút này để ghi đồng bộ giá trị hiện tại vào tất cả tenant hiện có.",
+        label: "Áp dụng cho tất cả không gian làm việc hiện có",
+        tooltip: "Giá trị đã lưu mặc định chỉ áp dụng cho không gian làm việc tạo mới về sau; nhấn nút này để ghi đồng bộ giá trị hiện tại vào tất cả không gian làm việc hiện có.",
         confirmBtn: "Xác nhận áp dụng",
-        confirmBody: "Sẽ ghi đè hạn mức lưu trữ của tất cả tenant hiện có thành {value} GB. Nếu có tenant đã được vận hành điều chỉnh hạn mức riêng thì cũng bị ghi đè. Tiếp tục?",
-        success: "Đã cập nhật hạn mức lưu trữ của {count} tenant thành {gb} GB",
-        failed: "Áp dụng cho tất cả tenant thất bại",
+        confirmBody: "Sẽ ghi đè hạn mức lưu trữ của tất cả không gian làm việc hiện có thành {value} GB. Nếu có không gian làm việc đã được vận hành điều chỉnh hạn mức riêng thì cũng bị ghi đè. Tiếp tục?",
+        success: "Đã cập nhật hạn mức lưu trữ của {count} không gian làm việc thành {gb} GB",
+        failed: "Áp dụng cho tất cả không gian làm việc thất bại",
       },
       audit: {
         tabLabel: "Nhật ký kiểm toán",
@@ -2584,7 +2584,7 @@ export default {
         },
         target: {
           bulkQuota: "Đồng bộ hàng loạt: hạn mức lưu trữ mặc định",
-          bulkQuotaDiff: "Áp dụng cho {count} tenant ({gb} GB)",
+          bulkQuotaDiff: "Áp dụng cho {count} không gian làm việc ({gb} GB)",
           promoteIdempotent: "Đối tượng đã là quản trị viên hệ thống (idempotent)",
           revokeNoop: "Đối tượng vốn không phải quản trị viên hệ thống (idempotent)",
           requiredRole: "Cần vai trò: {role}",
@@ -2982,7 +2982,7 @@ export default {
     multimodalParsing: "Phân tích tài liệu đa phương thức",
     hybridSearchEngine: "Truy hồi lai + đồ thị tri thức",
     ragQandA: "Hỏi đáp bằng trợ lý AI ReAct",
-    independentTenant: "Không gian tenant độc lập",
+    independentTenant: "Không gian làm việc độc lập",
     fullApiAccess: "Truy cập API đầy đủ",
     knowledgeBaseManagement: "Quản lý kho tri thức",
     carousel: {
@@ -4334,7 +4334,7 @@ export default {
     copySuffix: " bản sao",
     builtinModels: {
       title: "Mô hình tích hợp sẵn",
-      description: "Mô hình tích hợp sẵn hiển thị cho mọi tenant, thông tin nhạy cảm sẽ bị ẩn, và không thể sửa hoặc xóa.",
+      description: "Mô hình tích hợp sẵn hiển thị cho mọi không gian làm việc, thông tin nhạy cảm sẽ bị ẩn, và không thể sửa hoặc xóa.",
       viewGuide: "Xem hướng dẫn quản lý mô hình tích hợp sẵn",
     },
     builtinTag: "Tích hợp sẵn",
@@ -4923,7 +4923,7 @@ export default {
       loading: "Đang tải danh sách kho vector...",
       engineLabel: "Lưu trữ vector",
       engineDesc:
-        "Chọn từ cấu hình kho vector toàn cục, hoặc giữ mặc định hệ thống để dùng bộ máy RETRIEVE_DRIVER của tenant.",
+        "Chọn từ cấu hình kho vector toàn cục, hoặc giữ mặc định hệ thống để dùng bộ máy RETRIEVE_DRIVER của không gian làm việc.",
       boundLabel: "Kho vector đã liên kết",
       systemDefault: "Mặc định hệ thống",
       immutableHint:

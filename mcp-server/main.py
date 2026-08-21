@@ -68,8 +68,9 @@ Ví dụ:
   python main.py --verbose          # Bật log chi tiết
   
 Biến môi trường:
-  WEKNORA_BASE_URL    URL gốc API WeKnora (mặc định: http://localhost:8080/api/v1)
-  WEKNORA_API_KEY     Khóa API WeKnora
+  WEKNORA_BASE_URL       URL gốc API WeKnora (mặc định: http://localhost:8080/api/v1)
+  WEKNORA_API_KEY        Khóa API WeKnora
+  MCP_SERVER_AUTH_TOKEN  Bắt buộc với truyền tải SSE/HTTP; client gửi qua Authorization: Bearer
         """,
     )
 
@@ -91,8 +92,8 @@ Biến môi trường:
     )
     parser.add_argument(
         "--host",
-        default=os.getenv("MCP_HOST", "0.0.0.0"),
-        help="Bind host for network transports (default: 0.0.0.0)",
+        default=os.getenv("MCP_HOST", "127.0.0.1"),
+        help="Bind host for network transports (default: 127.0.0.1)",
     )
     parser.add_argument(
         "--port",

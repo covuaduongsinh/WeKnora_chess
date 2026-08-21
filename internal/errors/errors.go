@@ -24,11 +24,12 @@ const (
 	ErrValidation         ErrorCode = 1010
 
 	// Tenant related error codes (2000-2099)
-	ErrTenantNotFound      ErrorCode = 2000
-	ErrTenantAlreadyExists ErrorCode = 2001
-	ErrTenantInactive      ErrorCode = 2002
-	ErrTenantNameRequired  ErrorCode = 2003
-	ErrTenantInvalidStatus ErrorCode = 2004
+	ErrTenantNotFound         ErrorCode = 2000
+	ErrTenantAlreadyExists    ErrorCode = 2001
+	ErrTenantInactive         ErrorCode = 2002
+	ErrTenantNameRequired     ErrorCode = 2003
+	ErrTenantInvalidStatus    ErrorCode = 2004
+	ErrTenantCreationDisabled ErrorCode = 2005
 
 	// Agent related error codes (2100-2199)
 	ErrAgentMissingThinkingModel ErrorCode = 2100
@@ -180,6 +181,16 @@ func NewTenantInactiveError() *AppError {
 	return &AppError{
 		Code:     ErrTenantInactive,
 		Message:  "Tenant đã bị vô hiệu hóa",
+		HTTPCode: http.StatusForbidden,
+	}
+}
+
+// NewTenantCreationDisabledError reports a deployment-policy denial for
+// ordinary self-service tenant creation.
+func NewTenantCreationDisabledError() *AppError {
+	return &AppError{
+		Code:     ErrTenantCreationDisabled,
+		Message:  "Hệ thống không cho phép tự tạo không gian làm việc; hãy tham gia bằng lời mời",
 		HTTPCode: http.StatusForbidden,
 	}
 }
