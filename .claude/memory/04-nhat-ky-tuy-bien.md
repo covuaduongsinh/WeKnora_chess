@@ -581,6 +581,33 @@ Dịch **1182 khoá** mà upstream 0.6.3→0.7.2 thêm vào (`system` 249, `inte
 - Công cụ dùng lại được: `i18n_apply.py` (chèn theo đường dẫn, tự tạo container thiếu, tự thêm dấu phẩy, chống trùng khoá) — giữ nguyên format và 39 comment của file thay vì sinh lại.
 - **Kiểm chứng:** `npm test` **385/385** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch · khoá thiếu **0/4778**. 73 khoá giữ nguyên tiếng Anh là **cố ý**: tên nhà cung cấp (Tencent COS, Alibaba OSS…), tham số kỹ thuật (`chat_template_kwargs`), URL mẫu, ID model.
 
+### Deploy production bản 0.7.2 + gỡ nợ test tầng service (2026-08-22)
+Đưa toàn bộ đợt đồng bộ upstream lên `weknora.covuaduongsinh.com`. Hai việc đáng nhớ hơn cả bản thân việc deploy.
+
+**1. Lần đầu chạy được test tầng service — và nó bắt 6 lỗi thật.**
+Thêm `go test ./internal/application/service/... ./internal/modelcontext/...` + `npm test` + `vue-tsc` vào job `test` của `cicd-deploy.yml`. Trước đó CI chỉ chạy `internal/chess` + `agent/tools`, còn tầng service thì **chưa từng chạy runtime** (Windows crash SIGSEGV `gojieba` ở `internal/types.init`). Vừa bật lên là đỏ ngay, qua 4 vòng sửa mới xanh:
+- `stubIdxRepo` thiếu `Get`/`Delete`/`Upsert` → panic khi `Indexer.Remove` gọi tới.
+- `fakeTagBase` thiếu 6 `Get*` → panic khi `describeChessItem` tra thực thể cho mục lục ngang.
+- `fakeArticleRepo.GetArticle`, `fakeBookRepo.GetChapter`/`GetBook` trả **con trỏ gốc** thay vì bản sao. GORM luôn dựng struct mới mỗi truy vấn; fake trả con trỏ gốc thì `RestoreArticleRevision` sửa `Title`/`Content` tại chỗ sẽ đổi luôn bản trong "DB", khiến `UpdateArticle` thấy cũ ≡ mới và **bỏ qua việc tạo phiên bản** → test khôi phục thất bại. **Bài học chung: fake repo phải mô phỏng đúng ngữ nghĩa "mỗi query trả bản sao".**
+- `fakeArticleAliasRepo.ReplaceSynonyms` index theo `targetSlug`, trong khi bảng thật có `UNIQUE(tenant_id, chess_type, old_slug)` — một bí danh chỉ trỏ tới ĐÚNG MỘT đích, ghi lại với đích mới là UPDATE dòng cũ chứ không tạo dòng thứ hai. Fake cũ để lại bí danh ở đích cũ nên **báo "bí danh mồ côi" oan** cho `RenameArticleSlug` (code sản phẩm vốn đúng). **Fake phải mô phỏng cả ràng buộc UNIQUE, không chỉ hình dạng dữ liệu.**
+- **Một lỗi SẢN PHẨM thật:** `duplicateKBCopySuffix`/`duplicateKBDefaultName` có nhánh zh/ko/ru nhưng **không có `vi`**, trong khi `middleware/language.go` của fork đặt fallback locale là `vi-VN`. Hậu quả ở runtime: nhân bản kho tri thức ra `"… Copy"` giữa giao diện Việt. Đã thêm nhánh `vi` → `" Bản sao"` / `"Kho tri thức"`. Lỗi này ẩn từ lúc fork bỏ tiếng Trung.
+- Cũng sửa `cicd-deploy.yml`: job `deploy` thêm `if: github.ref == 'refs/heads/main'` để `workflow_dispatch` trên nhánh **chỉ dựng image lên GHCR mà không đụng production** — cần thiết cho đúng kịch bản nâng cấp lớn này.
+
+**2. Sự cố khi deploy: app không lên vì `.env`, KHÔNG phải vì merge.**
+Upstream 0.7.x đổi `docker-compose.yml` từ `DB_HOST=postgres` (cứng) sang `DB_HOST=${DB_HOST:-postgres}`. `.env` production có `DB_HOST=localhost` từ lâu (giá trị dành cho chạy ngoài Docker, trước nay vô hại vì bị compose ghi đè). Sau nâng cấp app đọc đúng `localhost` → không nối được Postgres → **panic lúc dựng DI** (`registerModelConcurrencyLimiter` → `SystemSettingService` → `*gorm.DB`). Thông báo lỗi trỏ vào DI nên rất dễ tưởng nhầm là merge làm hỏng wiring. Sửa `.env` → `DB_HOST=postgres`, app lên ngay. Đã ghi mục **4a** trong `docs/deploy/upstream-sync.md`: mỗi lần merge phải `git diff … -- docker-compose.yml | grep '^\+.*\$\{'` rồi đối chiếu `.env` production.
+
+**Quy trình deploy đã dùng (thủ công, kiểm soát được thứ tự):**
+1. Chạy CI trên nhánh (`workflow_dispatch`) → test + build image lên GHCR, **không** deploy.
+2. `git merge --ff-only` nhánh vào `main` rồi push (CI chạy lại; ta không chờ nó).
+3. SSH: `pg_dump` → **dừng app** → `git pull --ff-only` → `UPDATE schema_migrations SET version=61` → `pull-deploy.sh` với `IMAGE_TAG` = SHA đã build.
+4. Nghiệm thu.
+- **Dừng app trước khi đặt lại version** là bước then chốt: nếu app cũ khởi động lại trong khoảng đó, nó sẽ chạy migration cờ cũ và đẩy version về 74, khiến migration upstream 62–74 bị bỏ qua vĩnh viễn.
+- Trước đó đã dọn 122 tag image GHCR cũ trên VPS (giữ 3 bản gần nhất mỗi repo để rollback): đĩa **84% → 51%**, lấy lại 23GB. Mỗi tag app nặng 2.39GB nên tích tụ rất nhanh.
+
+**Nghiệm thu production:** `schema_migrations` = **912, dirty=false** · **74 bảng** (đủ `mcp_oauth_clients`, `storage_backends`, `chunk_revisions`, `wiki_page_revisions`, `chess_tags`, `chess_tag_items`) · dữ liệu **nguyên vẹn** (2 sách, 1 bài viết, 35 ván, 3 bài giảng, 32 tài liệu — khớp trước deploy) · `/health` 200 · chess-engine `ok` · `https://weknora.covuaduongsinh.com` 200 · log 3 phút đầu **không lỗi** · **10/10 route cờ trả 401 chứ không phải 404** (xác nhận `routes_chess.go` mới đăng ký đúng sau khi upstream tách router).
+
+**Kiểm chứng migration TRƯỚC khi đụng production:** dựng DB tạm từ bản sao DB thật rồi chạy đúng runbook (force 61 → 20 migration upstream → 13 migration cờ). **33/33 sạch**, migration cờ chạy lại đúng là no-op — chứng minh tính idempotent trên dữ liệu thật thay vì suy luận từ việc đọc SQL. 60 → 74 bảng, dữ liệu cờ nguyên vẹn.
+
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
 - [ ] (Tùy chọn) Bật `CHESS_KB_INDEX` full stack + nối KB "Tri thức cờ vua" vào agent HLV — **runbook đã có:** `docs/chess-rag-enable.md`.

@@ -123,6 +123,38 @@ Migration lỗi giữa chừng: app **vẫn khởi động được** (thiết k
 System Info hiện lỗi — xem [migration-troubleshooting.md](../migration-troubleshooting.md).
 Rollback = restore backup bước 1 + `git revert` chặng đó.
 
+## 4a. ⚠️ Kiểm `.env` production TRƯỚC khi khởi động bản mới
+
+Upstream 0.7.x đổi nhiều biến trong `docker-compose.yml` từ **giá trị cứng** sang
+**đọc `.env`**:
+
+```diff
+-      - DB_HOST=postgres
++      - DB_HOST=${DB_HOST:-postgres}
+```
+
+`.env` production có `DB_HOST=localhost` (giá trị dành cho chạy ngoài Docker; trước đây
+vô hại vì compose ghi đè cứng thành `postgres`). Sau khi nâng cấp, app trong container
+đọc đúng `localhost` và **không nối được Postgres** → panic lúc dựng DI:
+
+```
+DB Config: user=postgres host=localhost port=5432 dbname=WeKnora
+dial tcp 127.0.0.1:5432: connect: connection refused
+panic: could not build arguments for function ...registerModelConcurrencyLimiter
+```
+
+Đây là lỗi cấu hình, **không phải lỗi merge** — nhưng nó làm app không lên nổi.
+Trước khi khởi động bản mới, đối chiếu mọi biến vừa chuyển sang `${VAR:-default}`:
+
+```bash
+git diff <commit-cũ> <commit-mới> -- docker-compose.yml | grep -E '^\+.*\$\{'
+# rồi kiểm giá trị tương ứng trong .env production
+grep -nE '^(DB_HOST|DB_PORT|REDIS_HOST|MINIO_ENDPOINT|DOCREADER_ADDR)=' .env
+```
+
+Trên VPS phải là tên service trong compose network: `DB_HOST=postgres`, không phải
+`localhost`.
+
 ## 4b. Gộp nhiều chặng vào MỘT lần deploy
 
 Nếu merge liền 4 chặng trong git rồi mới deploy (đúng cách đã làm ở đợt 0.6.2→0.7.2),
