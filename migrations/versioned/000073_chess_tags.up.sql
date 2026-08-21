@@ -5,9 +5,10 @@
 --              VARCHAR(255) và CHỈ tồn tại ở 3/9 loại (chess_positions:26,
 --              chess_books:57, chess_articles:42). Ván cờ, bài tập, bài giảng,
 --              khóa học, chương, kệ KHÔNG có thẻ nào. Lọc theo thẻ phải dùng
---              `tags ILIKE '%kw%'` (không index, và `pin` khớp luôn
---              `opening`), và "Khai cuộc"/"khai-cuoc"/"khai cuoc" thành 3 thẻ
---              khác nhau không gộp lại được.
+--              `tags ILIKE '%kw%'` — không index, và khớp SUBSTRING nên thẻ
+--              "Mã" (slug "ma") kéo về cả "mate", "tham", "nam"… Cộng thêm:
+--              "Khai cuộc"/"khai-cuoc"/"khai cuoc" thành 3 thẻ khác nhau,
+--              không gộp lại được.
 --
 --              GIẢI PHÁP: bảng thẻ thật `chess_tags` + bảng nối ĐA HÌNH
 --              `chess_tag_items` phủ MỌI loại nội dung cờ. Bảng nối là NGUỒN

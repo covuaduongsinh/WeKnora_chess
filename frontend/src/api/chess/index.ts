@@ -469,3 +469,38 @@ export const getChessTagsOfMany = (chessType: string, ids: string[]) =>
 // Bảo trì: nạp dữ liệu phân loại cũ vào hệ thẻ (idempotent) / đếm lại số dùng.
 export const backfillChessTags = () => post("/api/v1/chess/tags/backfill", {});
 export const recountChessTags = () => post("/api/v1/chess/tags/recount", {});
+
+// ---- Tìm kiếm hợp nhất ----
+// Một từ khóa, kết quả của CẢ 8 loại nội dung, đã xếp hạng chung. Khác
+// searchChessRefs (autocomplete khi gõ "[["): endpoint đó không chấm điểm và
+// nối kết quả theo thứ tự cứng của từng loại — nó phục vụ chèn wikilink, còn
+// cái này phục vụ TRA CỨU.
+export interface ChessSearchHit {
+  chess_type: string;
+  chess_id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  /** Đoạn trích quanh vùng khớp, GIỮ NGUYÊN dấu tiếng Việt. */
+  snippet: string;
+  level: string;
+  status: string;
+  score: number;
+  tags?: ChessTag[];
+  updated_at?: string;
+}
+
+export interface ChessSearchPage {
+  items: ChessSearchHit[];
+  total: number;
+  page: number;
+  page_size: number;
+  by_type: Record<string, number>;
+  /** Có loại nào chạm trần quét hay không — nên khuyên người dùng thu hẹp từ khóa. */
+  truncated: boolean;
+}
+
+export const searchChess = (
+  q: string,
+  opts: Partial<{ type: string; level: string; status: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
+) => get(`/api/v1/chess/search${qs({ q, ...opts })}`);

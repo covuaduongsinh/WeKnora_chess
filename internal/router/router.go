@@ -639,6 +639,11 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		chapters.GET("/:chapter_id/revisions/:rev_id", g.Viewer(), h.GetChapterRevision)
 		chapters.POST("/:chapter_id/revisions/:rev_id/restore", g.Contributor(), h.RestoreChapterRevision)
 	}
+	// TÌM KIẾM HỢP NHẤT — một từ khóa, kết quả của cả 8 loại nội dung, xếp
+	// hạng chung. Khác /chess/refs/search (autocomplete wikilink, không chấm
+	// điểm): đây là ô tìm để TRA CỨU.
+	r.GET("/chess/search", g.Viewer(), h.SearchChess)
+
 	// HỆ THẺ THỐNG NHẤT — trục phân loại NGANG phủ cả 8 loại nội dung cờ.
 	// Gồm 2 nhóm từ vựng: thẻ "group" (8 nhóm nội dung dựng sẵn, không xóa
 	// được) và thẻ "free" (tự do). Đích chính là "/by-slug/:slug/items" — bấm

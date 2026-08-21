@@ -204,6 +204,12 @@ type ChessLibraryService interface {
 	CountBooks(ctx context.Context, tenantID uint64, f types.ChessBookFilter) (int64, error)
 	CountArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) (int64, error)
 
+	// ---- Tìm kiếm hợp nhất ----
+	// SearchChessAll tìm trên CẢ 8 loại nội dung và trả một trang đã XẾP HẠNG
+	// chung. Khác /chess/refs/search (autocomplete wikilink) vốn không chấm
+	// điểm và nối kết quả theo thứ tự cứng trong code.
+	SearchChessAll(ctx context.Context, tenantID uint64, q types.ChessSearchQuery) (*types.ChessSearchPage, error)
+
 	// ---- Hệ thẻ thống nhất (phủ CẢ 8 loại nội dung cờ) ----
 	// EnsureChessTagGroups tạo 8 thẻ nhóm nội dung dựng sẵn nếu tenant chưa có
 	// (idempotent); trả số thẻ vừa tạo.
