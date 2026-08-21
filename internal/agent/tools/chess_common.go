@@ -49,15 +49,38 @@ func fenSide(fen string) string {
 	return chess.SideToMove(fen)
 }
 
+// setBoardFEN ghi trường "fen" của một payload chess_board bằng bản FEN đã CHUẨN
+// HÓA đủ 6 trường (chess.NormalizeFEN bù trường thiếu rồi xác thực cấu trúc).
+//
+// VÌ SAO: thư viện bàn cờ phía frontend (cm-chessboard) tách FEN bằng
+// split(/\/|\s/) — gộp '/' với khoảng trắng vào một mảng phẳng — rồi đọc ngược
+// parts[7-part] mà KHÔNG kiểm số nhóm. Dư/thiếu một token là bàn cờ lệch nguyên
+// một hàng và hàng quân cuối bị nuốt, KHÔNG throw, KHÔNG cảnh báo. Vì vậy mọi
+// FEN rời khỏi backend phải sạch, hoặc phải được đánh dấu là hỏng.
+//
+// FEN không hợp lệ → giữ chuỗi gốc (để người dùng thấy mình đã gõ gì) và bật cờ
+// "fen_invalid" để frontend hiện hộp báo lỗi thay vì vẽ một thế cờ SAI.
+//
+// LƯU Ý: NormalizeFEN cố ý KHÔNG đòi thế cờ phải có Vua — ngân hàng thế cờ được
+// phép lưu thế giản lược dạy trẻ (xem internal/chess/fen.go).
+func setBoardFEN(data map[string]interface{}, fen string) {
+	if normalized, err := chess.NormalizeFEN(fen); err == nil {
+		data["fen"] = normalized
+		return
+	}
+	data["fen"] = fen
+	data["fen_invalid"] = true
+}
+
 // chessBoardData chuyển một chess.Analysis thành map dữ liệu cho frontend
 // (display_type "chess_board") để hiển thị bàn cờ tương tác kèm đánh giá.
 func chessBoardData(a *chess.Analysis, caption string) map[string]interface{} {
 	d := map[string]interface{}{
 		"display_type": "chess_board",
-		"fen":          a.FEN,
 		"side_to_move": a.SideToMove,
 		"depth":        a.Depth,
 	}
+	setBoardFEN(d, a.FEN)
 	if a.BestMove != "" {
 		d["best_move"] = a.BestMove
 	}

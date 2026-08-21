@@ -231,10 +231,10 @@ func puzzleResult(fen, theme, difficulty, hint string) *types.ToolResult {
 
 	data := map[string]interface{}{
 		"display_type": "chess_board",
-		"fen":          fen,
 		"side_to_move": fenSide(fen),
 		"caption":      fmt.Sprintf("Bài tập: %s (%s)", theme, difficulty),
 	}
+	setBoardFEN(data, fen)
 
 	return &types.ToolResult{Success: true, Output: output, Data: data}
 }

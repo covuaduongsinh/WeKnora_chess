@@ -206,10 +206,10 @@ func positionResult(fen, title, category, level, annotation string) *types.ToolR
 
 	data := map[string]interface{}{
 		"display_type": "chess_board",
-		"fen":          fen,
 		"side_to_move": fenSide(fen),
 		"caption":      title,
 	}
+	setBoardFEN(data, fen)
 
 	return &types.ToolResult{Success: true, Output: b.String(), Data: data}
 }

@@ -30,6 +30,10 @@ logs/
 
 WeKnora
 WeKnora-lite
+# Bản build trên Windows có đuôi .exe — thiếu dòng này thì binary ~255MB lọt vào
+# `git status` dưới dạng untracked và rất dễ bị `git add .` cuốn theo.
+WeKnora.exe
+WeKnora-lite.exe
 cmd/desktop/build/bin/
 /models/
 test/data/mswag.txt

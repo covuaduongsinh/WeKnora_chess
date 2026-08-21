@@ -33,20 +33,71 @@ export function isValidFEN(fen: string): boolean {
 // Khớp một khối mã fenced ```chess ... ``` (đã đóng).
 const CHESS_BLOCK_RE = /```[ \t]*chess[^\n]*\n([\s\S]*?)```/gi;
 
-function looksLikePGN(text: string): boolean {
-  return /\[\s*\w+\s+"[^"]*"\s*\]/.test(text) || /(^|\s)\d+\.(\.\.)?\s*\S/.test(text);
+// Thẻ PGN tường minh: [Event "..."] — bằng chứng CHẮC CHẮN đây là PGN.
+const PGN_TAG_RE = /\[\s*\w+\s+"[^"]*"\s*\]/;
+// Số nước kiểu "1." / "12..." — chỉ là PHỎNG ĐOÁN, vì một dòng chú thích như
+// "Diagrama 1. Posición inicial" cũng khớp. Vì vậy nó được xét SAU khi đã thử
+// bóc FEN (xem parseChessSource).
+const PGN_MOVENO_RE = /(^|\s)\d+\.(\.\.)?\s*\S/;
+
+/**
+ * Bóc MỘT dòng thành chuỗi FEN sạch, hoặc null nếu dòng đó không phải FEN.
+ *
+ * VÌ SAO CẦN: cm-chessboard (`node_modules/cm-chessboard/src/model/Position.js`)
+ * tách FEN bằng `split(/\/|\s/)` — gộp '/' VÀ khoảng trắng vào một mảng phẳng —
+ * rồi đọc ngược `parts[7 - part]` mà KHÔNG kiểm số nhóm. Nên chỉ cần dư đúng một
+ * token phía trước phần bố cục quân (ví dụ người soạn gõ "fen: rnbq…") là toàn bộ
+ * bàn cờ tụt xuống 1 hàng và nhóm cuối (hàng quân trắng) không bao giờ được đọc —
+ * thư viện KHÔNG throw, không cảnh báo. Đó là một lỗi CÂM, phải chặn ở đây.
+ */
+export function parseFenLine(line: string): string | null {
+  let s = (line || '').trim();
+  if (!s) return null;
+  // Nhiễu markdown đầu dòng: trích dẫn, gạch đầu dòng, backtick, nháy.
+  s = s.replace(/^[>\-*+\s]+/, '').replace(/^["'`]+/, '').trim();
+  // Nhãn dẫn đầu do người/AI soạn nội dung thêm vào (đa ngữ: vi/en/es).
+  s = s.replace(/^(fen|position|posici[oó]n|th[eế]\s*c[oờ])\s*[:=]?\s*/i, '').trim();
+  // Nháy/backtick đuôi.
+  s = s.replace(/["'`]+$/, '').trim();
+  return isValidFEN(s) ? s : null;
 }
 
 function parseChessSource(src: string): ChessBoardData | null {
   const text = (src || '').trim();
   if (!text) return null;
-  if (looksLikePGN(text)) {
+
+  // 1. Thẻ PGN tường minh thì chắc chắn là PGN — không cần đoán thêm.
+  if (PGN_TAG_RE.test(text)) {
     return { display_type: 'chess_board', fen: START_FEN, pgn: text };
   }
-  const firstLine = text.split('\n').map((s) => s.trim()).find(Boolean) || '';
-  if (firstLine.includes('/')) {
-    return { display_type: 'chess_board', fen: firstLine };
+
+  // 2. Thử bóc FEN theo TỪNG dòng. Đặt trước phỏng đoán số nước ở bước 3 để một
+  //    dòng chú thích như "Diagrama 1. Posición inicial" không cướp khối FEN sang
+  //    nhánh PGN (bàn cờ khi đó hiện thế ban đầu, danh sách nước rỗng).
+  const lines = text.split('\n').map((s) => s.trim()).filter(Boolean);
+  for (let i = 0; i < lines.length; i++) {
+    const fen = parseFenLine(lines[i]);
+    if (!fen) continue;
+    const data: ChessBoardData = { display_type: 'chess_board', fen };
+    // Chữ đứng trước dòng FEN là chú thích — giữ lại thay vì nuốt mất.
+    const caption = lines.slice(0, i).join(' ').trim();
+    if (caption) data.caption = caption;
+    return data;
   }
+
+  // 3. Không bóc được FEN nào → mới xét tới phỏng đoán số nước.
+  if (PGN_MOVENO_RE.test(text)) {
+    return { display_type: 'chess_board', fen: START_FEN, pgn: text };
+  }
+
+  // 4. Trông như FEN (có '/') nhưng hỏng thật → báo lỗi RÕ ở tầng hiển thị, thay
+  //    vì đưa chuỗi hỏng cho cm-chessboard và nhận về một bàn cờ sai câm lặng.
+  const firstLine = lines[0] || '';
+  if (firstLine.includes('/')) {
+    return { display_type: 'chess_board', fen: firstLine, fen_invalid: true };
+  }
+
+  // 5. Không nhận dạng được gì → để nguyên khối, hiện thành code block.
   return null;
 }
 

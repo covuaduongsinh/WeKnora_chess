@@ -2,7 +2,14 @@
   <div class="chess-board-display">
     <div v-if="caption" class="chess-caption">{{ caption }}</div>
 
-    <div class="chess-body">
+    <!-- FEN hỏng: nói thẳng ra, kèm chuỗi gốc để biết sửa ở đâu. Thà báo lỗi
+         còn hơn vẽ một thế cờ SAI mà người đọc tưởng là đúng. -->
+    <div v-if="fenError" class="chess-fen-error">
+      <div class="chess-fen-error-title">⚠ Thế cờ (FEN) không hợp lệ nên chưa hiện được bàn cờ</div>
+      <code class="chess-fen-error-raw">{{ rawFenText || '(trống)' }}</code>
+    </div>
+
+    <div v-else class="chess-body">
       <!-- Thanh đánh giá (nếu có điểm engine) -->
       <div v-if="hasEval" class="eval-bar" :title="evalText">
         <div class="eval-bar-fill" :style="evalFillStyle"></div>
@@ -12,7 +19,7 @@
     </div>
 
     <!-- Thông tin đánh giá engine -->
-    <div v-if="hasEval" class="chess-eval-line">
+    <div v-if="hasEval && !fenError" class="chess-eval-line">
       <span class="eval-score" :class="{ 'eval-mate': data.is_mate }">{{ evalText }}</span>
       <span v-if="bestMoveLabel" class="eval-best">
         {{ t('chess.bestMove') }}: <strong>{{ bestMoveLabel }}</strong>
@@ -21,7 +28,7 @@
     </div>
 
     <!-- Điều hướng nước đi (khi có nhiều thế cờ) -->
-    <div v-if="positions.length > 1" class="chess-nav">
+    <div v-if="positions.length > 1 && !fenError" class="chess-nav">
       <div class="chess-nav-controls">
         <button class="nav-btn" :disabled="currentIndex === 0" @click="goTo(0)" :title="t('chess.start')">⏮</button>
         <button class="nav-btn" :disabled="currentIndex === 0" @click="goTo(currentIndex - 1)" :title="t('chess.prev')">◀</button>
@@ -32,7 +39,7 @@
       </div>
     </div>
 
-    <div v-else class="chess-nav-single">
+    <div v-else-if="!fenError" class="chess-nav-single">
       <button class="nav-btn" @click="flip" :title="t('chess.flip')">⇅ {{ t('chess.flip') }}</button>
     </div>
 
@@ -41,7 +48,7 @@
          thể ẩn nút bấm điều hướng (vô nghĩa trên giấy) mà vẫn in được (xem
          :deep(.chess-nav) trong BookPrint.vue). Điều kiện dùng tokens (không
          phải positions) để PGN chỉ có bình luận, không nước nào, vẫn hiện được. -->
-    <div v-if="tokens.length" class="move-list" :class="{ 'move-list--annotated': hasAnnotations }">
+    <div v-if="tokens.length && !fenError" class="move-list" :class="{ 'move-list--annotated': hasAnnotations }">
       <template v-for="(tk, i) in displayTokens" :key="i">
         <span v-if="tk.sep" class="move-sep">{{ ' ' }}</span>
         <span v-if="tk.kind === 'comment'" class="move-comment" :class="varClass(tk.depth)">{{ tk.text }}</span>
@@ -67,6 +74,7 @@ import { Chessboard, COLOR } from 'cm-chessboard/src/Chessboard.js';
 import piecesUrl from 'cm-chessboard/assets/pieces/standard.svg?url';
 import 'cm-chessboard/assets/chessboard.css';
 import type { ChessBoardData } from '@/types/tool-results';
+import { isValidFEN } from '@/utils/chessBlocks';
 import {
   buildAnnotatedPgn, needsSpaceBefore, tokensFromPositions,
   type AnnotatedPos, type PgnToken,
@@ -204,15 +212,37 @@ const evalFillStyle = computed(() => {
   return { height: `${(whiteAdvantage * 100).toFixed(1)}%` };
 });
 
+// Chuỗi thực sự đưa vào cm-chessboard: CHỈ trường bố cục quân.
+//
+// VÌ SAO PHẢI CẮT: `Position.setFen` của cm-chessboard tách bằng `split(/\/|\s/)`
+// — gộp '/' VÀ khoảng trắng vào một mảng phẳng — rồi đọc ngược `parts[7 - part]`
+// mà KHÔNG kiểm số nhóm. Dư đúng một token là mọi hàng tụt xuống 1 nấc và hàng
+// quân trắng bị nuốt; thư viện không throw, không cảnh báo. Cắt còn trường đầu
+// thì miễn nhiễm. (ChessPositionEditor.vue đã làm đúng việc này từ đầu — đây là
+// chỗ còn thiếu, và là nguyên nhân bàn cờ trong chương sách hiện sai.)
+//
+// LƯU Ý: KHÔNG đụng `positions[].fen` — `currentFen` được defineExpose cho
+// GameLibrary (nút "Lưu thế cờ này") và phải giữ FEN ĐẦY ĐỦ 6 trường.
+const boardFen = computed(() => {
+  const raw = positions.value[currentIndex.value]?.fen || '';
+  return raw.trim().split(/\s+/)[0] || '';
+});
+
+// FEN hỏng: hoặc nguồn đã đánh dấu sẵn (chessBlocks/backend), hoặc tự kiểm thấy
+// sai cấu trúc. Khi đó KHÔNG dựng bàn cờ — vừa tránh vẽ sai câm lặng, vừa tránh
+// TypeError trong Position.setFen khi chuỗi quá ngắn (parts[7] là undefined).
+const fenError = computed(() => props.data.fen_invalid === true || !isValidFEN(boardFen.value));
+const rawFenText = computed(() => (positions.value[currentIndex.value]?.fen || props.data.fen || '').trim());
+
 // ---- cm-chessboard ----
 const boardEl = ref<HTMLElement | null>(null);
 let board: any = null;
 const orientation = ref<'white' | 'black'>(props.data.orientation || 'white');
 
 function buildBoard() {
-  if (!boardEl.value) return;
+  if (!boardEl.value || fenError.value) return;
   board = new Chessboard(boardEl.value, {
-    position: positions.value[currentIndex.value]?.fen || START_FEN,
+    position: boardFen.value || START_FEN,
     orientation: orientation.value === 'black' ? COLOR.black : COLOR.white,
     assetsUrl: '/',
     style: {
@@ -225,8 +255,8 @@ function buildBoard() {
 }
 
 function applyPosition() {
-  const fen = positions.value[currentIndex.value]?.fen;
-  if (board && fen) {
+  const fen = boardFen.value;
+  if (board && fen && !fenError.value) {
     board.setPosition(fen, true);
   }
 }
@@ -284,6 +314,34 @@ defineExpose({ currentFen, currentIndex, currentLabel });
   display: flex;
   align-items: stretch;
   gap: 8px;
+}
+
+/* Hộp báo FEN hỏng. Dùng token warning của TDesign — amber ở đây là TRẠNG THÁI
+   (cảnh báo), không phải màu nhận diện Dương Sinh (navy + xanh). */
+.chess-fen-error {
+  border: 1px solid var(--td-warning-color-3, #ffd8a8);
+  background: var(--td-warning-color-1, #fff8f0);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.chess-fen-error-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--td-warning-color-7, #a55a00);
+  margin-bottom: 6px;
+}
+
+.chess-fen-error-raw {
+  display: block;
+  font-family: var(--app-font-family-mono);
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-container);
+  border-radius: 4px;
+  padding: 4px 6px;
+  /* Chuỗi FEN dài không được phá layout ngang (nhất là trong cột hẹp/trang in) */
+  overflow-wrap: anywhere;
 }
 
 .eval-bar {

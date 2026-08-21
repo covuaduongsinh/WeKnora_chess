@@ -190,10 +190,10 @@ func (t *ChessEvaluateGameTool) Execute(ctx context.Context, args json.RawMessag
 	}
 	data := map[string]interface{}{
 		"display_type": "chess_board",
-		"fen":          startFEN,
 		"plies":        plies,
 		"caption":      "Xem lại ván cờ",
 	}
+	setBoardFEN(data, startFEN)
 
 	return &types.ToolResult{Success: true, Output: b.String(), Data: data}, nil
 }

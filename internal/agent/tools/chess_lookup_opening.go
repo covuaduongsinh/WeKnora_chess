@@ -185,10 +185,10 @@ func (t *ChessLookupOpeningTool) Execute(ctx context.Context, args json.RawMessa
 
 	data := map[string]interface{}{
 		"display_type": "chess_board",
-		"fen":          fen,
 		"side_to_move": fenSide(fen),
 		"caption":      fmt.Sprintf("%s (%s)", matched.name, matched.eco),
 	}
+	setBoardFEN(data, fen)
 
 	return &types.ToolResult{Success: true, Output: output, Data: data}, nil
 }

@@ -342,6 +342,10 @@ export interface ChessBoardData {
     caption?: string;
     // Hướng nhìn ban đầu của bàn cờ.
     orientation?: 'white' | 'black';
+    // Đánh dấu chuỗi `fen` KHÔNG hợp lệ: tầng hiển thị phải hiện hộp báo lỗi kèm
+    // chuỗi gốc thay vì vẽ bàn cờ. Không có cờ này thì cm-chessboard nhận chuỗi
+    // hỏng và vẽ ra một thế cờ SAI mà không báo gì (xem utils/chessBlocks.ts).
+    fen_invalid?: boolean;
 }
 
 // Union type for all tool result data
