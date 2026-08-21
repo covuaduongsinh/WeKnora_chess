@@ -9,7 +9,7 @@ import (
 )
 
 // chess_search_text.go dựng cột `search_text` — bản KHỬ DẤU + hạ chữ thường
-// của các trường tìm kiếm được của mỗi loại nội dung cờ (migration 000074).
+// của các trường tìm kiếm được của mỗi loại nội dung cờ (migration 000912).
 //
 // VÌ SAO Ở TẦNG REPOSITORY chứ không phải service: đây là nơi DUY NHẤT mọi
 // đường ghi đều đi qua. Đặt ở service thì mỗi lần thêm một lối tạo/sửa mới
@@ -120,7 +120,7 @@ func (r *chessLibraryRepository) refreshArticleSearchText(ctx context.Context, t
 }
 
 // BackfillSearchText tính lại cột search_text cho TOÀN BỘ nội dung cờ của một
-// tenant. Dùng sau migration 000074 (cột mới, các bản ghi cũ đang rỗng nên tìm
+// tenant. Dùng sau migration 000912 (cột mới, các bản ghi cũ đang rỗng nên tìm
 // không ra) và bất cứ khi nào nghi cột bị lệch.
 //
 // Trả số bản ghi đã ghi theo từng loại. Idempotent — chạy lại cho cùng kết quả.

@@ -1,4 +1,4 @@
--- Migration: 000070_chess_positions
+-- Migration: 000908_chess_positions
 -- Description: Ngân hàng thế cờ FEN (chess_positions) — thực thể cờ thứ 5 bên
 --              cạnh chess_games/chess_puzzles/chess_lessons/chess_courses.
 --              Khác chess_puzzles (bài TẬP có lời giải, để LUYỆN), position là
@@ -7,7 +7,7 @@
 --              CỐ Ý cho phép thế cờ giản lược KHÔNG có quân Vua (dạy trẻ mới
 --              học). Hỗ trợ wikilink [[position/<slug>]].
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000070] Applying chess_positions schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000908] Applying chess_positions schema'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_positions (
     id             VARCHAR(36) PRIMARY KEY,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS chess_positions (
 );
 
 -- Duy nhất theo (tenant_id, slug), loại trừ chuỗi rỗng — cùng khuôn mẫu với
--- idx_chess_games_tenant_slug/idx_chess_puzzles_tenant_slug (migration 000064).
+-- idx_chess_games_tenant_slug/idx_chess_puzzles_tenant_slug (migration 000902).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chess_positions_tenant_slug
     ON chess_positions (tenant_id, slug) WHERE slug <> '';
 

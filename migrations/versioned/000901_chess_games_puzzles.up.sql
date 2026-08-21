@@ -1,7 +1,7 @@
--- Migration: 000063_chess_games_puzzles
+-- Migration: 000901_chess_games_puzzles
 -- Description: Kho ván đấu (chess_games) và ngân hàng bài tập (chess_puzzles) cờ vua.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000063] Applying chess_games + chess_puzzles schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000901] Applying chess_games + chess_puzzles schema'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_games (
     id         VARCHAR(36) PRIMARY KEY,

@@ -1,4 +1,4 @@
--- Rollback: 000067_chess_refs_source_type
+-- Rollback: 000905_chess_refs_source_type
 DROP INDEX IF EXISTS idx_wiki_chess_refs_source;
 DROP INDEX IF EXISTS idx_wiki_chess_refs_edge;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wiki_chess_refs_edge

@@ -1,9 +1,9 @@
--- Migration: 000064_chess_slugs
+-- Migration: 000902_chess_slugs
 -- Description: Thêm cột slug (định danh thân thiện, duy nhất theo tenant) cho
 --              chess_games, chess_puzzles, chess_lessons để hỗ trợ wikilink
 --              [[game/<slug>]], [[puzzle/<slug>]], [[lesson/<slug>]].
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000064] Adding slug columns to chess objects'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000902] Adding slug columns to chess objects'; END $$;
 
 ALTER TABLE chess_games   ADD COLUMN IF NOT EXISTS slug VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE chess_puzzles ADD COLUMN IF NOT EXISTS slug VARCHAR(255) NOT NULL DEFAULT '';

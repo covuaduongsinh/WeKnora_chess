@@ -64,7 +64,7 @@ mới** (điều hướng tới khu quản lý đúng loại).
 **Giải thích:** biến ngõ cụt thành hành động — tạo nhanh đối tượng còn thiếu.
 
 ### 2.4 Alias/redirect khi đổi slug
-**Giải thích (hạ tầng):** bảng `chess_slug_aliases` (migration 000068) cho phép map
+**Giải thích (hạ tầng):** bảng `chess_slug_aliases` (migration 000906) cho phép map
 `slug cũ → slug mới`; khâu resolve kiểm tra alias *trước* fuzzy. Hiện chưa có nút đổi
 tên nên bảng đang trống — đây là nền cho tính năng đổi tên/re-import sau này để link
 cũ vẫn sống. (Chưa có demo trực quan.)
@@ -90,7 +90,7 @@ vector store + worker — phải kiểm thử trên full stack trước khi bậ
   slug nhiễu.
 - **Part B — index đối tượng cờ:** ván/thế cờ/bài giảng vốn KHÔNG nằm trong KB nên HLV
   không truy hồi được. Indexer tạo bản ghi manual-knowledge (tái dùng toàn bộ pipeline
-  chunk + embedding sẵn có) và lưu ánh xạ ở `chess_kb_index` (migration 000069). Chạy
+  chunk + embedding sẵn có) và lưu ánh xạ ở `chess_kb_index` (migration 000907). Chạy
   **best-effort, không bao giờ chặn** thao tác tạo/sửa cờ; import PGN hàng loạt **không**
   trigger để tránh "bão" embedding.
 

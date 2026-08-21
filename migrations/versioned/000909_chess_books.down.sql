@@ -1,4 +1,4 @@
--- Rollback: 000071_chess_books
+-- Rollback: 000909_chess_books
 DROP INDEX IF EXISTS idx_chess_chapter_revisions_chapter;
 DROP TABLE IF EXISTS chess_chapter_revisions;
 

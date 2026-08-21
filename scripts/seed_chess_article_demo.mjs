@@ -14,7 +14,7 @@
 // vào RAG. Xoá thử nghiệm xong bằng nút Xoá trong Ngân hàng bài viết, hoặc:
 //   curl -X DELETE -H "X-API-Key: $API_KEY" $BASE_URL/api/v1/chess/articles/<id>
 //
-// YÊU CẦU: Node >= 18; backend đã migrate 000072 (chess_articles); tài
+// YÊU CẦU: Node >= 18; backend đã migrate 000910 (chess_articles); tài
 // khoản/API key có vai trò Contributor trở lên (tạo bài viết cần Contributor).
 // CHẠY:
 //   BASE_URL=http://localhost API_KEY='<tenant api key>' \

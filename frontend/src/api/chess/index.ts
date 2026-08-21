@@ -23,7 +23,7 @@ export interface ChessLesson {
   content: string;
   fen: string;
   pgn: string;
-  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073. */
+  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000911. */
   level?: string;
   sort_order: number;
   slug?: string;
@@ -116,7 +116,7 @@ export interface ChessPuzzle {
   id: string;
   title: string; fen: string; solution: string;
   theme: string; difficulty: string; source: string;
-  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073. */
+  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000911. */
   level?: string;
   slug?: string;
   created_at?: string;

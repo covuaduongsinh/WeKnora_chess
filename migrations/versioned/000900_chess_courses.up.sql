@@ -1,9 +1,9 @@
--- Migration: 000062_chess_courses
+-- Migration: 000900_chess_courses
 -- Description: Bảng khóa học và bài học cờ vua (LMS) cho công ty Cờ vua Dương Sinh.
 --              Khóa học (chess_courses) chứa nhiều bài học (chess_lessons).
 --              Nội dung bài học là markdown, có thể nhúng khối ```chess (FEN/PGN).
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000062] Applying chess_courses + chess_lessons schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000900] Applying chess_courses + chess_lessons schema'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_courses (
     id          VARCHAR(36) PRIMARY KEY,

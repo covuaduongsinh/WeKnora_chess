@@ -1,4 +1,4 @@
--- Migration: 000073_chess_tags
+-- Migration: 000911_chess_tags
 -- Description: Hệ THẺ + phân loại THỐNG NHẤT cho toàn bộ lớp cờ vua.
 --
 --              VẤN ĐỀ ĐANG SỬA: trước migration này, `tags` là chuỗi CSV
@@ -15,7 +15,7 @@
 --              SỰ THẬT; 3 cột CSV `tags` cũ giữ lại làm bản HIỂN THỊ/tương
 --              thích (service ghi lại từ pivot sau mỗi lần lưu, KHÔNG bao giờ
 --              đọc ngược) — đúng tiền lệ chess_articles.aliases ↔
---              chess_slug_aliases (migration 000072).
+--              chess_slug_aliases (migration 000910).
 --
 --              BA TRỤC PHÂN LOẠI sau migration này:
 --                1. Cấp độ  — cột `level`, từ vựng ĐÓNG 6 bậc Dương Sinh
@@ -40,7 +40,7 @@
 --              service/chess_slug.go) và chắc chắn trôi lệch. Backfill nằm ở
 --              tầng service, chạy idempotent qua POST /chess/tags/backfill.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000073] Applying chess_tags schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000911] Applying chess_tags schema'; END $$;
 
 -- Từ điển thẻ. slug là dạng đã slug hóa + KHỬ DẤU (slugifyChess) nên
 -- "Khai cuộc", "khai-cuoc", "KHAI CUOC" cùng quy về một thẻ; name giữ nguyên
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_chess_tags_kind
 
 -- Bảng nối ĐA HÌNH thẻ↔nội dung (mẫu chess_article_topic_items / chess_shelf_books).
 -- chess_type để VARCHAR(16) TỰ DO, KHÔNG CHECK/enum — đúng tiền lệ
--- wiki_chess_refs.chess_type (000065) và chess_kb_index (000069), nên thêm
+-- wiki_chess_refs.chess_type (000903) và chess_kb_index (000907), nên thêm
 -- loại nội dung mới KHÔNG cần migration.
 CREATE TABLE IF NOT EXISTS chess_tag_items (
     tenant_id    BIGINT NOT NULL,

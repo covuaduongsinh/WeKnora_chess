@@ -1,4 +1,4 @@
--- Rollback: 000072_chess_articles
+-- Rollback: 000910_chess_articles
 DROP INDEX IF EXISTS idx_chess_slug_aliases_kind;
 ALTER TABLE chess_slug_aliases DROP COLUMN IF EXISTS kind;
 

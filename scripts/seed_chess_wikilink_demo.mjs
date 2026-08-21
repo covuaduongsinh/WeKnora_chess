@@ -3,7 +3,7 @@
 // cờ / bài giảng". Dùng Node (fetch) để giữ UTF-8 sạch end-to-end — TRÁNH lỗi
 // curl --data làm hỏng tiếng Việt trên Git-Bash/Windows.
 //
-// YÊU CẦU: Node >= 18; backend đã migrate 000064 + 000065.
+// YÊU CẦU: Node >= 18; backend đã migrate 000902 + 000903.
 // CHẠY:
 //   BASE_URL=http://localhost API_KEY='<tenant api key>' \
 //   WIKI_KB_ID='<id KB bật wiki — tuỳ chọn>' \

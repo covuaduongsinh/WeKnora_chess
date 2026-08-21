@@ -1,9 +1,9 @@
--- Rollback: 000074_chess_search_text
+-- Rollback: 000912_chess_search_text
 -- Gỡ cột search_text + index kèm theo. KHÔI PHỤC lại hai index trigram trên
 -- lower(title) đúng như trước (dù chúng chưa từng được planner chọn — rollback
 -- phải trả schema về đúng trạng thái cũ, không phải trạng thái "tốt hơn").
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000074] Reverting chess search_text columns'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000912] Reverting chess search_text columns'; END $$;
 
 DROP INDEX IF EXISTS idx_chess_positions_fulltext;
 DROP INDEX IF EXISTS idx_chess_lessons_fulltext;

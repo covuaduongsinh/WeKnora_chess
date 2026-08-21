@@ -309,7 +309,7 @@ func (r *chessLibraryRepository) ListTagItems(ctx context.Context, tenantID uint
 // ---- Cột hiển thị `tags` (CSV) trên 3 bảng cũ ----
 
 // chessTagCSVTables ánh xạ loại nội dung sang bảng CÓ cột `tags` CSV. Chỉ 3
-// loại có cột này (thêm từ migration 000070/000071/000072); 5 loại còn lại
+// loại có cột này (thêm từ migration 000908/000909/000910); 5 loại còn lại
 // hoàn toàn dựa vào pivot.
 var chessTagCSVTables = map[string]string{
 	types.ChessRefTypePosition: "chess_positions",

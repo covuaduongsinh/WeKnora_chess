@@ -242,7 +242,7 @@ interface PuzzleDialogState {
   solution: string;
   theme: string;
   difficulty: string;
-  /** Cấp độ 6 bậc — cột mới từ migration 000073 (khác Difficulty của riêng bài tập). */
+  /** Cấp độ 6 bậc — cột mới từ migration 000911 (khác Difficulty của riêng bài tập). */
   level: string;
   /** CSV tên thẻ; lưu qua endpoint hệ thẻ, KHÔNG nằm trong bản ghi bài tập. */
   tags: string;

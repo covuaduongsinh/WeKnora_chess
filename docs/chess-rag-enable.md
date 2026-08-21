@@ -30,7 +30,7 @@ Panel cần quyền **Contributor** trở lên. Các mục `curl` bên dưới g
 > chưa tìm thấy — phải đợi embedding nền chạy hết. Đây đúng là chỗ từng bị hiểu nhầm
 > thành "thành công giả" ở đợt bật RAG đầu tiên.
 
-## 0b. BẮT BUỘC sau khi chạy migration 000073/000074
+## 0b. BẮT BUỘC sau khi chạy migration 000911/000912
 
 Hai migration này thêm **hệ thẻ thống nhất** và cột **`search_text`** (khử dấu).
 Cả hai đều để **rỗng** cho dữ liệu cũ — phải nạp một lần:

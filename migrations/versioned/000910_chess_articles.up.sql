@@ -1,4 +1,4 @@
--- Migration: 000072_chess_articles
+-- Migration: 000910_chess_articles
 -- Description: Ngân hàng bài viết (chess_articles) — thực thể cờ thứ 7 (bên
 --              cạnh game/puzzle/lesson/course/position/book+chapter). Mỗi bài
 --              là một trang tri thức ĐỘC LẬP về khái niệm/thuật ngữ/kinh
@@ -21,13 +21,13 @@
 --              thảo không rò vào câu trả lời agent) — cùng quy tắc sách.
 --
 --              Bí danh/từ đồng nghĩa: thêm cột `kind` vào chess_slug_aliases
---              (bảng dùng chung, migration 000068) để phân biệt alias sinh do
+--              (bảng dùng chung, migration 000906) để phân biệt alias sinh do
 --              ĐỔI SLUG ('rename', không bao giờ xóa — link cũ trong sách sẽ
 --              gãy) với alias người dùng GÕ TAY ('synonym', sửa/xóa tự do qua
 --              UI). Alias cũ (trước migration này) mặc định 'rename' — đúng
 --              vì mọi alias hiện có đều sinh từ đổi slug.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000072] Applying chess_articles schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000910] Applying chess_articles schema'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_articles (
     id           VARCHAR(36) PRIMARY KEY,
@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_chess_articles_filter
 CREATE INDEX IF NOT EXISTS idx_chess_articles_status
     ON chess_articles (tenant_id, status);
 -- Full-text + trigram cho tìm kiếm nội dung bài (mẫu chess_book_chapters,
--- migration 000071). pg_trgm đã cài ở migration 000002.
+-- migration 000909). pg_trgm đã cài ở migration 000002.
 CREATE INDEX IF NOT EXISTS idx_chess_articles_fulltext
     ON chess_articles USING GIN (to_tsvector('simple',
         coalesce(title, '') || ' ' || coalesce(aliases, '') || ' ' ||
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS chess_article_revisions (
 CREATE INDEX IF NOT EXISTS idx_chess_article_revisions_article
     ON chess_article_revisions (tenant_id, article_id, revision_number DESC);
 
--- ---- Bí danh/từ đồng nghĩa (chess_slug_aliases, bảng dùng chung 000068) ----
+-- ---- Bí danh/từ đồng nghĩa (chess_slug_aliases, bảng dùng chung 000906) ----
 -- 'rename' = sinh tự động khi đổi slug (giữ VĨNH VIỄN, không xóa qua UI).
 -- 'synonym' = người dùng gõ tay (sửa/xóa tự do qua ReplaceSynonyms).
 ALTER TABLE chess_slug_aliases ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'rename';

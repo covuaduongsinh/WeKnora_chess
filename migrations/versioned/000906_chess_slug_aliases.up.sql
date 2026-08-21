@@ -1,10 +1,10 @@
--- Migration: 000068_chess_slug_aliases
+-- Migration: 000906_chess_slug_aliases
 -- Description: Bảng alias/redirect cho slug đối tượng cờ. Khi một slug đổi (đổi tên,
 --              re-import dedup, humanize backfill), ghi (old_slug -> new_slug) để
 --              wikilink [[game/<old>]] cũ vẫn giải mã đúng. Resolve theo thứ tự:
 --              exact slug -> alias -> fuzzy.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000068] Creating chess_slug_aliases'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000906] Creating chess_slug_aliases'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_slug_aliases (
     id          VARCHAR(36) PRIMARY KEY,

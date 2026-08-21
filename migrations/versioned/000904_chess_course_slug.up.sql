@@ -1,8 +1,8 @@
--- Migration: 000066_chess_course_slug
+-- Migration: 000904_chess_course_slug
 -- Description: Thêm cột slug (duy nhất theo tenant) cho chess_courses để khóa học
 --              trở thành đích wikilink [[course/<slug>]].
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000066] Adding slug column to chess_courses'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000904] Adding slug column to chess_courses'; END $$;
 
 ALTER TABLE chess_courses ADD COLUMN IF NOT EXISTS slug VARCHAR(255) NOT NULL DEFAULT '';
 

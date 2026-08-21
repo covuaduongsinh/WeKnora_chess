@@ -5,7 +5,7 @@
 # một trang wiki) có dùng [[game/<slug>]] (chip) và ![[game/<slug>]] (nhúng), bao
 # phủ MỌI trường hợp để bạn xem trực tiếp trên UI.
 #
-# YÊU CẦU: backend ĐÃ rebuild + chạy migration 000064 (slug) và 000065
+# YÊU CẦU: backend ĐÃ rebuild + chạy migration 000902 (slug) và 000903
 #          (wiki_chess_refs). Script bắt slug do server tự sinh nên link luôn khớp.
 #
 # XÁC THỰC — chọn MỘT trong hai:

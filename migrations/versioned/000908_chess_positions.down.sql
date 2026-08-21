@@ -1,4 +1,4 @@
--- Rollback: 000070_chess_positions
+-- Rollback: 000908_chess_positions
 DROP INDEX IF EXISTS idx_chess_positions_srcgame;
 DROP INDEX IF EXISTS idx_chess_positions_fenkey;
 DROP INDEX IF EXISTS idx_chess_positions_filter;

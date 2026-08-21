@@ -1,4 +1,4 @@
--- Migration: 000074_chess_search_text
+-- Migration: 000912_chess_search_text
 -- Description: Cột `search_text` KHỬ DẤU + index trigram cho mọi loại nội dung
 --              cờ, và SỬA hai index trigram cũ vốn không bao giờ được dùng.
 --
@@ -14,7 +14,7 @@
 --              truy vấn bằng LIKE — chạy giống hệt trên cả Postgres lẫn SQLite.
 --
 --              VẤN ĐỀ 2 — hai index trigram đang là gánh nặng chết.
---              000071:111 và 000072:66 tạo index trên BIỂU THỨC `lower(title)`,
+--              000909:111 và 000910:66 tạo index trên BIỂU THỨC `lower(title)`,
 --              trong khi truy vấn viết là `title ILIKE ?` (chess_book.go:283,
 --              chess_article.go:69). Postgres chỉ dùng index biểu thức khi câu
 --              truy vấn chứa ĐÚNG biểu thức đó, nên hai index này chưa từng
@@ -26,7 +26,7 @@
 --              (nút "Nạp thẻ từ dữ liệu cũ") một lần để điền cho dữ liệu cũ;
 --              bản ghi tạo/sửa từ đây trở đi được điền tự động ở repository.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000074] Applying chess search_text columns'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000912] Applying chess search_text columns'; END $$;
 
 ALTER TABLE chess_games         ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
 ALTER TABLE chess_puzzles       ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
@@ -56,7 +56,7 @@ DROP INDEX IF EXISTS idx_chess_articles_title_trgm;
 
 -- Full-text cho hai loại còn thiếu, để tìm SÂU trong nội dung dài (cột
 -- search_text bị cắt ở 8000 ký tự nên không thay được vai trò này).
--- Cùng khuôn idx_chess_chapters_fulltext (000071) và idx_chess_articles_fulltext (000072).
+-- Cùng khuôn idx_chess_chapters_fulltext (000909) và idx_chess_articles_fulltext (000910).
 CREATE INDEX IF NOT EXISTS idx_chess_lessons_fulltext
     ON chess_lessons USING GIN (to_tsvector('simple',
         coalesce(title, '') || ' ' || coalesce(content, '')));

@@ -1,4 +1,4 @@
--- Rollback: 000064_chess_slugs
+-- Rollback: 000902_chess_slugs
 DROP INDEX IF EXISTS idx_chess_lessons_tenant_slug;
 DROP INDEX IF EXISTS idx_chess_puzzles_tenant_slug;
 DROP INDEX IF EXISTS idx_chess_games_tenant_slug;

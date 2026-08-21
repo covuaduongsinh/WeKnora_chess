@@ -1,9 +1,9 @@
--- Rollback: 000073_chess_tags
+-- Rollback: 000911_chess_tags
 -- Gỡ hệ thẻ thống nhất. Cột CSV `tags` của chess_positions/chess_books/
 -- chess_articles KHÔNG bị đụng ở migration này nên rollback không mất dữ liệu
 -- thẻ cũ — chỉ mất các thẻ gắn cho 6 loại chưa từng có cột CSV.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000073] Reverting chess_tags schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000911] Reverting chess_tags schema'; END $$;
 
 DROP INDEX IF EXISTS idx_chess_lessons_level;
 DROP INDEX IF EXISTS idx_chess_puzzles_level;

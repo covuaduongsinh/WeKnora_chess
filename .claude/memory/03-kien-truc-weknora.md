@@ -41,7 +41,7 @@ internal/types/(interfaces/)chess_*    + wiki_chess_ref.go
 
 **7 tool cờ (đăng ký cho agent):** `chess_analyze_position`, `chess_best_move`, `chess_evaluate_game`, `chess_explain_move`, `chess_lookup_opening`, `chess_generate_puzzle`, `chess_lookup_position`.
 
-**Migrations cờ:** `000062` courses · `000063` games_puzzles · `000064` slugs · `000065` wiki_chess_refs · `000066` course_slug · `000067` refs_source_type · `000068` slug_aliases · `000069` kb_index · `000070` chess_positions (Ngân hàng thế cờ) · `000071` chess_books (Thư viện sách: kệ/sách/chương/ảnh/phiên bản).
+**Migrations cờ:** `000900` courses · `000901` games_puzzles · `000902` slugs · `000903` wiki_chess_refs · `000904` course_slug · `000905` refs_source_type · `000906` slug_aliases · `000907` kb_index · `000908` chess_positions (Ngân hàng thế cờ) · `000909` chess_books (Thư viện sách: kệ/sách/chương/ảnh/phiên bản).
 
 **Frontend:**
 ```

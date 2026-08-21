@@ -1,10 +1,10 @@
--- Migration: 000069_chess_kb_index
+-- Migration: 000907_chess_kb_index
 -- Description: Ánh xạ đối tượng cờ (game/puzzle/lesson) → bản ghi Knowledge đã được
 --              index vào "KB tri thức cờ vua", để trợ lý/HLV truy hồi nội dung ván
 --              cờ qua RAG. Một (tenant, loại, slug) ↔ một knowledge_id.
 --              (Tính năng index gate sau env CHESS_KB_INDEX; bảng vẫn an toàn nếu tắt.)
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000069] Creating chess_kb_index'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000907] Creating chess_kb_index'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_kb_index (
     id           VARCHAR(36) PRIMARY KEY,

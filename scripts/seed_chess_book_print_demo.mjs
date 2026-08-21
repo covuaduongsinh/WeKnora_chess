@@ -12,7 +12,7 @@
 // Xoá thử nghiệm xong bằng nút Xoá trong Thư viện sách, hoặc:
 //   curl -X DELETE -H "X-API-Key: $API_KEY" $BASE_URL/api/v1/chess/books/<id>
 //
-// YÊU CẦU: Node >= 18; backend đã migrate 000071 (chess_books); tài khoản/API
+// YÊU CẦU: Node >= 18; backend đã migrate 000909 (chess_books); tài khoản/API
 // key có vai trò Contributor trở lên (tạo sách/chương cần Contributor).
 // CHẠY:
 //   BASE_URL=http://localhost API_KEY='<tenant api key>' \

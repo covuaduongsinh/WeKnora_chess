@@ -61,7 +61,7 @@ weknora chat "Y tuong chinh cua Sicilian la gi?"
 1. Tạo `internal/agent/tools/chess_<ten>.go` (theo mẫu các tool sẵn + `chess_common.go`).
 2. Đăng ký tool vào registry (file dùng chung → **ghi mục C của nhật ký**).
 3. Thêm vào `allowed_tools` của agent trong `builtin_agents.yaml`.
-4. Nếu cần dữ liệu mới → thêm migration `000070+` (`.up`/`.down`).
+4. Nếu cần dữ liệu mới → thêm migration `000908+` (`.up`/`.down`).
 5. `gofmt`, test, commit `feat(chess): ...`.
 
 ## 5.7. Lưu ý production

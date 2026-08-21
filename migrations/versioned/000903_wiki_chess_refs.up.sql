@@ -1,8 +1,8 @@
--- Migration: 000065_wiki_chess_refs
+-- Migration: 000903_wiki_chess_refs
 -- Description: Bảng liên kết wiki -> đối tượng cờ (game/puzzle/lesson) để hỗ trợ
 --              backlink và đồ thị cho wikilink [[game/<slug>]].
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000065] Creating wiki_chess_refs'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000903] Creating wiki_chess_refs'; END $$;
 
 CREATE TABLE IF NOT EXISTS wiki_chess_refs (
     id          VARCHAR(36) PRIMARY KEY,

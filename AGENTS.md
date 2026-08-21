@@ -42,7 +42,7 @@ Fork của [Tencent/WeKnora](https://github.com/Tencent/WeKnora) (knowledge plat
 | Service | `internal/application/service/chess_*` | course, knowledge_indexer, knowledge_text, library, library_position, **library_book**, resolve, slug |
 | Handler (API) | `internal/handler/chess_*` | course, library, position, **book**, ref — vd `GET /api/v1/chess/refs/search?q=` |
 | Types | `internal/types/...chess_*`, `wiki_chess_ref.go` | kiểu dữ liệu & interfaces |
-| Migrations | `migrations/versioned/000062`–`000071` | courses, games_puzzles, slugs, wiki_chess_refs, course_slug, refs_source_type, slug_aliases, kb_index, chess_positions, **chess_books (kệ/sách/chương/ảnh/phiên bản)** |
+| Migrations | `migrations/versioned/000900`–`000909` | courses, games_puzzles, slugs, wiki_chess_refs, course_slug, refs_source_type, slug_aliases, kb_index, chess_positions, **chess_books (kệ/sách/chương/ảnh/phiên bản)** |
 | Frontend | `frontend/src/views/chess/` (ChessCourses, ChessManage, GameLibrary, PuzzleBank, PositionBank, **BookLibrary, BookPrint** + components), `views/chat/components/tool-results/ChessBoardDisplay.vue`, `api/chess/`, `stores/chessWikiDraft.ts`, `utils/chessBlocks.ts`, `utils/chessRef.ts` | UI quản lý cờ, bàn cờ tương tác, wikilink, **thư viện sách** |
 | Agent cấu hình | `config/builtin_agents.yaml` → agent `builtin-chess-coach` ("HLV Cờ vua") | system prompt tiếng Việt + 6 chess tools |
 | Docker | `docker-compose.chess.yml`, `docker/Dockerfile.chess-engine`, `docker/chess-engine/uci_http_bridge.py` | overlay engine |
@@ -83,7 +83,7 @@ make dev-frontend    # frontend Vue
 
 - **`gofmt`** trước commit; lint theo `.golangci.yml`.
 - **Conventional Commits**: `feat:` / `fix:` / `docs:` / `test:` / `refactor:` / `chore:`. Ví dụ: `feat(chess): them tool tra cuu khai cuoc`.
-- Thay đổi schema → **thêm migration mới** trong `migrations/versioned/` (đánh số tiếp theo, có cả `.up.sql` và `.down.sql`). Không sửa migration cũ đã chạy production.
+- Thay đổi schema → **thêm migration mới** trong `migrations/versioned/` — **dải cờ là `000900+`, đánh tiếp từ `000913`** (KHÔNG dùng dải `000062`–`000899`, đó là của upstream), có cả `.up.sql` và `.down.sql`, và **phải idempotent**. Không sửa migration cũ đã chạy production.
 - Frontend theo lint/format có sẵn trong `frontend/`.
 
 ---
@@ -95,7 +95,8 @@ Lớp cờ đã đụng sâu vào `internal/` và `migrations/` → **`git merge
 ### Nguyên tắc giữ "diff sạch" với upstream
 - **Code cờ để RIÊNG** trong các file `*chess*` / thư mục `internal/chess/`, `frontend/src/views/chess/` → dễ giữ qua merge.
 - Khi buộc phải **sửa file dùng chung của upstream** (router, đăng ký tool, store frontend, schema chung): giữ thay đổi **tối thiểu, khoanh vùng rõ**, và **GHI NGAY vào `.claude/memory/04-nhat-ky-tuy-bien.md`** (file gì, vì sao, điểm dễ conflict).
-- Mọi migration cờ đánh số > upstream để tránh đụng số.
+- **Migration cờ dùng RIÊNG dải `000900+`** (từ 22/8/2026). Trước đó lớp cờ chiếm `000062`–`000074` và **đụng khít 13/13** với migration upstream cùng dải → upstream `000062_mcp_oauth`… `000074_mcp_oauth_refresh_lease` sẽ bị `golang-migrate` bỏ qua im lặng (nó chỉ lưu MỘT số version). Dải `000062`–`000899` nay **thuộc về upstream, không được chiếm**; migration cờ mới đánh tiếp từ `000913`.
+- Migration cờ **phải idempotent** (`CREATE TABLE/INDEX IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`): mỗi lần merge upstream, runbook đặt lại `schema_migrations.version` về mốc trước nhóm migration upstream mới, nên migration cờ sẽ chạy LẠI và phải là no-op. Xem `docs/deploy/upstream-sync.md`.
 
 ### ❌ Không làm khi chưa được duyệt
 - Xóa attribution Tencent / đổi LICENSE (MIT — phải giữ ghi công).

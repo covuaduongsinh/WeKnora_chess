@@ -57,7 +57,7 @@ type ChessLesson struct {
 	// PGN là ván minh họa (tùy chọn).
 	PGN string `json:"pgn" gorm:"type:text"`
 	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
-	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// migration 000911 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
 	// Rỗng = không phân cấp.
 	Level string `json:"level" gorm:"type:varchar(16);index"`
 	// SortOrder là thứ tự bài trong khóa.

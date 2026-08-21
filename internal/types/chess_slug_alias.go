@@ -13,7 +13,7 @@ type ChessSlugAlias struct {
 	// Kind phân biệt alias sinh do ĐỔI SLUG ("rename", giữ vĩnh viễn — xóa sẽ
 	// làm gãy link cũ trong sách/bài giảng) với alias NGƯỜI DÙNG GÕ TAY làm
 	// bí danh/từ đồng nghĩa ("synonym", sửa/xóa tự do qua ReplaceSynonyms).
-	// Cột có DEFAULT 'rename' ở DB (migration 000072) — alias cũ trước khi có
+	// Cột có DEFAULT 'rename' ở DB (migration 000910) — alias cũ trước khi có
 	// cột này đều đúng là 'rename' (mọi alias trước đó đều sinh từ đổi slug).
 	Kind      string    `json:"kind" gorm:"type:varchar(16);default:rename"`
 	CreatedAt time.Time `json:"created_at"`

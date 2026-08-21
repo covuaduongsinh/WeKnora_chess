@@ -1,4 +1,4 @@
--- Migration: 000071_chess_books
+-- Migration: 000909_chess_books
 -- Description: Thư viện sách cờ vua — Kệ (chess_shelves) → Sách (chess_books) →
 --              Chương (chess_book_chapters), cộng ảnh chèn trong chương
 --              (chess_book_images) và lịch sử phiên bản chương
@@ -16,7 +16,7 @@
 --              Wikilink: [[book/<slug>]] và [[chapter/<slug>]]. Kệ KHÔNG phải
 --              đích wikilink (chỉ điều hướng UI) — xem 04-nhat-ky-tuy-bien.md.
 
-DO $$ BEGIN RAISE NOTICE '[Migration 000071] Applying chess book library schema'; END $$;
+DO $$ BEGIN RAISE NOTICE '[Migration 000909] Applying chess book library schema'; END $$;
 
 CREATE TABLE IF NOT EXISTS chess_shelves (
     id           VARCHAR(36) PRIMARY KEY,

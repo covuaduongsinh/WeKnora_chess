@@ -7,7 +7,7 @@ import "time"
 // position/book/chapter/article), thay cho cột CSV `tags` vốn chỉ có ở 3 loại
 // và chỉ lọc được bằng ILIKE substring.
 //
-// Ba trục phân loại của lớp cờ sau migration 000073:
+// Ba trục phân loại của lớp cờ sau migration 000911:
 //  1. Cấp độ        — cột `level` trên từng bảng, từ vựng ĐÓNG 6 bậc Dương Sinh.
 //  2. Nhóm nội dung — thẻ hệ thống (Kind="group"), từ vựng ĐÓNG 8 nhóm.
 //  3. Thẻ tự do     — thẻ Kind="free".

@@ -28,7 +28,7 @@ type ChessGame struct {
 	// PlyCount là số nửa-nước.
 	PlyCount int `json:"ply_count" gorm:"default:0"`
 	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
-	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// migration 000911 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
 	// Rỗng = không phân cấp.
 	Level string `json:"level" gorm:"type:varchar(16);index"`
 	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
@@ -65,7 +65,7 @@ type ChessPuzzle struct {
 	// Source là nguồn (tùy chọn).
 	Source string `json:"source" gorm:"type:varchar(255)"`
 	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
-	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// migration 000911 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
 	// Rỗng = không phân cấp.
 	Level string `json:"level" gorm:"type:varchar(16);index"`
 	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
@@ -87,7 +87,7 @@ type ChessGameFilter struct {
 	ECO    string
 	Result string
 	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
-	// migration 000073 để ván cờ cùng trục phân loại với mọi loại nội dung khác.
+	// migration 000911 để ván cờ cùng trục phân loại với mọi loại nội dung khác.
 	Level string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/white/black/event) — dùng cho
 	// autocomplete wikilink. Rỗng = không lọc.
@@ -105,7 +105,7 @@ type ChessGameFilter struct {
 type ChessPuzzleFilter struct {
 	Theme      string
 	Difficulty string
-	// Level là cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073 (khác
+	// Level là cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000911 (khác
 	// Difficulty vốn là độ khó của riêng bài tập).
 	Level string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/theme) — dùng cho
