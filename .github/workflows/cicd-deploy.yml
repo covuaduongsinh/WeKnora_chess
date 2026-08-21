@@ -122,6 +122,12 @@ jobs:
   deploy:
     needs: [build-ui, build-backend, test]
     runs-on: ubuntu-latest
+    # CHỈ tự deploy khi build từ main. Nhờ vậy `workflow_dispatch` trên một nhánh
+    # khác chỉ DỰNG image lên GHCR mà không đụng production — đúng thứ ta cần khi
+    # nâng cấp lớn: dựng image trước, rồi tự tay backup + đặt lại
+    # schema_migrations trên VPS, rồi mới đổi sang image mới.
+    # Xem docs/deploy/upstream-sync.md.
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy to VPS over SSH
         env:
