@@ -175,6 +175,7 @@ func (r *chessCourseRepository) UpdateLesson(ctx context.Context, lesson *types.
 			"content":    lesson.Content,
 			"fen":        lesson.FEN,
 			"pgn":        lesson.PGN,
+			"level":      lesson.Level,
 			"sort_order": lesson.SortOrder,
 		}).Error
 }

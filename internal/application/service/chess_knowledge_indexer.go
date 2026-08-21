@@ -29,6 +29,11 @@ type ChessKnowledgeIndexer struct {
 	kbService        interfaces.KnowledgeBaseService
 	knowledgeService interfaces.KnowledgeService
 	idxRepo          interfaces.ChessKBIndexRepository
+	// libRepo CHỈ để đọc thẻ của mục đang index. Thẻ nằm ở bảng dùng chung
+	// chess_tag_items (khóa theo ID, không theo slug) nên phải tra ở đây thay
+	// vì trong các hàm buildXKnowledgeText thuần. Có thể nil — khi đó phần thẻ
+	// đơn giản là vắng mặt, KHÔNG phải lỗi.
+	libRepo interfaces.ChessLibraryRepository
 }
 
 // NewChessKnowledgeIndexer tạo indexer tri thức cờ.
@@ -36,8 +41,45 @@ func NewChessKnowledgeIndexer(
 	kbService interfaces.KnowledgeBaseService,
 	knowledgeService interfaces.KnowledgeService,
 	idxRepo interfaces.ChessKBIndexRepository,
+	libRepo interfaces.ChessLibraryRepository,
 ) *ChessKnowledgeIndexer {
-	return &ChessKnowledgeIndexer{kbService: kbService, knowledgeService: knowledgeService, idxRepo: idxRepo}
+	return &ChessKnowledgeIndexer{
+		kbService: kbService, knowledgeService: knowledgeService,
+		idxRepo: idxRepo, libRepo: libRepo,
+	}
+}
+
+// tagLines dựng phần "Nhóm nội dung"/"Thẻ" để nối vào văn bản index của MỘT
+// mục. Nhờ đó câu hỏi theo chủ đề ("bài nào về ghim?", "tài liệu khai cuộc cho
+// cấp Mã") bắt trúng cả những loại nội dung chưa từng có cột tags (ván, bài
+// tập, bài giảng, khóa học, chương).
+//
+// Trả chuỗi RỖNG khi không có thẻ hoặc chưa nối được repo — caller nối thẳng
+// nên không sinh dòng trống.
+func (ix *ChessKnowledgeIndexer) tagLines(ctx context.Context, tenantID uint64, chessType, chessID string) string {
+	if ix.libRepo == nil || chessID == "" {
+		return ""
+	}
+	byOwner, err := ix.libRepo.TagsForMany(ctx, tenantID, chessType, []string{chessID})
+	if err != nil {
+		return ""
+	}
+	var groups, frees []string
+	for _, t := range byOwner[chessID] {
+		if t.Kind == types.ChessTagKindGroup {
+			groups = append(groups, t.Name)
+		} else {
+			frees = append(frees, t.Name)
+		}
+	}
+	var b strings.Builder
+	if len(groups) > 0 {
+		fmt.Fprintf(&b, "\n- Nhóm nội dung: %s", strings.Join(groups, ", "))
+	}
+	if len(frees) > 0 {
+		fmt.Fprintf(&b, "\n- Thẻ: %s", strings.Join(frees, ", "))
+	}
+	return b.String()
 }
 
 // Enabled cho biết có bật index tri thức cờ không (env CHESS_KB_INDEX truthy).
@@ -57,6 +99,7 @@ func (ix *ChessKnowledgeIndexer) IndexGame(ctx context.Context, g *types.ChessGa
 		return nil
 	}
 	title, content := buildGameKnowledgeText(g)
+	content += ix.tagLines(ctx, g.TenantID, types.ChessRefTypeGame, g.ID)
 	return ix.upsert(ctx, g.TenantID, types.ChessRefTypeGame, g.Slug, title, content)
 }
 
@@ -65,6 +108,7 @@ func (ix *ChessKnowledgeIndexer) IndexPuzzle(ctx context.Context, p *types.Chess
 		return nil
 	}
 	title, content := buildPuzzleKnowledgeText(p)
+	content += ix.tagLines(ctx, p.TenantID, types.ChessRefTypePuzzle, p.ID)
 	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePuzzle, p.Slug, title, content)
 }
 
@@ -73,6 +117,7 @@ func (ix *ChessKnowledgeIndexer) IndexLesson(ctx context.Context, l *types.Chess
 		return nil
 	}
 	title, content := buildLessonKnowledgeText(l)
+	content += ix.tagLines(ctx, l.TenantID, types.ChessRefTypeLesson, l.ID)
 	return ix.upsert(ctx, l.TenantID, types.ChessRefTypeLesson, l.Slug, title, content)
 }
 
@@ -81,6 +126,7 @@ func (ix *ChessKnowledgeIndexer) IndexPosition(ctx context.Context, p *types.Che
 		return nil
 	}
 	title, content := buildPositionKnowledgeText(p)
+	content += ix.tagLines(ctx, p.TenantID, types.ChessRefTypePosition, p.ID)
 	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePosition, p.Slug, title, content)
 }
 
@@ -92,6 +138,7 @@ func (ix *ChessKnowledgeIndexer) IndexArticle(ctx context.Context, a *types.Ches
 		return nil
 	}
 	title, content := buildArticleKnowledgeText(a)
+	content += ix.tagLines(ctx, a.TenantID, types.ChessRefTypeArticle, a.ID)
 	return ix.upsert(ctx, a.TenantID, types.ChessRefTypeArticle, a.Slug, title, content)
 }
 
@@ -104,6 +151,7 @@ func (ix *ChessKnowledgeIndexer) IndexBook(ctx context.Context, b *types.ChessBo
 		return nil
 	}
 	title, content := buildBookKnowledgeText(b, chapters)
+	content += ix.tagLines(ctx, b.TenantID, types.ChessRefTypeBook, b.ID)
 	return ix.upsert(ctx, b.TenantID, types.ChessRefTypeBook, b.Slug, title, content)
 }
 
@@ -115,6 +163,7 @@ func (ix *ChessKnowledgeIndexer) IndexChapter(ctx context.Context, book *types.C
 		return nil
 	}
 	title, content := buildChapterKnowledgeText(book, ch)
+	content += ix.tagLines(ctx, ch.TenantID, types.ChessRefTypeChapter, ch.ID)
 	return ix.upsert(ctx, ch.TenantID, types.ChessRefTypeChapter, ch.Slug, title, content)
 }
 

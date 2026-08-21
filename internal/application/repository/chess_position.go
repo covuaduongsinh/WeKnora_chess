@@ -32,6 +32,7 @@ func (r *chessLibraryRepository) positionQuery(ctx context.Context, tenantID uin
 		kw := "%" + f.Keyword + "%"
 		q = q.Where("slug ILIKE ? OR title ILIKE ? OR tags ILIKE ?", kw, kw, kw)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypePosition, "chess_positions.id", f.Tags)
 	return q
 }
 

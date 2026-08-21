@@ -12,6 +12,9 @@
         <t-select v-model="filter.status" :options="bookStatusOptions" placeholder="Trạng thái" clearable
           style="width:130px" @change="loadBooks" />
         <t-input v-model="filter.q" placeholder="Tìm theo tên/tác giả…" clearable style="width:170px" @change="loadBooks" />
+        <div class="bkl-tagfilter">
+          <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
+        </div>
       </div>
       <div class="bkl-toolbar">
         <t-button variant="outline" size="small" @click="shelfManagerVisible = true">
@@ -47,6 +50,7 @@
             <span v-if="b.level" class="bkl-tag">{{ bookLevelLabel(b.level) }}</span>
             <span v-if="b.phase" class="bkl-tag bkl-tag--phase">{{ bookPhaseLabel(b.phase) }}</span>
             <span class="bkl-count">{{ b.chapter_count || 0 }} chương</span>
+            <ChessTagChips :csv="b.tags" @pick="pickTag" />
           </div>
           <div v-if="b.author" class="bkl-row-author">{{ b.author }}<span v-if="b.year"> · {{ b.year }}</span></div>
         </div>
@@ -114,6 +118,7 @@
               <span class="bkl-chapter-actions">
                 <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyChapterWikilink(ch)"><t-icon name="link" /></t-button>
                 <t-button size="small" variant="text" title="Đổi slug" @click.stop="renameChapterSlugPrompt(ch)"><t-icon name="tag" /></t-button>
+                <t-button size="small" variant="text" title="Gắn thẻ" @click.stop="openChapterTags(ch)"><t-icon name="bookmark" /></t-button>
                 <t-button size="small" variant="text" title="Lịch sử phiên bản" @click.stop="openHistory(ch)"><t-icon name="history" /></t-button>
                 <t-button size="small" variant="text" title="In chương này" @click.stop="openPrintChapter(ch)"><t-icon name="print" /></t-button>
                 <t-button size="small" variant="text" title="Lên" @click.stop="moveChapter(ch, -1)"><t-icon name="chevron-up" /></t-button>
@@ -175,8 +180,8 @@
             <t-select v-model="bookDialog.status" :options="bookStatusOptions" />
           </div>
         </div>
-        <label>Thẻ (cách nhau dấu phẩy)</label>
-        <t-input v-model="bookDialog.tags" />
+        <label>Thẻ</label>
+        <ChessTagInput v-model="bookDialog.tags" />
         <label>Ảnh bìa (URL)</label>
         <t-input v-model="bookDialog.cover_url" />
         <label>Mô tả</label>
@@ -276,6 +281,8 @@
     <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
     <ChessShelfManager v-model:visible="shelfManagerVisible" @changed="loadShelves" />
     <ChessKBStatusDialog v-model:visible="kbStatusVisible" />
+    <ChessTagAssignDialog v-model:visible="chapterTagDialog.visible" chess-type="chapter"
+      :chess-id="chapterTagDialog.id" :item-title="chapterTagDialog.title" />
     <ChessChapterHistory v-model:visible="historyVisible" :chapter-id="historyChapterId" @restored="onRestored" />
   </div>
 </template>
@@ -295,6 +302,9 @@ import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import ChessShelfManager from '@/views/chess/components/ChessShelfManager.vue';
 import ChessChapterHistory from '@/views/chess/components/ChessChapterHistory.vue';
 import ChessKBStatusDialog from '@/views/chess/components/ChessKBStatusDialog.vue';
+import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessTagAssignDialog from '@/views/chess/components/ChessTagAssignDialog.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessContent, renderChessChips, isValidFEN } from '@/utils/chessBlocks';
 import { resolveChessRef } from '@/utils/chessRef';
@@ -362,7 +372,22 @@ const selectedBook = ref<ChessBook | null>(null);
 const chapters = ref<ChessBookChapter[]>([]);
 const bookShelves = ref<ChessShelf[]>([]);
 const expandedChapters = ref<Set<string>>(new Set());
-const filter = reactive({ shelf_id: '', level: '', phase: '', status: '', q: '' });
+const filter = reactive({ shelf_id: '', level: '', phase: '', status: '', q: '', tag: '' });
+
+// pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
+function pickTag(name: string) {
+  filter.tag = name;
+  loadBooks();
+}
+
+// Chương không có cột `tags` riêng nên gắn thẻ qua hộp thoại dùng chung
+// (PUT /chess/tags/assign) thay vì thêm trường vào API sửa chương.
+const chapterTagDialog = reactive({ visible: false, id: '', title: '' });
+function openChapterTags(ch: ChessBookChapter) {
+  chapterTagDialog.id = ch.id;
+  chapterTagDialog.title = ch.title;
+  chapterTagDialog.visible = true;
+}
 const shelfManagerVisible = ref(false);
 const kbStatusVisible = ref(false);
 
@@ -972,6 +997,9 @@ loadBooks().then(() => {
 }
 .bkl-picker-label { font-weight: 600; color: var(--td-text-color-primary); flex: 1; }
 .bkl-picker-slug { font-size: 12px; color: var(--td-text-color-placeholder); font-family: monospace; }
+.bkl-tagfilter {
+  width: 190px;
+}
 .bkl-spacer { flex: 1; }
 .bkl-back { display: none; }
 

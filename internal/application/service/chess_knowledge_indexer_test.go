@@ -50,6 +50,7 @@ func newTestIndexerWithCounts(
 		stubKBService{kbs: kbs},
 		stubKnowService{byKB: byKB},
 		stubIdxRepo{counts: counts},
+		nil, // libRepo: không tra thẻ trong test này — tagLines trả chuỗi rỗng
 	)
 }
 
@@ -264,7 +265,7 @@ func TestUpsert_OrphanMappingSelfHeals(t *testing.T) {
 	}
 	knu := &healStubKnow{getErr: fmt.Errorf("knowledge not found")}
 	idx := &healStubIdx{mapping: &types.ChessKBIndex{KnowledgeID: "dead-k"}}
-	ix := NewChessKnowledgeIndexer(healStubKB{kb: kb}, knu, idx)
+	ix := NewChessKnowledgeIndexer(healStubKB{kb: kb}, knu, idx, nil)
 
 	err := ix.IndexGame(context.Background(), &types.ChessGame{Slug: "van-mau", TenantID: 1})
 	if err != nil {

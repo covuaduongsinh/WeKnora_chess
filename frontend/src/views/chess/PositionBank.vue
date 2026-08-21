@@ -7,7 +7,10 @@
       <t-select v-model="filter.level" :options="positionLevelOptions" placeholder="Cấp độ" clearable
         style="width:120px" @change="load" />
       <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
-      <t-input v-model="filter.q" placeholder="Tìm theo tên/thẻ…" clearable style="width:180px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:180px" @change="load" />
+      <div class="pob-tagfilter">
+        <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
+      </div>
       <div class="pob-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export
@@ -31,6 +34,7 @@
               <span v-if="p.category" class="pob-tag">{{ positionCategoryLabel(p.category) }}</span>
               <span v-if="p.level" class="pob-tag pob-tag--level">{{ positionLevelLabel(p.level) }}</span>
               <span v-if="p.eco" class="pob-tag pob-tag--eco">{{ p.eco }}</span>
+              <ChessTagChips :csv="p.tags" @pick="pickTag" />
             </div>
           </div>
           <span class="pob-actions">
@@ -106,8 +110,8 @@
         </div>
         <label>Đánh giá (tùy chọn)</label>
         <t-input v-model="dialog.assessment" placeholder="VD: Trắng thắng / Hòa / Trắng ưu" />
-        <label>Thẻ (tùy chọn, cách nhau dấu phẩy)</label>
-        <t-input v-model="dialog.tags" placeholder="tan-cuoc, vua-xe" />
+        <label>Thẻ</label>
+        <ChessTagInput v-model="dialog.tags" />
         <div class="pob-content-label">
           <label>Chú giải (markdown — gõ [[ để chèn liên kết ván/thế cờ/bài giảng)</label>
         </div>
@@ -136,6 +140,8 @@ import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import ChessPositionEditor from '@/views/chess/components/ChessPositionEditor.vue';
+import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listPositions, getPositionBySlug, createPosition, updatePosition, deletePosition,
@@ -170,7 +176,13 @@ const orientationOptions = [
 
 const positions = ref<ChessPosition[]>([]);
 const selected = ref<ChessPosition | null>(null);
-const filter = reactive({ category: '', level: '', eco: '', q: '' });
+const filter = reactive({ category: '', level: '', eco: '', q: '', tag: '' });
+
+// pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
+function pickTag(name: string) {
+  filter.tag = name;
+  load();
+}
 const revealKey = ref(0);
 const editorVisible = ref(false);
 
@@ -412,6 +424,9 @@ load();
 .pob-fen-label { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; label { margin-top: 0; } }
 .pob-content-label { margin-top: 6px; }
 .pob-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
+.pob-tagfilter {
+  width: 200px;
+}
 .pob-spacer { flex: 1; }
 .pob-back { display: none; }
 

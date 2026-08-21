@@ -34,10 +34,14 @@ func (r *chessLibraryRepository) ListGames(ctx context.Context, tenantID uint64,
 	if f.Result != "" {
 		q = q.Where("result = ?", f.Result)
 	}
+	if f.Level != "" {
+		q = q.Where("level = ?", f.Level)
+	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
 		q = q.Where("slug ILIKE ? OR white ILIKE ? OR black ILIKE ? OR event ILIKE ?", kw, kw, kw, kw)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeGame, "chess_games.id", f.Tags)
 	var games []*types.ChessGame
 	err := q.Order("created_at DESC").Limit(500).Find(&games).Error
 	return games, err
@@ -93,7 +97,7 @@ func (r *chessLibraryRepository) UpdateGame(ctx context.Context, game *types.Che
 		Updates(map[string]interface{}{
 			"white": game.White, "black": game.Black, "result": game.Result,
 			"eco": game.ECO, "event": game.Event, "date": game.Date,
-			"pgn": game.PGN, "ply_count": game.PlyCount,
+			"pgn": game.PGN, "ply_count": game.PlyCount, "level": game.Level,
 		}).Error
 }
 
@@ -118,10 +122,14 @@ func (r *chessLibraryRepository) puzzleQuery(ctx context.Context, tenantID uint6
 	if f.Difficulty != "" {
 		q = q.Where("difficulty = ?", f.Difficulty)
 	}
+	if f.Level != "" {
+		q = q.Where("level = ?", f.Level)
+	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
 		q = q.Where("slug ILIKE ? OR title ILIKE ? OR theme ILIKE ?", kw, kw, kw)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypePuzzle, "chess_puzzles.id", f.Tags)
 	return q
 }
 
@@ -174,6 +182,7 @@ func (r *chessLibraryRepository) UpdatePuzzle(ctx context.Context, puzzle *types
 		Updates(map[string]interface{}{
 			"title": puzzle.Title, "fen": puzzle.FEN, "solution": puzzle.Solution,
 			"theme": puzzle.Theme, "difficulty": puzzle.Difficulty, "source": puzzle.Source,
+			"level": puzzle.Level,
 		}).Error
 }
 

@@ -29,13 +29,18 @@ func chessFail(c *gin.Context, code int, err error) {
 
 // ---- Ván đấu ----
 
-// ListGames GET /chess/games?white=&black=&eco=&result=
+// ListGames GET /chess/games?white=&black=&eco=&result=&level=&q=&tag=&tag_mode=
 func (h *ChessLibraryHandler) ListGames(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
 	games, err := h.service.ListGames(ctx, tenantID, types.ChessGameFilter{
 		White: c.Query("white"), Black: c.Query("black"),
 		ECO: c.Query("eco"), Result: c.Query("result"),
+		Level: c.Query("level"),
+		// `q` được repo hỗ trợ từ đầu (ChessGameFilter.Keyword) nhưng handler
+		// chưa bao giờ đọc — nối lại ở đây để ô tìm của Kho ván hoạt động.
+		Keyword: c.Query("q"),
+		Tags:    parseChessTagSelector(c),
 	})
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
@@ -254,6 +259,10 @@ func (h *ChessLibraryHandler) ListPuzzles(c *gin.Context) {
 	tenantID := types.MustTenantIDFromContext(ctx)
 	puzzles, err := h.service.ListPuzzles(ctx, tenantID, types.ChessPuzzleFilter{
 		Theme: c.Query("theme"), Difficulty: c.Query("difficulty"),
+		Level: c.Query("level"),
+		// `q` cũng chưa từng được nối ở đây — xem ghi chú tại ListGames.
+		Keyword: c.Query("q"),
+		Tags:    parseChessTagSelector(c),
 	})
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)

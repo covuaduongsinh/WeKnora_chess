@@ -18,6 +18,7 @@ func (h *ChessLibraryHandler) ListPositions(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
 	positions, err := h.service.ListPositions(ctx, tenantID, types.ChessPositionFilter{
+		Tags:     parseChessTagSelector(c),
 		Category: c.Query("category"), Level: c.Query("level"), ECO: c.Query("eco"),
 		SourceGameID: c.Query("source_game_id"), Keyword: c.Query("q"),
 	})

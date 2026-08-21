@@ -76,6 +76,7 @@ func (s *chessLibraryService) CreatePosition(ctx context.Context, position *type
 	if err := s.repo.CreatePosition(ctx, position); err != nil {
 		return nil, err
 	}
+	position.Tags = s.applyChessTags(ctx, position.TenantID, types.ChessRefTypePosition, position.ID, position.Tags)
 	s.syncPositionChessRefs(ctx, position)
 	if s.indexer != nil {
 		_ = s.indexer.IndexPosition(ctx, position) // best-effort: không chặn CRUD
@@ -105,6 +106,7 @@ func (s *chessLibraryService) UpdatePosition(ctx context.Context, position *type
 	if err != nil || updated == nil {
 		return updated, err
 	}
+	updated.Tags = s.applyChessTags(ctx, updated.TenantID, types.ChessRefTypePosition, updated.ID, updated.Tags)
 	s.syncPositionChessRefs(ctx, updated)
 	if s.indexer != nil {
 		_ = s.indexer.IndexPosition(ctx, updated) // best-effort: không chặn CRUD
@@ -156,6 +158,7 @@ func (s *chessLibraryService) DeletePosition(ctx context.Context, tenantID uint6
 	if err := s.repo.DeletePosition(ctx, tenantID, id); err != nil {
 		return err
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypePosition, id)
 	if p != nil {
 		// Xóa cả ref ĐÍCH tới thế cờ này (backlink từ nơi khác) lẫn ref NGUỒN từ
 		// chú giải của chính nó (nó từng trỏ đi đâu).

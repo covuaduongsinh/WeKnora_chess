@@ -13,7 +13,11 @@ import (
 // phiên bản cần dùng — cùng kỹ thuật fakePositionRepo/fakeBookRepo. ---
 
 type fakeArticleRepo struct {
-	interfaces.ChessLibraryRepository
+	// fakeTagBase (chess_library_tag_test.go) mang phần lưu trữ HỆ THẺ và tự
+	// embed interface repo. Phải embed nó CHỨ KHÔNG embed interface trực tiếp:
+	// mọi đường Create/Update/Delete nay đều gọi repo thẻ, còn embed cả hai ở
+	// cùng độ sâu sẽ làm method thẻ nhập nhằng.
+	fakeTagBase
 	articles   map[string]*types.ChessArticle
 	topics     map[string]*types.ChessArticleTopic
 	topicItems map[string]map[string]int // topicID -> articleID -> sortOrder
@@ -24,7 +28,8 @@ type fakeArticleRepo struct {
 
 func newFakeArticleRepo() *fakeArticleRepo {
 	return &fakeArticleRepo{
-		articles: map[string]*types.ChessArticle{}, topics: map[string]*types.ChessArticleTopic{},
+		fakeTagBase: newFakeTagBase(),
+		articles:    map[string]*types.ChessArticle{}, topics: map[string]*types.ChessArticleTopic{},
 		topicItems: map[string]map[string]int{}, images: map[string]*types.ChessArticleImage{},
 		revisions: map[string]*types.ChessArticleRevision{},
 	}

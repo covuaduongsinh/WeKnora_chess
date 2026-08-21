@@ -38,6 +38,7 @@ func (r *chessLibraryRepository) articleQuery(ctx context.Context, tenantID uint
 		q = q.Joins("JOIN chess_article_topic_items ti ON ti.article_id = chess_articles.id "+
 			"AND ti.tenant_id = ? AND ti.topic_id = ?", tenantID, f.TopicID)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeArticle, "chess_articles.id", f.Tags)
 	return q
 }
 

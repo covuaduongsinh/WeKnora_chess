@@ -208,6 +208,8 @@ type ChessBookFilter struct {
 	Status  string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/author/tags).
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
 }
 
 // ---- Bundle export/import (không kèm ID/slug/tenant để import luôn tạo mới) ----

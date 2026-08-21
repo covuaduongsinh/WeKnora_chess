@@ -29,6 +29,11 @@
       <t-tab-panel value="articles" label="Ngân hàng bài viết">
         <div class="cm-pane"><ArticleBank v-if="tab === 'articles'" :focus-slug="focusArticleSlug" /></div>
       </t-tab-panel>
+      <!-- Thẻ là trục phân loại NGANG phủ cả 8 loại, nên tab này không phải
+           "loại nội dung thứ 7" mà là MỤC LỤC NGANG của 6 tab kia. -->
+      <t-tab-panel value="tags" label="Thẻ">
+        <div class="cm-pane"><TagBrowser v-if="tab === 'tags'" /></div>
+      </t-tab-panel>
     </t-tabs>
     <ChessKBStatusDialog v-model:visible="kbStatusVisible" />
   </div>
@@ -43,6 +48,7 @@ import PuzzleBank from './PuzzleBank.vue';
 import PositionBank from './PositionBank.vue';
 import BookLibrary from './BookLibrary.vue';
 import ArticleBank from './ArticleBank.vue';
+import TagBrowser from './TagBrowser.vue';
 import ChessKBStatusDialog from './components/ChessKBStatusDialog.vue';
 
 const route = useRoute();

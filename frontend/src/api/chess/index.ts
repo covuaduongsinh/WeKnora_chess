@@ -23,6 +23,8 @@ export interface ChessLesson {
   content: string;
   fen: string;
   pgn: string;
+  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073. */
+  level?: string;
   sort_order: number;
   slug?: string;
   created_at?: string;
@@ -87,7 +89,9 @@ function qs(params: Record<string, string>): string {
   const p = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
   return p.length ? `?${p.join("&")}` : "";
 }
-export const listGames = (f: Partial<{ white: string; black: string; eco: string; result: string }> = {}) =>
+export const listGames = (
+  f: Partial<{ white: string; black: string; eco: string; result: string; level: string; q: string; tag: string; tag_mode: string }> = {},
+) =>
   get(`/api/v1/chess/games${qs(f as Record<string, string>)}`);
 export const getGame = (id: string) => get(`/api/v1/chess/games/${id}`);
 // Giải mã wikilink [[game/<slug>]] → ván cờ.
@@ -108,10 +112,14 @@ export interface ChessPuzzle {
   id: string;
   title: string; fen: string; solution: string;
   theme: string; difficulty: string; source: string;
+  /** Cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073. */
+  level?: string;
   slug?: string;
   created_at?: string;
 }
-export const listPuzzles = (f: Partial<{ theme: string; difficulty: string }> = {}) =>
+export const listPuzzles = (
+  f: Partial<{ theme: string; difficulty: string; level: string; q: string; tag: string; tag_mode: string }> = {},
+) =>
   get(`/api/v1/chess/puzzles${qs(f as Record<string, string>)}`);
 export const getPuzzle = (id: string) => get(`/api/v1/chess/puzzles/${id}`);
 // Giải mã wikilink [[puzzle/<slug>]] → thế cờ/bài tập.
@@ -145,7 +153,7 @@ export interface ChessPosition {
   created_at?: string;
 }
 export const listPositions = (
-  f: Partial<{ category: string; level: string; eco: string; source_game_id: string; q: string }> = {},
+  f: Partial<{ category: string; level: string; eco: string; source_game_id: string; q: string; tag: string; tag_mode: string }> = {},
 ) => get(`/api/v1/chess/positions${qs(f as Record<string, string>)}`);
 export const getPosition = (id: string) => get(`/api/v1/chess/positions/${id}`);
 // Giải mã wikilink [[position/<slug>]] → thế cờ.
@@ -210,7 +218,7 @@ export const setShelfBooks = (id: string, bookIds: string[]) => put(`/api/v1/che
 
 // ---- Sách ----
 export const listBooks = (
-  f: Partial<{ shelf_id: string; level: string; phase: string; status: string; q: string }> = {},
+  f: Partial<{ shelf_id: string; level: string; phase: string; status: string; q: string; tag: string; tag_mode: string }> = {},
 ) => get(`/api/v1/chess/books${qs(f as Record<string, string>)}`);
 export const getBook = (id: string) => get(`/api/v1/chess/books/${id}`);
 // Giải mã wikilink [[book/<slug>]] → sách.
@@ -279,7 +287,7 @@ export interface ChessArticle {
   created_at?: string; updated_at?: string;
 }
 export const listArticles = (
-  f: Partial<{ topic_id: string; category: string; level: string; status: string; q: string }> = {},
+  f: Partial<{ topic_id: string; category: string; level: string; status: string; q: string; tag: string; tag_mode: string }> = {},
 ) => get(`/api/v1/chess/articles${qs(f as Record<string, string>)}`);
 export const getArticle = (id: string) => get(`/api/v1/chess/articles/${id}`);
 // Giải mã wikilink [[article/<slug>]] → bài viết.
@@ -375,3 +383,85 @@ export const getArticleRevision = (articleId: string, revId: string) =>
   get(`/api/v1/chess/articles/${articleId}/revisions/${revId}`);
 export const restoreArticleRevision = (articleId: string, revId: string) =>
   post(`/api/v1/chess/articles/${articleId}/revisions/${revId}/restore`, {});
+
+// ---- Hệ thẻ thống nhất (phủ CẢ 8 loại nội dung cờ) ----
+// Thẻ là trục phân loại NGANG duy nhất: một thẻ "ghim" kéo về đủ bài viết,
+// thế cờ, bài tập và ván minh họa. Hai loại thẻ:
+//   kind="group" — 8 nhóm nội dung dựng sẵn, KHÔNG xóa được (từ vựng đóng)
+//   kind="free"  — thẻ tự do người dùng gõ
+export interface ChessTag {
+  id: string;
+  slug: string;
+  name: string;
+  kind: "group" | "free";
+  description: string;
+  color: string;
+  usage_count: number;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Một mục nội dung mang thẻ — đã đủ thông tin để hiển thị và điều hướng, KHÔNG
+// cần gọi thêm API theo từng loại.
+export interface ChessTagItemRef {
+  chess_type: string;
+  chess_id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  level: string;
+  status: string;
+  updated_at?: string;
+}
+
+// Trang kết quả tra nội dung theo thẻ. Đây là endpoint cờ ĐẦU TIÊN có phân
+// trang thật + tổng số (các list cũ cắt cứng ở 500 bản ghi mà không báo gì).
+export interface ChessTagItemPage {
+  items: ChessTagItemRef[];
+  total: number;
+  page: number;
+  page_size: number;
+  by_type: Record<string, number>;
+}
+
+export const listChessTags = (f: Partial<{ kind: string; q: string; only_used: string }> = {}) =>
+  get(`/api/v1/chess/tags${qs(f as Record<string, string>)}`);
+export const getChessTagBySlug = (slug: string) =>
+  get(`/api/v1/chess/tags/by-slug/${encodeURIComponent(slug)}`);
+// Mọi nội dung mang một thẻ, gộp mọi loại (type rỗng) hoặc lọc một loại.
+export const listChessTagItems = (
+  slug: string,
+  f: Partial<{ type: string; page: number; page_size: number }> = {},
+) => {
+  const params: Record<string, string> = {};
+  if (f.type) params.type = f.type;
+  if (f.page) params.page = String(f.page);
+  if (f.page_size) params.page_size = String(f.page_size);
+  return get(`/api/v1/chess/tags/by-slug/${encodeURIComponent(slug)}/items${qs(params)}`);
+};
+export const createChessTag = (data: Partial<ChessTag>) => post("/api/v1/chess/tags", data);
+// Đổi tên thẻ; nếu tên mới quy về slug của thẻ KHÁC thì backend tự GỘP vào thẻ
+// đó và trả về thẻ đích — nên luôn dùng phản hồi thay vì giả định id không đổi.
+export const updateChessTag = (id: string, data: Partial<ChessTag>) =>
+  put(`/api/v1/chess/tags/${id}`, data);
+export const deleteChessTag = (id: string) => del(`/api/v1/chess/tags/${id}`);
+export const mergeChessTags = (fromId: string, targetId: string) =>
+  put(`/api/v1/chess/tags/${fromId}/merge`, { target_id: targetId });
+
+// Gắn thẻ cho MỘT mục bất kỳ (ghi đè, mảng rỗng = gỡ hết). Một endpoint duy
+// nhất cho cả 8 loại — nhờ vậy ván/bài tập/bài giảng/khóa học/chương dùng được
+// hệ thẻ mà không phải đổi API create/update của chúng.
+export const assignChessTags = (chessType: string, chessId: string, tags: string[]) =>
+  put("/api/v1/chess/tags/assign", { chess_type: chessType, chess_id: chessId, tags });
+// Thẻ đang gắn cho một mục.
+export const getChessTagsOf = (chessType: string, id: string) =>
+  get(`/api/v1/chess/tags/of/${encodeURIComponent(chessType)}/${encodeURIComponent(id)}`);
+// Thẻ của NHIỀU mục cùng loại trong một lượt gọi — dùng để hiện chip thẻ trên
+// từng hàng danh sách mà không tạo N+1 request. POST vì danh sách id có thể dài.
+export const getChessTagsOfMany = (chessType: string, ids: string[]) =>
+  post("/api/v1/chess/tags/of", { chess_type: chessType, ids });
+
+// Bảo trì: nạp dữ liệu phân loại cũ vào hệ thẻ (idempotent) / đếm lại số dùng.
+export const backfillChessTags = () => post("/api/v1/chess/tags/backfill", {});
+export const recountChessTags = () => post("/api/v1/chess/tags/recount", {});

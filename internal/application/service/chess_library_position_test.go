@@ -13,12 +13,16 @@ import (
 // cùng kỹ thuật với chess_knowledge_indexer_test.go (stubKBService...). ---
 
 type fakePositionRepo struct {
-	interfaces.ChessLibraryRepository
+	// fakeTagBase (chess_library_tag_test.go) mang phần lưu trữ HỆ THẺ và tự
+	// embed interface repo. Phải embed nó CHỨ KHÔNG embed interface trực tiếp:
+	// mọi đường Create/Update/Delete nay đều gọi repo thẻ, còn embed cả hai ở
+	// cùng độ sâu sẽ làm method thẻ nhập nhằng.
+	fakeTagBase
 	byID map[string]*types.ChessPosition
 }
 
 func newFakePositionRepo() *fakePositionRepo {
-	return &fakePositionRepo{byID: map[string]*types.ChessPosition{}}
+	return &fakePositionRepo{fakeTagBase: newFakeTagBase(), byID: map[string]*types.ChessPosition{}}
 }
 
 func (r *fakePositionRepo) ListPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) ([]*types.ChessPosition, error) {

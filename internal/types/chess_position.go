@@ -69,6 +69,9 @@ type ChessPositionFilter struct {
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/tags) — dùng cho
 	// autocomplete wikilink. Rỗng = không lọc.
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items) — khác Keyword ở chỗ
+	// khớp CHÍNH XÁC theo slug thẻ, không phải substring trên cột CSV.
+	Tags ChessTagSelector
 }
 
 // ChessPositionBundle là gói export/import 1 thế cờ (không kèm ID/slug/tenant

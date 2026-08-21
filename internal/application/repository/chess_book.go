@@ -171,6 +171,7 @@ func (r *chessLibraryRepository) bookQuery(ctx context.Context, tenantID uint64,
 		q = q.Joins("JOIN chess_shelf_books sb ON sb.book_id = chess_books.id AND sb.tenant_id = ? AND sb.shelf_id = ?",
 			tenantID, f.ShelfID)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeBook, "chess_books.id", f.Tags)
 	return q
 }
 

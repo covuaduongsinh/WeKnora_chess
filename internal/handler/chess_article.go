@@ -20,6 +20,7 @@ func (h *ChessLibraryHandler) ListArticles(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
 	articles, err := h.service.ListArticles(ctx, tenantID, types.ChessArticleFilter{
+		Tags:    parseChessTagSelector(c),
 		TopicID: c.Query("topic_id"), Category: c.Query("category"), Level: c.Query("level"),
 		Status: c.Query("status"), Keyword: c.Query("q"),
 	})

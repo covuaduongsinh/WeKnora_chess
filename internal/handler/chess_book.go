@@ -157,6 +157,7 @@ func (h *ChessLibraryHandler) ListBooks(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
 	books, err := h.service.ListBooks(ctx, tenantID, types.ChessBookFilter{
+		Tags:    parseChessTagSelector(c),
 		ShelfID: c.Query("shelf_id"), Level: c.Query("level"), Phase: c.Query("phase"),
 		Status: c.Query("status"), Keyword: c.Query("q"),
 	})

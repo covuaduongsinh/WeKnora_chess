@@ -26,10 +26,12 @@
           <div class="cc-course-meta">
             <span v-if="c.level" class="cc-tag">{{ levelLabel(c.level) }}</span>
             <span class="cc-count">{{ c.lesson_count || 0 }} bài học</span>
+            <ChessTagChips :tags="courseTags[c.id]" />
           </div>
         </div>
         <div class="cc-course-actions">
           <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyCourseWikilink(c)"><t-icon name="link" /></t-button>
+          <t-button size="small" variant="text" title="Gắn thẻ" @click.stop="openTags('course', c.id, c.title)"><t-icon name="bookmark" /></t-button>
           <t-button size="small" variant="text" @click.stop="openCourseDialog(c)"><t-icon name="edit" /></t-button>
           <t-button size="small" variant="text" theme="danger" @click.stop="removeCourse(c)"><t-icon name="delete" /></t-button>
         </div>
@@ -56,7 +58,9 @@
           <div class="cc-lesson-head" @click="toggleLesson(l.id)">
             <span class="cc-lesson-idx">{{ idx + 1 }}.</span>
             <span class="cc-lesson-title">{{ l.title }}</span>
+            <ChessTagChips :tags="lessonTags[l.id]" />
             <span class="cc-lesson-actions">
+              <t-button size="small" variant="text" title="Gắn thẻ" @click.stop="openTags('lesson', l.id, l.title)"><t-icon name="bookmark" /></t-button>
               <t-button size="small" variant="text" @click.stop="openLessonDialog(l)"><t-icon name="edit" /></t-button>
               <t-button size="small" variant="text" theme="danger" @click.stop="removeLesson(l)"><t-icon name="delete" /></t-button>
               <t-icon :name="expandedLessons.has(l.id) ? 'chevron-up' : 'chevron-down'" />
@@ -170,6 +174,9 @@
 
     <!-- Popup bàn cờ khi bấm chip trong nội dung bài giảng -->
     <ChessRefDialog v-model:visible="refDialog.visible" :ref-str="refDialog.refStr" />
+
+    <ChessTagAssignDialog v-model:visible="tagDialog.visible" :chess-type="tagDialog.type"
+      :chess-id="tagDialog.id" :item-title="tagDialog.title" @saved="onTagsSaved" />
   </div>
 </template>
 
@@ -182,6 +189,8 @@ import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDi
 import ChessRefEmbed from '@/views/chess/components/ChessRefEmbed.vue';
 import ChessRefDialog from '@/views/chess/components/ChessRefDialog.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessTagAssignDialog from '@/views/chess/components/ChessTagAssignDialog.vue';
 import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.vue';
 import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import type { ChessBoardData } from '@/types/tool-results';
@@ -193,6 +202,7 @@ import {
   listLessons, createLesson, updateLesson, deleteLesson, getLessonBySlug,
   listGames, listPuzzles, listPositions, listArticles, exportCourses, importCourses,
   type ChessCourse, type ChessLesson, type ChessGame, type ChessPuzzle, type ChessPosition, type ChessArticle,
+  getChessTagsOfMany, type ChessTag,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 
@@ -290,6 +300,7 @@ async function loadCourses() {
   try {
     const res: any = await listCourses();
     courses.value = res?.data || [];
+    await loadCourseTags();
   } catch {
     MessagePlugin.error('Tải khóa học thất bại');
   }
@@ -301,9 +312,48 @@ async function selectCourse(c: ChessCourse) {
   try {
     const res: any = await listLessons(c.id);
     lessons.value = res?.data || [];
+    await loadLessonTags();
   } catch {
     lessons.value = [];
   }
+}
+
+// ---- Thẻ (khóa học & bài giảng) ----
+// Cả hai loại đều KHÔNG có cột `tags` trong bản ghi, nên thẻ nạp theo LÔ cho
+// cả danh sách (một request) và sửa qua hộp thoại gắn thẻ dùng chung.
+const courseTags = ref<Record<string, ChessTag[]>>({});
+const lessonTags = ref<Record<string, ChessTag[]>>({});
+const tagDialog = reactive({ visible: false, type: 'course', id: '', title: '' });
+
+function openTags(type: string, id: string, title: string) {
+  tagDialog.type = type;
+  tagDialog.id = id;
+  tagDialog.title = title;
+  tagDialog.visible = true;
+}
+
+async function loadCourseTags() {
+  const ids = courses.value.map((c) => c.id).filter(Boolean);
+  if (!ids.length) { courseTags.value = {}; return; }
+  try {
+    const res: any = await getChessTagsOfMany('course', ids);
+    courseTags.value = res?.data || {};
+  } catch { courseTags.value = {}; }
+}
+
+async function loadLessonTags() {
+  const ids = lessons.value.map((l) => l.id).filter(Boolean);
+  if (!ids.length) { lessonTags.value = {}; return; }
+  try {
+    const res: any = await getChessTagsOfMany('lesson', ids);
+    lessonTags.value = res?.data || {};
+  } catch { lessonTags.value = {}; }
+}
+
+// Sau khi lưu thẻ, nạp lại đúng nhóm vừa sửa để chip trên hàng cập nhật ngay.
+function onTagsSaved() {
+  if (tagDialog.type === 'course') loadCourseTags();
+  else loadLessonTags();
 }
 
 function toggleLesson(id: string) {

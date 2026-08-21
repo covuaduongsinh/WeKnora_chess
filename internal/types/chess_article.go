@@ -148,6 +148,8 @@ type ChessArticleFilter struct {
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/aliases/summary/tags) —
 	// dùng cho autocomplete wikilink. Rỗng = không lọc.
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
 }
 
 // ChessArticleTopicFilter là bộ lọc khi liệt kê chuyên mục.

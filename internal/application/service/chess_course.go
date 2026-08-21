@@ -18,6 +18,12 @@ type chessCourseService struct {
 	chessRefRepo interfaces.WikiChessRefRepository
 	aliasRepo    interfaces.ChessSlugAliasRepository
 	indexer      *ChessKnowledgeIndexer
+	// libraryRepo CHỈ dùng để dọn liên kết THẺ khi xóa khóa học/bài giảng.
+	// Hệ thẻ (chess_tag_items) là bảng dùng chung cho cả 8 loại nội dung nên
+	// nằm ở ChessLibraryRepository; quên dọn ở đây là để lại liên kết mồ côi
+	// và usage_count sai vĩnh viễn. dig tự nối vì repository đó đã được
+	// Provide sẵn — KHÔNG cần sửa container.go. Có thể nil trong test.
+	libraryRepo interfaces.ChessLibraryRepository
 }
 
 // NewChessCourseService tạo service khóa học cờ vua.
@@ -26,8 +32,22 @@ func NewChessCourseService(
 	chessRefRepo interfaces.WikiChessRefRepository,
 	aliasRepo interfaces.ChessSlugAliasRepository,
 	indexer *ChessKnowledgeIndexer,
+	libraryRepo interfaces.ChessLibraryRepository,
 ) interfaces.ChessCourseService {
-	return &chessCourseService{repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo, indexer: indexer}
+	return &chessCourseService{
+		repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo,
+		indexer: indexer, libraryRepo: libraryRepo,
+	}
+}
+
+// removeChessTags gỡ một khóa học/bài giảng khỏi mọi thẻ (khi xóa nó).
+// Best-effort như mọi thao tác dọn dẹp khác trong file này.
+func (s *chessCourseService) removeChessTags(ctx context.Context, tenantID uint64, chessType, chessID string) {
+	if s.libraryRepo == nil || chessID == "" {
+		return
+	}
+	_ = s.libraryRepo.RemoveAllTagsFor(ctx, tenantID, chessType, chessID)
+	_ = s.libraryRepo.RecountTagUsage(ctx, tenantID, nil)
 }
 
 // resolveAliasOrFuzzy nắn một slug "chết" về slug sống: alias trước, rồi fuzzy.
@@ -139,6 +159,10 @@ func (s *chessCourseService) DeleteCourse(ctx context.Context, tenantID uint64, 
 	if s.chessRefRepo != nil && course != nil && course.Slug != "" {
 		_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeCourse, course.Slug)
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeCourse, id)
+	for _, l := range lessons {
+		s.removeChessTags(ctx, tenantID, types.ChessRefTypeLesson, l.ID)
+	}
 	for _, l := range lessons {
 		if l.Slug == "" {
 			continue
@@ -236,6 +260,7 @@ func (s *chessCourseService) DeleteLesson(ctx context.Context, tenantID uint64, 
 	if err := s.repo.DeleteLesson(ctx, tenantID, id); err != nil {
 		return err
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeLesson, id)
 	if l != nil && l.Slug != "" {
 		if s.chessRefRepo != nil {
 			_ = s.chessRefRepo.DeleteForChess(ctx, tenantID, types.ChessRefTypeLesson, l.Slug) // ref TRỎ TỚI bài
