@@ -89,22 +89,19 @@ func (s *sessionService) AgentQA(
 		return fmt.Errorf("failed to get chat model: %w", err)
 	}
 
-	// Get rerank model from custom agent config (only required when knowledge_search is allowed)
+	// Get rerank model from custom agent config only when knowledge_search can
+	// actually run. A disabled KB scope makes all KB tools ineffective, so it
+	// must not force users to configure an otherwise-unused rerank model.
 	var rerankModel rerank.Reranker
-	hasKnowledgeSearchTool := false
-	for _, tool := range agentConfig.AllowedTools {
-		if tool == tools.ToolKnowledgeSearch {
-			hasKnowledgeSearchTool = true
-			break
-		}
-	}
-
-	if hasKnowledgeSearchTool {
+	if agentRequiresRerankModel(req.CustomAgent) {
 		// Rerank model is resolved from the agent config. KHÔNG bắt buộc cứng:
 		// khi tenant chưa cấu hình rerank model, knowledge_search tự degrade sang
 		// LLM-based rerank dùng chat model (xem knowledge_search.go: "fall back to
 		// chatModel"). Hard-fail ở đây sẽ chặn RAG cho tenant không có rerank model
 		// (vd Gemini không cung cấp API rerank) — nên chỉ cảnh báo rồi đi tiếp.
+		// Upstream 0.6.3 thay vòng lặp quét AllowedTools bằng helper
+		// agentRequiresRerankModel(); giữ helper đó, chỉ giữ lại hành vi không
+		// hard-fail của fork (thân dưới dùng logger.Warnf thay vì trả lỗi).
 		rerankModelID := req.CustomAgent.Config.RerankModelID
 		if rerankModelID == "" {
 			logger.Warnf(ctx, "No rerank model for custom agent %s; knowledge_search sẽ dùng LLM-based rerank fallback (chat model)", req.CustomAgent.ID)
@@ -116,7 +113,7 @@ func (s *sessionService) AgentQA(
 			}
 		}
 	} else {
-		logger.Infof(ctx, "knowledge_search tool not enabled, skipping rerank model initialization")
+		logger.Infof(ctx, "knowledge_search is unavailable for the effective agent scope, skipping rerank model initialization")
 	}
 
 	// Load multi-turn history directly from DB (the single source of truth).

@@ -67,6 +67,7 @@ type RouterParams struct {
 	SystemHandler                *handler.SystemHandler
 	MCPServiceHandler            *handler.MCPServiceHandler
 	MCPCredentialsHandler        *handler.MCPCredentialsHandler
+	MCPOAuthHandler              *handler.MCPOAuthHandler
 	WebSearchHandler             *handler.WebSearchHandler
 	WebSearchProviderHandler     *handler.WebSearchProviderHandler
 	WebSearchCredentialsHandler  *handler.WebSearchProviderCredentialsHandler
@@ -224,7 +225,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterInitializationRoutes(v1, params.InitializationHandler, rbacGuards)
 		RegisterSystemRoutes(v1, params.SystemHandler, rbacGuards)
 		RegisterSystemAdminRoutes(v1, params.SystemHandler, params.AuditLogHandler, rbacGuards)
-		RegisterMCPServiceRoutes(v1, params.MCPServiceHandler, params.MCPCredentialsHandler, rbacGuards)
+		RegisterMCPServiceRoutes(v1, params.MCPServiceHandler, params.MCPCredentialsHandler, params.MCPOAuthHandler, rbacGuards)
 		RegisterWebSearchRoutes(v1, params.WebSearchHandler, rbacGuards)
 		RegisterWebSearchProviderRoutes(v1, params.WebSearchProviderHandler, params.WebSearchCredentialsHandler, rbacGuards)
 		RegisterVectorStoreRoutes(v1, params.VectorStoreHandler, rbacGuards)
@@ -330,6 +331,7 @@ func RegisterKnowledgeRoutes(r *gin.RouterGroup, handler *handler.KnowledgeHandl
 		// "must own every targeted KB" guard if the requirement
 		// surfaces.
 		k.PUT("/tags", g.Contributor(), handler.UpdateKnowledgeTagBatch)
+		k.POST("/batch-reparse", g.Contributor(), handler.BatchReparseKnowledge)
 		k.GET("/search", g.Viewer(), handler.SearchKnowledge)
 		k.POST("/batch-delete", g.Contributor(), handler.BatchDeleteKnowledge)
 		k.POST("/move", g.Contributor(), handler.MoveKnowledge)
@@ -880,6 +882,8 @@ func RegisterModelRoutes(
 		models.POST("", g.Admin(), handler.CreateModel)
 		// 获取模型列表 — Viewer+
 		models.GET("", g.Viewer(), handler.ListModels)
+		// 调试已保存模型会发起真实上游调用并产生费用 — Admin+
+		models.POST("/:id/debug", g.Admin(), handler.DebugModel)
 		// 获取单个模型 — Viewer+
 		models.GET("/:id", g.Viewer(), handler.GetModel)
 		// 更新模型 — Admin+
@@ -1079,8 +1083,15 @@ func RegisterMCPServiceRoutes(
 	r *gin.RouterGroup,
 	handler *handler.MCPServiceHandler,
 	credHandler *handler.MCPCredentialsHandler,
+	oauthHandler *handler.MCPOAuthHandler,
 	g *rbacGuards,
 ) {
+	// MCP OAuth provider redirect. Registered OUTSIDE the /mcp-services group
+	// to avoid a static-vs-":id" route conflict, and left unauthenticated
+	// (allow-listed in middleware/auth.go) because the third-party browser
+	// redirect carries no WeKnora bearer — the single-use state authenticates.
+	r.GET("/mcp-oauth/callback", oauthHandler.Callback)
+
 	mcpServices := r.Group("/mcp-services")
 	{
 		// Create MCP service — Admin+
@@ -1106,6 +1117,12 @@ func RegisterMCPServiceRoutes(
 		// MCP tool human approval (issue #1173) — Viewer+ to read, Admin+ to set policy
 		mcpServices.GET("/:id/tool-approvals", g.Viewer(), handler.ListMCPToolApprovals)
 		mcpServices.PUT("/:id/tool-approvals/:tool_name", g.Admin(), handler.SetMCPToolApproval)
+		// Per-user OAuth authorization flow. Viewer+ may authorize/inspect/
+		// revoke their own token; the callback is the separate public route
+		// registered above.
+		mcpServices.POST("/:id/oauth/authorize-url", g.Viewer(), oauthHandler.AuthorizeURL)
+		mcpServices.GET("/:id/oauth/status", g.Viewer(), oauthHandler.Status)
+		mcpServices.DELETE("/:id/oauth/token", g.Viewer(), oauthHandler.Revoke)
 	}
 
 	agentTool := r.Group("/agent")
@@ -1407,6 +1424,7 @@ func RegisterEmbedChannelRoutes(r *gin.RouterGroup, embedHandler *handler.EmbedC
 	channels := r.Group("/embed-channels")
 	{
 		channels.GET("", g.Viewer(), embedHandler.ListAllEmbedChannels)
+		channels.GET("/:channel_id", g.Viewer(), embedHandler.GetEmbedChannel)
 		channels.PUT("/:channel_id", g.Admin(), embedHandler.UpdateEmbedChannel)
 		channels.DELETE("/:channel_id", g.Admin(), embedHandler.DeleteEmbedChannel)
 		channels.POST("/:channel_id/rotate-token", g.Admin(), embedHandler.RotateEmbedToken)

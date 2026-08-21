@@ -258,7 +258,13 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 		// (vd KB cờ bị xóa để tạo lại theo runbook) → mapping MỒ CÔI: UpdateManualKnowledge
 		// sẽ báo "knowledge not found". Khi đó gỡ mapping mồ côi rồi rơi xuống nhánh TẠO MỚI.
 		if _, gerr := ix.knowledgeService.GetKnowledgeByID(ctx, existing.KnowledgeID); gerr == nil {
-			payload.TagID = ix.chessTagID(ctx, existing.KBID, chessType)
+			// Upstream 0.6.3 đổi nhãn tài liệu sang NHIỀU-NHIỀU (migration
+			// 000063_knowledge_multi_tags): TagID string → TagIDs []string.
+			// Lớp cờ vẫn gắn ĐÚNG MỘT nhãn theo loại nội dung ("Ván cờ", "Sách"…);
+			// gắn thêm nhãn nhóm nội dung là việc mở rộng riêng, chưa làm ở đây.
+			if tagID := ix.chessTagID(ctx, existing.KBID, chessType); tagID != "" {
+				payload.TagIDs = []string{tagID}
+			}
 			if _, err := ix.knowledgeService.UpdateManualKnowledge(ctx, existing.KnowledgeID, payload); err != nil {
 				logger.Warnf(ctx, "chess index: cập nhật knowledge cho %s/%s thất bại: %v", chessType, slug, err)
 				return err
@@ -277,7 +283,9 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 		logger.Warnf(ctx, "chess index: không có KB cờ để index %s/%s: %v", chessType, slug, err)
 		return err
 	}
-	payload.TagID = ix.chessTagID(ctx, kb.ID, chessType)
+	if tagID := ix.chessTagID(ctx, kb.ID, chessType); tagID != "" {
+		payload.TagIDs = []string{tagID}
+	}
 	k, err := ix.knowledgeService.CreateKnowledgeFromManual(ctx, kb.ID, payload, "chess")
 	if err != nil || k == nil {
 		if err == nil {

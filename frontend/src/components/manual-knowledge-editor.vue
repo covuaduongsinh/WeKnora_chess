@@ -612,20 +612,20 @@ const handleSave = async (targetStatus: ManualStatus) => {
   saving.value = true
   savingAction.value = targetStatus
   try {
-    const tagIdToUpload = uiStore.selectedTagId !== '__untagged__' ? uiStore.selectedTagId : undefined
+    const tagIdsToUpload = uiStore.selectedTagIds.length > 0 ? [...uiStore.selectedTagIds] : undefined
     const payload: {
       title: string
       content: string
       status: string
-      tag_id?: string
+      tag_ids?: string[]
       process_config?: KnowledgeProcessOverrides
     } = {
       title: form.title.trim(),
       content: form.content,
       status: targetStatus,
     }
-    if (tagIdToUpload) {
-      payload.tag_id = tagIdToUpload
+    if (tagIdsToUpload && tagIdsToUpload.length > 0) {
+      payload.tag_ids = tagIdsToUpload
     }
 
     if (targetStatus === 'publish') {
@@ -650,7 +650,7 @@ const handleSave = async (targetStatus: ManualStatus) => {
             knowledgeId: knowledgeId.value || undefined,
             title: payload.title,
             content: payload.content,
-            tagId: tagIdToUpload,
+            tagIds: tagIdsToUpload,
           },
         })
         payload.process_config = confirmResult.processConfig

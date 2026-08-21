@@ -74,6 +74,7 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 
 ### C4 — i18n & prompt templates (Việt hóa + bỏ tiếng Trung)
 - **Bỏ** `frontend/src/i18n/locales/zh-CN.ts` (D) · **Thêm** `locales/vi-VN.ts` (A).
+- `frontend/src/views/knowledge/components/TagEditDialog.test.ts` (M, từ 22/8/2026) — drift-guard i18n của upstream đọc danh sách locale; fork đổi `zh-CN` → `vi-VN`. **Mỗi lần upstream thêm test drift-guard kiểu này, kiểm xem nó có đọc `zh-CN.ts` không** — file đó không còn tồn tại trong fork nên test sẽ fail với `ENOENT`.
 - Sửa: `i18n/index.ts`, `i18n/embed.ts`, `locales/en-US.ts`, `locales/ko-KR.ts`, `locales/ru-RU.ts`.
 - Prompt: `config/prompt_templates/` → `agent_system_prompt.yaml`, `context_template.yaml`, `fallback.yaml`, `intent_prompts.yaml`, `rewrite.yaml`, `system_prompt.yaml`.
 > Đây là vùng dễ conflict text khi upstream đổi prompt/i18n — thường tự giải quyết được, nhưng kiểm tra kỹ vi-VN không bị mất.
@@ -466,6 +467,30 @@ Thầy hỏi upstream có update thì fork có nên theo không. Đo thật: for
 - **Tài liệu mới:** `docs/deploy/upstream-sync.md` (quy trình merge từng chặng + bảng file phải kiểm tay + runbook DB + nghiệm thu). `AGENTS.md` mục 5 và 6 cập nhật quy tắc dải `000900+` và yêu cầu idempotent.
 - Bật `rerere.enabled` + `merge.conflictStyle=zdiff3` cho repo — merge 4 chặng sẽ đụng lặp lại cùng vùng code.
 - G1 thuần `git mv` + sửa comment (38 file, 66 dòng, không đụng logic). Các chặng merge G2–G5 làm sau.
+
+### G2: merge upstream `v0.6.3` (2026-08-22) — nhánh `chore/upstream-sync`
+Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merge-tree --write-tree` (không đụng working tree): **7 file conflict**, và `agent_service.go`/`router.go`/`container.go`/`ToolResultRenderer.vue`/`wiki_page.go` **tự merge được** — nhẹ hơn hẳn lo ngại ban đầu.
+
+**Cách giải từng conflict:**
+- **`session_agent_qa.go`** (file nguy hiểm nhất): upstream thay vòng lặp quét `AllowedTools` bằng helper `agentRequiresRerankModel(req.CustomAgent)`. Lấy helper của upstream, **giữ hành vi fork** (không hard-fail khi tenant thiếu rerank model) — may là phần thân `logger.Warnf` nằm NGOÀI vùng conflict nên tự merge, chỉ cần chọn đúng dòng điều kiện.
+- **`stores/menu.ts`, `router/index.ts`, `menu.vue`**: cả hai bên cùng thêm một mục/route/nhánh điều kiện ở cùng chỗ → giữ CẢ HAI (`chess-courses` của fork + `integrations` mới của upstream).
+- **`i18n/locales/zh-CN.ts`**: modify/delete → giữ quyết định XOÁ của fork.
+- **`i18n/embed.ts`**: so tập key hai bên thấy **giống hệt nhau** (upstream chỉ sửa text tiếng Trung, không thêm khóa) → giữ nguyên bản Việt hoá. Kiểm lại bằng grep dải Hán tự: 0 ký tự lọt.
+- **`im/feishu/adapter.go`**: upstream xoá `state.content.Reset()` thừa trong `if !state.firstChunk` (ngay dưới đã có `Reset()` vô điều kiện) → theo upstream.
+
+**Ba thứ vỡ sau merge mà `merge-tree` KHÔNG báo (chỉ lộ khi build/test):**
+1. **`ManualKnowledgePayload.TagID` → `TagIDs []string`** (upstream 0.6.3 đổi nhãn tài liệu sang NHIỀU-NHIỀU, migration `000063_knowledge_multi_tags`). `chess_knowledge_indexer.go` gán `payload.TagID` ở 2 chỗ → **lỗi biên dịch**. Sửa sang `payload.TagIDs = []string{tagID}` (bỏ qua khi rỗng). Lớp cờ vẫn gắn ĐÚNG MỘT nhãn theo loại nội dung; gắn thêm nhãn nhóm nội dung là mở rộng riêng, chưa làm.
+2. **Test upstream `knowledge_create_test.go` KHÔNG biên dịch được ở chính tag v0.6.3** — truyền `""` cho tham số `tagIDs []string` (4 chỗ). Không phải do merge: bản test ở HEAD giống hệt v0.6.3 gốc. `upstream/main` đã sửa thành `nil`; áp luôn bản sửa đó để `go vet`/`go test` chạy được, và khi merge 0.7.x sẽ tự khớp.
+3. **`TagEditDialog.test.ts` (test MỚI của upstream) đọc `zh-CN.ts`** — file fork đã cố ý xoá → test fail. Đây là drift-guard i18n, nên **đổi sang đọc `vi-VN.ts`** (giữ nguyên mục đích test, khớp quyết định vi-VN là ngôn ngữ chính). **File này nay vào inventory C4.**
+
+**i18n — phần tốn công nhất, và là lỗi CÂM nếu bỏ qua:** upstream 0.6.3 thêm **121 khoá**, `vi-VN.ts` thiếu **119** (nợ cũ chỉ 1 — fork giữ i18n rất kỷ luật). Vì vi-VN vừa là locale mặc định vừa là fallback, thiếu khoá thì UI hiện **key thô** (`menu.integrations`) chứ không rơi về tiếng Anh. Đã dịch đủ 119 (đếm theo đường dẫn đầy đủ là 156 mục), tạo mới 12 container (`integrations`, `modelSettings.debug`, `mcpServiceDialog.customHeaders`/`codeImport`, `uploadConfirm.pdfForceScanned`…). Chèn bằng script "chèn trước dấu đóng container" để **giữ nguyên format/comment** của file, KHÔNG sinh lại file.
+- ⚠️ **Bẫy đã dính và sửa:** viết `\"` trong heredoc bash→python mất một tầng escape → chuỗi thành `"... là "{agent}" ..."` làm **vite build vỡ** (`Expected "}" but found "{"`), trong khi `npm test` và `vue-tsc` vẫn PASS (chúng không parse file locale). Bài học: sau khi sửa file i18n **phải chạy `npm run build`**, test+type-check không bắt được. Đã đổi sang dùng `«»` cho nháy lồng — đúng tiền lệ fork dùng trong `embed.ts`.
+
+**Tính năng upstream đáng chú ý cho Thầy trong chặng này:** `DOCREADER_PDF_FORCE_SCANNED` + tuỳ chọn "Ép chế độ quét cho PDF" trong hộp thoại tải lên (đúng nhu cầu số hoá sách cờ bản quét), đọc EPUB/MHTML, phân tích lại hàng loạt, thẻ tài liệu nhiều-nhiều, RSS connector, wiki folder/hierarchy.
+
+**Kiểm chứng:** `go build ./...` sạch · `go vet ./internal/...` **sạch tuyệt đối** · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **180/180** (153 của fork + 27 mới của upstream) · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà thủ công 17 điểm móc nối fork (route cờ 15 nhóm, 7 tool, agent HLV, `chessRefPrefixes` 8 loại, brand CSS, `fen_invalid`, MobileNavBar, docker-compose overlay, CI/CD) — **còn nguyên**. `go test` tầng service vẫn không chạy được trên Windows (SIGSEGV gojieba) → **cần CI/Linux**.
+
+**Chưa làm:** chưa deploy production (theo đúng runbook: chỉ deploy khi kèm bước đặt lại `schema_migrations.version` về 61). Chưa merge 0.7.0/0.7.1/0.7.2.
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
