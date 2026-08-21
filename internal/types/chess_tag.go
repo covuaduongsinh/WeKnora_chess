@@ -183,6 +183,10 @@ type ChessTagBackfillResult struct {
 	LinksCreated int `json:"links_created"`
 	// ByType đếm số mục đã xử lý theo từng loại nội dung.
 	ByType map[string]int `json:"by_type"`
+	// SearchTextByType đếm số bản ghi đã được tính lại cột search_text (khử
+	// dấu). Chạy cùng lượt với backfill thẻ vì cả hai đều là "nạp lại dữ liệu
+	// cũ" — người vận hành chỉ phải bấm MỘT nút.
+	SearchTextByType map[string]int `json:"search_text_by_type"`
 	// Warnings cảnh báo vận hành — đáng chú ý nhất là trường hợp một loại nội
 	// dung trả về đúng trần 500 bản ghi của tầng repository: backfill khi đó
 	// KHÔNG phủ hết dữ liệu và phải chạy lại sau khi có phân trang thật.

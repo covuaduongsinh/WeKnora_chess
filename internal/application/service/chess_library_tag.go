@@ -622,6 +622,16 @@ func (s *chessLibraryService) BackfillChessTags(ctx context.Context, tenantID ui
 	}
 
 	_ = s.repo.RecountTagUsage(ctx, tenantID, nil)
+
+	// Tính lại cột search_text trong CÙNG lượt: cả hai đều là "nạp lại dữ liệu
+	// cũ" sau khi thêm cột/bảng mới, nên gộp vào một nút bấm thay vì bắt người
+	// vận hành nhớ hai thao tác riêng.
+	if counts, err := s.repo.BackfillSearchText(ctx, tenantID); err == nil {
+		res.SearchTextByType = counts
+	} else {
+		res.Warnings = append(res.Warnings, "tính lại chuỗi tìm kiếm thất bại: "+err.Error())
+	}
+
 	tagsAfter, _ := s.repo.ListTags(ctx, tenantID, types.ChessTagFilter{})
 	linksAfter := 0
 	for _, t := range tagsAfter {
@@ -640,4 +650,29 @@ func chessTagNameOfGroup(slug string) string {
 		}
 	}
 	return slug
+}
+
+// ---- Đếm tổng cho phân trang ----
+//
+// Năm hàm này chỉ chuyển tiếp xuống repository, nhưng phải đi qua service để
+// handler (chỉ thấy interface service) dựng được khối `meta` kèm tổng số.
+
+func (s *chessLibraryService) CountGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (int64, error) {
+	return s.repo.CountGames(ctx, tenantID, f)
+}
+
+func (s *chessLibraryService) CountPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (int64, error) {
+	return s.repo.CountPuzzles(ctx, tenantID, f)
+}
+
+func (s *chessLibraryService) CountPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) (int64, error) {
+	return s.repo.CountPositions(ctx, tenantID, f)
+}
+
+func (s *chessLibraryService) CountBooks(ctx context.Context, tenantID uint64, f types.ChessBookFilter) (int64, error) {
+	return s.repo.CountBooks(ctx, tenantID, f)
+}
+
+func (s *chessLibraryService) CountArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) (int64, error) {
+	return s.repo.CountArticles(ctx, tenantID, f)
 }

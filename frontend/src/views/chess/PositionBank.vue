@@ -6,8 +6,8 @@
         style="width:170px" @change="load" />
       <t-select v-model="filter.level" :options="positionLevelOptions" placeholder="Cấp độ" clearable
         style="width:120px" @change="load" />
-      <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
-      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:180px" @change="load" />
+      <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="loadDebounced" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:180px" @change="loadDebounced" />
       <div class="pob-tagfilter">
         <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
       </div>
@@ -46,6 +46,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(p)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="positions.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
 
       <div class="pob-viewer">
@@ -142,6 +144,8 @@ import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.
 import ChessPositionEditor from '@/views/chess/components/ChessPositionEditor.vue';
 import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
 import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listPositions, getPositionBySlug, createPosition, updatePosition, deletePosition,
@@ -177,6 +181,7 @@ const orientationOptions = [
 const positions = ref<ChessPosition[]>([]);
 const selected = ref<ChessPosition | null>(null);
 const filter = reactive({ category: '', level: '', eco: '', q: '', tag: '' });
+const paging = useChessPaging(50);
 
 // pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
 function pickTag(name: string) {
@@ -196,11 +201,28 @@ const viewerData = computed<ChessBoardData>(() => ({
   caption: selected.value?.title || 'Thế cờ',
 }));
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm. Tham số
+// phân trang CỐ Ý không nằm trong `filter` — export dùng chung object đó, và
+// lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listPositions(filter);
+    const res: any = await listPositions({ ...filter, ...paging.params(1) });
     positions.value = res?.data || [];
+    paging.applyMeta(res, positions.value.length);
   } catch { MessagePlugin.error('Tải ngân hàng thế cờ thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listPositions({ ...filter, ...paging.params(next) });
+    positions.value = positions.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, positions.value.length);
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 function select(p: ChessPosition) { selected.value = p; revealKey.value++; loadSourceGame(p); }
 

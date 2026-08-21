@@ -517,3 +517,9 @@ func TestListChessTagItems_ResolvesSlugFromAccentedName(t *testing.T) {
 		t.Errorf("tổng = %d, muốn 1", page.Total)
 	}
 }
+
+// BackfillSearchText: bản giả không dựng chuỗi tìm kiếm (đó là việc của SQL
+// thật), chỉ cần tồn tại để BackfillChessTags không rơi vào interface nil.
+func (r *fakeTagBase) BackfillSearchText(ctx context.Context, tenantID uint64) (map[string]int, error) {
+	return map[string]int{}, nil
+}

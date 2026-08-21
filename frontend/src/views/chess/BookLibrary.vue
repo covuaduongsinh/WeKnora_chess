@@ -11,7 +11,8 @@
           style="width:130px" @change="loadBooks" />
         <t-select v-model="filter.status" :options="bookStatusOptions" placeholder="Trạng thái" clearable
           style="width:130px" @change="loadBooks" />
-        <t-input v-model="filter.q" placeholder="Tìm theo tên/tác giả…" clearable style="width:170px" @change="loadBooks" />
+        <t-input v-model="filter.q" placeholder="Tìm theo tên/tác giả…" clearable style="width:170px"
+          @change="loadDebounced" />
         <div class="bkl-tagfilter">
           <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
         </div>
@@ -63,6 +64,8 @@
           <t-button size="small" variant="text" theme="danger" @click.stop="removeBook(b)"><t-icon name="delete" /></t-button>
         </div>
       </div>
+      <ChessListFooter :loaded="books.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+        :loading="paging.loadingMore.value" @more="loadMore" />
     </div>
 
     <div class="bkl-right">
@@ -304,6 +307,8 @@ import ChessChapterHistory from '@/views/chess/components/ChessChapterHistory.vu
 import ChessKBStatusDialog from '@/views/chess/components/ChessKBStatusDialog.vue';
 import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
 import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import ChessTagAssignDialog from '@/views/chess/components/ChessTagAssignDialog.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import { splitChessContent, renderChessChips, isValidFEN } from '@/utils/chessBlocks';
@@ -373,6 +378,7 @@ const chapters = ref<ChessBookChapter[]>([]);
 const bookShelves = ref<ChessShelf[]>([]);
 const expandedChapters = ref<Set<string>>(new Set());
 const filter = reactive({ shelf_id: '', level: '', phase: '', status: '', q: '', tag: '' });
+const paging = useChessPaging(50);
 
 // pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
 function pickTag(name: string) {
@@ -400,11 +406,28 @@ function kbHint(status: string): string {
     : 'Bản thảo — chưa vào kho tri thức, HLV AI không trích dẫn được';
 }
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm. Tham số
+// phân trang CỐ Ý không nằm trong `filter` — export dùng chung object đó, và
+// lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function loadBooks() {
+  paging.reset();
   try {
-    const res: any = await listBooks(filter);
+    const res: any = await listBooks({ ...filter, ...paging.params(1) });
     books.value = res?.data || [];
+    paging.applyMeta(res, books.value.length);
   } catch { MessagePlugin.error('Tải danh sách sách thất bại'); }
+}
+const loadDebounced = debounceFn(loadBooks);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listBooks({ ...filter, ...paging.params(next) });
+    books.value = books.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, books.value.length);
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 
 async function selectBook(b: ChessBook) {

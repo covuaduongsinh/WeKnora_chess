@@ -85,14 +85,18 @@ export interface ChessGame {
   slug?: string;
   created_at?: string;
 }
-function qs(params: Record<string, string>): string {
-  const p = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
+// Chấp nhận cả số (page/page_size) chứ không chỉ chuỗi. Giá trị rỗng/0/undefined
+// bị bỏ qua — đó chính là cách các endpoint hiểu "không phân trang, trả tất cả".
+function qs(params: Record<string, string | number | undefined>): string {
+  const p = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "" && v !== 0)
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
   return p.length ? `?${p.join("&")}` : "";
 }
 export const listGames = (
-  f: Partial<{ white: string; black: string; eco: string; result: string; level: string; q: string; tag: string; tag_mode: string }> = {},
+  f: Partial<{ white: string; black: string; eco: string; result: string; level: string; q: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
 ) =>
-  get(`/api/v1/chess/games${qs(f as Record<string, string>)}`);
+  get(`/api/v1/chess/games${qs(f)}`);
 export const getGame = (id: string) => get(`/api/v1/chess/games/${id}`);
 // Giải mã wikilink [[game/<slug>]] → ván cờ.
 export const getGameBySlug = (slug: string) => get(`/api/v1/chess/games/by-slug/${encodeURIComponent(slug)}`);
@@ -118,9 +122,9 @@ export interface ChessPuzzle {
   created_at?: string;
 }
 export const listPuzzles = (
-  f: Partial<{ theme: string; difficulty: string; level: string; q: string; tag: string; tag_mode: string }> = {},
+  f: Partial<{ theme: string; difficulty: string; level: string; q: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
 ) =>
-  get(`/api/v1/chess/puzzles${qs(f as Record<string, string>)}`);
+  get(`/api/v1/chess/puzzles${qs(f)}`);
 export const getPuzzle = (id: string) => get(`/api/v1/chess/puzzles/${id}`);
 // Giải mã wikilink [[puzzle/<slug>]] → thế cờ/bài tập.
 export const getPuzzleBySlug = (slug: string) => get(`/api/v1/chess/puzzles/by-slug/${encodeURIComponent(slug)}`);
@@ -153,8 +157,8 @@ export interface ChessPosition {
   created_at?: string;
 }
 export const listPositions = (
-  f: Partial<{ category: string; level: string; eco: string; source_game_id: string; q: string; tag: string; tag_mode: string }> = {},
-) => get(`/api/v1/chess/positions${qs(f as Record<string, string>)}`);
+  f: Partial<{ category: string; level: string; eco: string; source_game_id: string; q: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
+) => get(`/api/v1/chess/positions${qs(f)}`);
 export const getPosition = (id: string) => get(`/api/v1/chess/positions/${id}`);
 // Giải mã wikilink [[position/<slug>]] → thế cờ.
 export const getPositionBySlug = (slug: string) => get(`/api/v1/chess/positions/by-slug/${encodeURIComponent(slug)}`);
@@ -218,8 +222,8 @@ export const setShelfBooks = (id: string, bookIds: string[]) => put(`/api/v1/che
 
 // ---- Sách ----
 export const listBooks = (
-  f: Partial<{ shelf_id: string; level: string; phase: string; status: string; q: string; tag: string; tag_mode: string }> = {},
-) => get(`/api/v1/chess/books${qs(f as Record<string, string>)}`);
+  f: Partial<{ shelf_id: string; level: string; phase: string; status: string; q: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
+) => get(`/api/v1/chess/books${qs(f)}`);
 export const getBook = (id: string) => get(`/api/v1/chess/books/${id}`);
 // Giải mã wikilink [[book/<slug>]] → sách.
 export const getBookBySlug = (slug: string) => get(`/api/v1/chess/books/by-slug/${encodeURIComponent(slug)}`);
@@ -287,8 +291,8 @@ export interface ChessArticle {
   created_at?: string; updated_at?: string;
 }
 export const listArticles = (
-  f: Partial<{ topic_id: string; category: string; level: string; status: string; q: string; tag: string; tag_mode: string }> = {},
-) => get(`/api/v1/chess/articles${qs(f as Record<string, string>)}`);
+  f: Partial<{ topic_id: string; category: string; level: string; status: string; q: string; tag: string; tag_mode: string; page: number; page_size: number }> = {},
+) => get(`/api/v1/chess/articles${qs(f)}`);
 export const getArticle = (id: string) => get(`/api/v1/chess/articles/${id}`);
 // Giải mã wikilink [[article/<slug>]] → bài viết.
 export const getArticleBySlug = (slug: string) => get(`/api/v1/chess/articles/by-slug/${encodeURIComponent(slug)}`);

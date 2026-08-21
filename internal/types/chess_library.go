@@ -31,6 +31,10 @@ type ChessGame struct {
 	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
 	// Rỗng = không phân cấp.
 	Level string `json:"level" gorm:"type:varchar(16);index"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -64,6 +68,10 @@ type ChessPuzzle struct {
 	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
 	// Rỗng = không phân cấp.
 	Level string `json:"level" gorm:"type:varchar(16);index"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -86,6 +94,11 @@ type ChessGameFilter struct {
 	Keyword string
 	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
 	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessPuzzleFilter là bộ lọc khi liệt kê bài tập.
@@ -100,6 +113,11 @@ type ChessPuzzleFilter struct {
 	Keyword string
 	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
 	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessRefSearchItem là một mục gợi ý khi tìm tham chiếu cờ cho autocomplete

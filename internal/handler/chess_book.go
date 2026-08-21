@@ -156,16 +156,23 @@ func (h *ChessLibraryHandler) SetShelfBooks(c *gin.Context) {
 func (h *ChessLibraryHandler) ListBooks(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	books, err := h.service.ListBooks(ctx, tenantID, types.ChessBookFilter{
+	page, pageSize, ok := parseChessPagination(c)
+	if !ok {
+		return
+	}
+	filter := types.ChessBookFilter{
 		Tags:    parseChessTagSelector(c),
 		ShelfID: c.Query("shelf_id"), Level: c.Query("level"), Phase: c.Query("phase"),
 		Status: c.Query("status"), Keyword: c.Query("q"),
-	})
+		Page: page, PageSize: pageSize,
+	}
+	books, err := h.service.ListBooks(ctx, tenantID, filter)
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
 		return
 	}
-	chessOK(c, books)
+	total, _ := h.service.CountBooks(ctx, tenantID, filter)
+	chessOKPage(c, books, total, page, pageSize)
 }
 
 // GetBook GET /chess/books/:id

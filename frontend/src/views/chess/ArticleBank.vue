@@ -9,7 +9,8 @@
         style="width:120px" @change="load" />
       <t-select v-model="filter.status" :options="articleStatusOptions" placeholder="Trạng thái" clearable
         style="width:150px" @change="load" />
-      <t-input v-model="filter.q" placeholder="Tìm theo tên/bí danh…" clearable style="width:200px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên/bí danh…" clearable style="width:200px"
+        @change="loadDebounced" />
       <div class="atb-tagfilter">
         <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
       </div>
@@ -70,6 +71,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(a)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="articles.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
 
       <div class="atb-viewer">
@@ -206,6 +209,8 @@ import ChessArticleTopicManager from '@/views/chess/components/ChessArticleTopic
 import ChessArticleHistory from '@/views/chess/components/ChessArticleHistory.vue';
 import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
 import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import {
   listArticles, getArticleBySlug, createArticle, updateArticle, deleteArticle,
   renameArticleSlug, exportArticles, importArticles, type ChessArticle,
@@ -237,6 +242,7 @@ watch(() => props.focusSlug, (s) => focusBySlug(s));
 const articles = ref<ChessArticle[]>([]);
 const selected = ref<ChessArticle | null>(null);
 const filter = reactive({ category: '', level: '', status: '', q: '', topic_id: '', tag: '' });
+const paging = useChessPaging(50);
 
 // pickTag: bấm chip thẻ trên một hàng = lọc danh sách theo đúng thẻ đó. Ghi đè
 // (không cộng dồn) để một cú bấm luôn cho kết quả đoán được.
@@ -246,11 +252,28 @@ function pickTag(name: string) {
 }
 const editing = ref(false);
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm.
+// Tham số phân trang CỐ Ý không nằm trong `filter` — export dùng chung object
+// đó, và lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listArticles(filter);
+    const res: any = await listArticles({ ...filter, ...paging.params(1) });
     articles.value = res?.data || [];
+    paging.applyMeta(res, articles.value.length);
   } catch { MessagePlugin.error('Tải ngân hàng bài viết thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listArticles({ ...filter, ...paging.params(next) });
+    articles.value = articles.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, articles.value.length);
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 function select(a: ChessArticle) { selected.value = a; editing.value = false; }
 

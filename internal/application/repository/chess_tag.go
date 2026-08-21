@@ -331,3 +331,22 @@ func (r *chessLibraryRepository) UpdateEntityTagsCSV(ctx context.Context, tenant
 		Where("tenant_id = ? AND id = ?", tenantID, chessID).
 		Update("tags", csv).Error
 }
+
+// ---- Phân trang dùng chung cho mọi truy vấn danh sách cờ ----
+
+// applyChessPaging áp Offset/Limit khi caller yêu cầu phân trang.
+//
+// pageSize <= 0 nghĩa là KHÔNG phân trang — trả TOÀN BỘ. Đây là thay đổi có
+// chủ ý so với trần cứng `Limit(500)` cũ: 500 là con số tùy tiện và nó CẮT ÂM
+// THẦM, làm export/backfill/picker thiếu dữ liệu mà không báo gì. Nơi thật sự
+// cần toàn bộ (export, backfill, autocomplete) nay nhận đủ; nơi hiển thị danh
+// sách thì truyền page/page_size tường minh.
+func applyChessPaging(q *gorm.DB, page, pageSize int) *gorm.DB {
+	if pageSize <= 0 {
+		return q
+	}
+	if page < 1 {
+		page = 1
+	}
+	return q.Offset((page - 1) * pageSize).Limit(pageSize)
+}

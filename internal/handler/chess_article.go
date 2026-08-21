@@ -19,16 +19,23 @@ import (
 func (h *ChessLibraryHandler) ListArticles(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	articles, err := h.service.ListArticles(ctx, tenantID, types.ChessArticleFilter{
+	page, pageSize, ok := parseChessPagination(c)
+	if !ok {
+		return
+	}
+	filter := types.ChessArticleFilter{
 		Tags:    parseChessTagSelector(c),
 		TopicID: c.Query("topic_id"), Category: c.Query("category"), Level: c.Query("level"),
 		Status: c.Query("status"), Keyword: c.Query("q"),
-	})
+		Page: page, PageSize: pageSize,
+	}
+	articles, err := h.service.ListArticles(ctx, tenantID, filter)
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
 		return
 	}
-	chessOK(c, articles)
+	total, _ := h.service.CountArticles(ctx, tenantID, filter)
+	chessOKPage(c, articles, total, page, pageSize)
 }
 
 // GetArticle GET /chess/articles/:id

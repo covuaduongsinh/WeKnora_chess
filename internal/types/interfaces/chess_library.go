@@ -194,6 +194,16 @@ type ChessLibraryService interface {
 	// (KB tồn tại?, có embedding model?, bao nhiêu doc completed/pending/failed).
 	IndexStatus(ctx context.Context) (*types.ChessIndexStatus, error)
 
+	// ---- Đếm tổng cho phân trang ----
+	// Năm hàm Count* dùng CHUNG query với List* tương ứng, nên số đếm không
+	// bao giờ lệch bộ lọc. Chúng cho phép giao diện hiện "đang xem 20/137"
+	// thay vì cắt âm thầm như trần Limit(500) cũ.
+	CountGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (int64, error)
+	CountPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (int64, error)
+	CountPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) (int64, error)
+	CountBooks(ctx context.Context, tenantID uint64, f types.ChessBookFilter) (int64, error)
+	CountArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) (int64, error)
+
 	// ---- Hệ thẻ thống nhất (phủ CẢ 8 loại nội dung cờ) ----
 	// EnsureChessTagGroups tạo 8 thẻ nhóm nội dung dựng sẵn nếu tenant chưa có
 	// (idempotent); trả số thẻ vừa tạo.
@@ -397,6 +407,16 @@ type ChessLibraryRepository interface {
 	ListBookImagesByBook(ctx context.Context, tenantID uint64, bookID string) ([]*types.ChessBookImage, error)
 	DeleteBookImage(ctx context.Context, tenantID uint64, id string) error
 
+	// ---- Đếm tổng cho phân trang ----
+	// Năm hàm Count* dùng CHUNG query với List* tương ứng, nên số đếm không
+	// bao giờ lệch bộ lọc. Chúng cho phép giao diện hiện "đang xem 20/137"
+	// thay vì cắt âm thầm như trần Limit(500) cũ.
+	CountGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (int64, error)
+	CountPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (int64, error)
+	CountPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) (int64, error)
+	CountBooks(ctx context.Context, tenantID uint64, f types.ChessBookFilter) (int64, error)
+	CountArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) (int64, error)
+
 	// ---- Hệ thẻ thống nhất: từ điển thẻ ----
 	ListTags(ctx context.Context, tenantID uint64, f types.ChessTagFilter) ([]*types.ChessTag, error)
 	GetTag(ctx context.Context, tenantID uint64, id string) (*types.ChessTag, error)
@@ -434,4 +454,8 @@ type ChessLibraryRepository interface {
 	CountTagItemsByType(ctx context.Context, tenantID uint64, tagID string) (map[string]int64, error)
 	// ListTagItems trả một TRANG liên kết của một thẻ (phân trang thật).
 	ListTagItems(ctx context.Context, tenantID uint64, tagID, chessType string, offset, limit int) ([]*types.ChessTagItem, error)
+
+	// BackfillSearchText tính lại cột search_text (khử dấu) cho toàn bộ nội
+	// dung cờ của tenant. Idempotent; trả số bản ghi đã ghi theo từng loại.
+	BackfillSearchText(ctx context.Context, tenantID uint64) (map[string]int, error)
 }

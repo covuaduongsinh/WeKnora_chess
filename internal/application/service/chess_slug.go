@@ -4,12 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"unicode"
 
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
-
+	"github.com/Tencent/WeKnora/internal/chess"
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
@@ -17,20 +13,11 @@ import (
 // wikilink [[game/<slug>]]. Slug duy nhất theo tenant cho mỗi loại; gán một lần
 // khi tạo và giữ ổn định sau đó (đổi slug = đổi đích link, như đổi tên trang wiki).
 
-// diacriticFold tách tổ hợp (NFD) → bỏ dấu thanh/dấu phụ (combining marks Mn) →
-// NFC. Khử dấu tiếng Việt ROBUST bất kể đầu vào ở dạng NFC hay NFD (tránh lệ
-// thuộc bảng ký tự dựng sẵn vốn dễ trật khi normalize khác nhau).
-var diacriticFold = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-
-// foldVN bỏ dấu tiếng Việt: xử lý đ/Đ (không phải tổ hợp dấu) trước rồi tách dấu.
-func foldVN(s string) string {
-	s = strings.NewReplacer("đ", "d", "Đ", "D", "ð", "d").Replace(s)
-	out, _, err := transform.String(diacriticFold, s)
-	if err != nil {
-		return s
-	}
-	return out
-}
+// foldVN bỏ dấu tiếng Việt. Bản cài đặt THẬT nằm ở internal/chess/text.go để
+// tầng repository (dựng cột search_text) dùng chung ĐÚNG phép khử dấu này —
+// slug và search_text lệch nhau một chút là gõ không dấu sẽ khớp chỗ này mà
+// trượt chỗ kia. Giữ tên cũ ở đây cho phần còn lại của file khỏi phải đổi.
+func foldVN(s string) string { return chess.FoldVN(s) }
 
 // slugifyChess: lowercase, bỏ dấu tiếng Việt, ký tự ngoài [a-z0-9] → "-",
 // gộp nhiều "-", cắt độ dài. Trả "" nếu không còn ký tự hợp lệ.

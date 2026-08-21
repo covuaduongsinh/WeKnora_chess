@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"github.com/Tencent/WeKnora/internal/chess"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/gorm"
@@ -66,6 +68,7 @@ func (r *chessCourseRepository) CourseSlugExists(ctx context.Context, tenantID u
 }
 
 func (r *chessCourseRepository) CreateCourse(ctx context.Context, course *types.ChessCourse) error {
+	course.SearchText = courseSearchText(course)
 	return r.db.WithContext(ctx).Create(course).Error
 }
 
@@ -77,6 +80,7 @@ func (r *chessCourseRepository) UpdateCourse(ctx context.Context, course *types.
 			"title":       course.Title,
 			"description": course.Description,
 			"level":       course.Level,
+			"search_text": courseSearchText(course),
 			"cover_url":   course.CoverURL,
 			"sort_order":  course.SortOrder,
 		}).Error
@@ -118,8 +122,11 @@ func (r *chessCourseRepository) SearchLessons(ctx context.Context, tenantID uint
 		Select("id", "tenant_id", "course_id", "slug", "title", "created_at").
 		Where("tenant_id = ?", tenantID)
 	if keyword != "" {
+		// search_text khử dấu (bao gồm cả NỘI DUNG bài) — trước đây SearchLessons
+		// chỉ tìm slug/title nên gõ một cụm trong thân bài giảng là trượt.
 		kw := "%" + keyword + "%"
-		q = q.Where("slug ILIKE ? OR title ILIKE ?", kw, kw)
+		q = q.Where("search_text LIKE ? OR slug ILIKE ? OR title ILIKE ?",
+			"%"+chess.SearchNeedle(keyword)+"%", kw, kw)
 	}
 	var lessons []*types.ChessLesson
 	err := q.Order("created_at DESC").Limit(limit).Find(&lessons).Error
@@ -163,6 +170,7 @@ func (r *chessCourseRepository) LessonSlugExists(ctx context.Context, tenantID u
 }
 
 func (r *chessCourseRepository) CreateLesson(ctx context.Context, lesson *types.ChessLesson) error {
+	lesson.SearchText = lessonSearchText(lesson)
 	return r.db.WithContext(ctx).Create(lesson).Error
 }
 
@@ -171,12 +179,13 @@ func (r *chessCourseRepository) UpdateLesson(ctx context.Context, lesson *types.
 		Model(&types.ChessLesson{}).
 		Where("tenant_id = ? AND id = ?", lesson.TenantID, lesson.ID).
 		Updates(map[string]interface{}{
-			"title":      lesson.Title,
-			"content":    lesson.Content,
-			"fen":        lesson.FEN,
-			"pgn":        lesson.PGN,
-			"level":      lesson.Level,
-			"sort_order": lesson.SortOrder,
+			"title":       lesson.Title,
+			"content":     lesson.Content,
+			"fen":         lesson.FEN,
+			"pgn":         lesson.PGN,
+			"level":       lesson.Level,
+			"sort_order":  lesson.SortOrder,
+			"search_text": lessonSearchText(lesson),
 		}).Error
 }
 

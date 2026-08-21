@@ -17,16 +17,23 @@ import (
 func (h *ChessLibraryHandler) ListPositions(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	positions, err := h.service.ListPositions(ctx, tenantID, types.ChessPositionFilter{
+	page, pageSize, ok := parseChessPagination(c)
+	if !ok {
+		return
+	}
+	filter := types.ChessPositionFilter{
 		Tags:     parseChessTagSelector(c),
 		Category: c.Query("category"), Level: c.Query("level"), ECO: c.Query("eco"),
 		SourceGameID: c.Query("source_game_id"), Keyword: c.Query("q"),
-	})
+		Page: page, PageSize: pageSize,
+	}
+	positions, err := h.service.ListPositions(ctx, tenantID, filter)
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
 		return
 	}
-	chessOK(c, positions)
+	total, _ := h.service.CountPositions(ctx, tenantID, filter)
+	chessOKPage(c, positions, total, page, pageSize)
 }
 
 // GetPosition GET /chess/positions/:id

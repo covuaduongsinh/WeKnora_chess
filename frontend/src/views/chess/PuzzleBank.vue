@@ -8,7 +8,7 @@
         style="width:140px" @change="load" />
       <t-select v-model="filter.level" :options="chessLevelOptions" placeholder="Cấp độ" clearable
         style="width:120px" @change="load" />
-      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:160px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:160px" @change="loadDebounced" />
       <div class="pb-tagfilter">
         <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
       </div>
@@ -50,6 +50,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(p)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="puzzles.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
       <div class="pb-viewer">
         <t-button class="pb-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
@@ -97,6 +99,8 @@ import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDi
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
 import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
 import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle,
@@ -145,6 +149,7 @@ const diffLabel = (v: string) => diffOptions.find(o => o.value === v)?.label || 
 const puzzles = ref<ChessPuzzle[]>([]);
 const selected = ref<ChessPuzzle | null>(null);
 const filter = reactive({ theme: '', difficulty: '', level: '', q: '', tag: '' });
+const paging = useChessPaging(50);
 // Bài tập KHÔNG có cột `tags` nên thẻ của cả trang được nạp theo LÔ sau mỗi
 // lần tải danh sách (một request cho toàn trang, không phải mỗi hàng một request).
 const tagsById = ref<Record<string, ChessTag[]>>({});
@@ -163,12 +168,30 @@ const viewerData = computed<ChessBoardData>(() => ({
   caption: selected.value?.title || 'Bài tập',
 }));
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm. Tham số
+// phân trang CỐ Ý không nằm trong `filter` — export dùng chung object đó, và
+// lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listPuzzles(filter);
+    const res: any = await listPuzzles({ ...filter, ...paging.params(1) });
     puzzles.value = res?.data || [];
+    paging.applyMeta(res, puzzles.value.length);
     await loadTags();
   } catch { MessagePlugin.error('Tải bài tập thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listPuzzles({ ...filter, ...paging.params(next) });
+    puzzles.value = puzzles.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, puzzles.value.length);
+    await loadTags();
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 // loadTags nạp thẻ cho toàn bộ hàng đang hiện. Best-effort: lỗi thì hàng chỉ
 // mất chip thẻ, không làm hỏng danh sách.

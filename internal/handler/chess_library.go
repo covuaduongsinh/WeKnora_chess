@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -27,13 +30,67 @@ func chessFail(c *gin.Context, code int, err error) {
 	c.JSON(code, gin.H{"success": false, "error": err.Error()})
 }
 
+// chessOKPage trả danh sách KÈM tổng số. `data` vẫn là MẢNG như trước nên mọi
+// caller cũ không đổi một dòng nào; phần đếm nằm ở khóa `meta` bổ sung.
+//
+// Có `meta` rồi thì giao diện mới hiện được "đang xem 20/137" — thay cho trần
+// cứng Limit(500) trước đây vốn cắt âm thầm, không dấu hiệu gì.
+func chessOKPage(c *gin.Context, data interface{}, total int64, page, pageSize int) {
+	meta := gin.H{"total": total, "page": page, "page_size": pageSize}
+	if pageSize > 0 {
+		meta["has_more"] = int64(page)*int64(pageSize) < total
+	} else {
+		meta["has_more"] = false
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "meta": meta})
+}
+
+// parseChessPagination đọc ?page & ?page_size cho các danh sách cờ.
+//
+// KHÁC parseListPagination của nền: THIẾU tham số nghĩa là KHÔNG phân trang
+// (trả toàn bộ), chứ không mặc định trang 1 cỡ 20. Lý do: các endpoint này
+// đang được dùng bởi picker chèn wikilink, export và script — mặc định cắt 20
+// sẽ làm chúng thiếu dữ liệu âm thầm, đúng lỗi vừa sửa xong.
+func parseChessPagination(c *gin.Context) (page, pageSize int, ok bool) {
+	if strings.TrimSpace(c.Query("page")) == "" && strings.TrimSpace(c.Query("page_size")) == "" {
+		return 0, 0, true // không phân trang
+	}
+	page, pageSize = 1, chessDefaultPageSize
+	if v := strings.TrimSpace(c.Query("page")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			chessFail(c, http.StatusBadRequest, fmt.Errorf("page phải là số nguyên dương"))
+			return 0, 0, false
+		}
+		page = n
+	}
+	if v := strings.TrimSpace(c.Query("page_size")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > chessMaxPageSize {
+			chessFail(c, http.StatusBadRequest, fmt.Errorf("page_size phải trong khoảng 1..%d", chessMaxPageSize))
+			return 0, 0, false
+		}
+		pageSize = n
+	}
+	return page, pageSize, true
+}
+
+const (
+	chessDefaultPageSize = 50
+	chessMaxPageSize     = 200
+)
+
 // ---- Ván đấu ----
 
 // ListGames GET /chess/games?white=&black=&eco=&result=&level=&q=&tag=&tag_mode=
 func (h *ChessLibraryHandler) ListGames(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	games, err := h.service.ListGames(ctx, tenantID, types.ChessGameFilter{
+	page, pageSize, ok := parseChessPagination(c)
+	if !ok {
+		return
+	}
+	filter := types.ChessGameFilter{
 		White: c.Query("white"), Black: c.Query("black"),
 		ECO: c.Query("eco"), Result: c.Query("result"),
 		Level: c.Query("level"),
@@ -41,12 +98,15 @@ func (h *ChessLibraryHandler) ListGames(c *gin.Context) {
 		// chưa bao giờ đọc — nối lại ở đây để ô tìm của Kho ván hoạt động.
 		Keyword: c.Query("q"),
 		Tags:    parseChessTagSelector(c),
-	})
+		Page:    page, PageSize: pageSize,
+	}
+	games, err := h.service.ListGames(ctx, tenantID, filter)
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
 		return
 	}
-	chessOK(c, games)
+	total, _ := h.service.CountGames(ctx, tenantID, filter)
+	chessOKPage(c, games, total, page, pageSize)
 }
 
 // GetGame GET /chess/games/:id
@@ -257,18 +317,25 @@ func (h *ChessLibraryHandler) ImportPuzzles(c *gin.Context) {
 func (h *ChessLibraryHandler) ListPuzzles(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID := types.MustTenantIDFromContext(ctx)
-	puzzles, err := h.service.ListPuzzles(ctx, tenantID, types.ChessPuzzleFilter{
+	page, pageSize, ok := parseChessPagination(c)
+	if !ok {
+		return
+	}
+	filter := types.ChessPuzzleFilter{
 		Theme: c.Query("theme"), Difficulty: c.Query("difficulty"),
 		Level: c.Query("level"),
 		// `q` cũng chưa từng được nối ở đây — xem ghi chú tại ListGames.
 		Keyword: c.Query("q"),
 		Tags:    parseChessTagSelector(c),
-	})
+		Page:    page, PageSize: pageSize,
+	}
+	puzzles, err := h.service.ListPuzzles(ctx, tenantID, filter)
 	if err != nil {
 		chessFail(c, http.StatusInternalServerError, err)
 		return
 	}
-	chessOK(c, puzzles)
+	total, _ := h.service.CountPuzzles(ctx, tenantID, filter)
+	chessOKPage(c, puzzles, total, page, pageSize)
 }
 
 // RandomPuzzle GET /chess/puzzles/random?theme=&difficulty=

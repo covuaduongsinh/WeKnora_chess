@@ -44,6 +44,10 @@ type ChessPosition struct {
 	Annotation string `json:"annotation" gorm:"type:text"`
 	// Tags là CSV nhẹ (khớp mẫu Theme của ChessPuzzle).
 	Tags string `json:"tags" gorm:"type:varchar(255)"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// Source là nguồn (tùy chọn, vd tên sách/giáo trình).
 	Source string `json:"source" gorm:"type:varchar(255)"`
 	// SourceGameID là ID ván cờ đã trích thế cờ này ra (rỗng nếu không trích từ ván).
@@ -72,6 +76,11 @@ type ChessPositionFilter struct {
 	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items) — khác Keyword ở chỗ
 	// khớp CHÍNH XÁC theo slug thẻ, không phải substring trên cột CSV.
 	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessPositionBundle là gói export/import 1 thế cờ (không kèm ID/slug/tenant
