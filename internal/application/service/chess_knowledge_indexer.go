@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -29,6 +30,20 @@ type ChessKnowledgeIndexer struct {
 	kbService        interfaces.KnowledgeBaseService
 	knowledgeService interfaces.KnowledgeService
 	idxRepo          interfaces.ChessKBIndexRepository
+	// libRepo CHỈ để đọc thẻ của mục đang index. Thẻ nằm ở bảng dùng chung
+	// chess_tag_items (khóa theo ID, không theo slug) nên phải tra ở đây thay
+	// vì trong các hàm buildXKnowledgeText thuần. Có thể nil — khi đó phần thẻ
+	// đơn giản là vắng mặt, KHÔNG phải lỗi.
+	libRepo interfaces.ChessLibraryRepository
+	// tagService gắn NHÃN cho tài liệu cờ trong KB tri thức (bảng
+	// knowledge_tags của nền). Trước đây payload để TagID rỗng nên mọi tài
+	// liệu cờ nằm chung một đống không phân biệt được loại khi mở KB lên xem.
+	// Có thể nil — khi đó tài liệu vẫn được index, chỉ là không có nhãn.
+	tagService interfaces.KnowledgeTagService
+	// tagCache nhớ id nhãn theo (kbID, loại) để một lượt reindex hàng trăm mục
+	// không gọi FindOrCreateTagByName hàng trăm lần.
+	tagCache map[string]string
+	tagMu    sync.Mutex
 }
 
 // NewChessKnowledgeIndexer tạo indexer tri thức cờ.
@@ -36,8 +51,92 @@ func NewChessKnowledgeIndexer(
 	kbService interfaces.KnowledgeBaseService,
 	knowledgeService interfaces.KnowledgeService,
 	idxRepo interfaces.ChessKBIndexRepository,
+	libRepo interfaces.ChessLibraryRepository,
+	tagService interfaces.KnowledgeTagService,
 ) *ChessKnowledgeIndexer {
-	return &ChessKnowledgeIndexer{kbService: kbService, knowledgeService: knowledgeService, idxRepo: idxRepo}
+	return &ChessKnowledgeIndexer{
+		kbService: kbService, knowledgeService: knowledgeService,
+		idxRepo: idxRepo, libRepo: libRepo, tagService: tagService,
+		tagCache: map[string]string{},
+	}
+}
+
+// chessKnowledgeTagNames là nhãn hiển thị của tài liệu cờ trong KB tri thức.
+// Giữ khớp với chessTypeLabels ở frontend/src/utils/chessTaxonomy.ts.
+var chessKnowledgeTagNames = map[string]string{
+	types.ChessRefTypeGame:     "Ván cờ",
+	types.ChessRefTypePuzzle:   "Bài tập",
+	types.ChessRefTypeLesson:   "Bài giảng",
+	types.ChessRefTypeCourse:   "Khóa học",
+	types.ChessRefTypePosition: "Thế cờ",
+	types.ChessRefTypeBook:     "Sách",
+	types.ChessRefTypeChapter:  "Chương sách",
+	types.ChessRefTypeArticle:  "Bài viết",
+}
+
+// chessTagID trả id nhãn cho một loại nội dung trong KB cờ, tạo nếu chưa có.
+//
+// Trả "" khi chưa nối tagService hoặc gặp lỗi — index vẫn chạy bình thường,
+// chỉ là tài liệu không mang nhãn. Gắn nhãn là tiện ích duyệt/lọc trong giao
+// diện KB, KHÔNG được phép chặn việc đưa tri thức vào kho.
+func (ix *ChessKnowledgeIndexer) chessTagID(ctx context.Context, kbID, chessType string) string {
+	if ix.tagService == nil || kbID == "" {
+		return ""
+	}
+	name := chessKnowledgeTagNames[chessType]
+	if name == "" {
+		return ""
+	}
+	key := kbID + "|" + chessType
+	ix.tagMu.Lock()
+	if id, ok := ix.tagCache[key]; ok {
+		ix.tagMu.Unlock()
+		return id
+	}
+	ix.tagMu.Unlock()
+
+	tag, err := ix.tagService.FindOrCreateTagByName(ctx, kbID, name)
+	if err != nil || tag == nil {
+		logger.Warnf(ctx, "chess index: không tạo được nhãn %q cho KB %s: %v", name, kbID, err)
+		return ""
+	}
+	ix.tagMu.Lock()
+	ix.tagCache[key] = tag.ID
+	ix.tagMu.Unlock()
+	return tag.ID
+}
+
+// tagLines dựng phần "Nhóm nội dung"/"Thẻ" để nối vào văn bản index của MỘT
+// mục. Nhờ đó câu hỏi theo chủ đề ("bài nào về ghim?", "tài liệu khai cuộc cho
+// cấp Mã") bắt trúng cả những loại nội dung chưa từng có cột tags (ván, bài
+// tập, bài giảng, khóa học, chương).
+//
+// Trả chuỗi RỖNG khi không có thẻ hoặc chưa nối được repo — caller nối thẳng
+// nên không sinh dòng trống.
+func (ix *ChessKnowledgeIndexer) tagLines(ctx context.Context, tenantID uint64, chessType, chessID string) string {
+	if ix.libRepo == nil || chessID == "" {
+		return ""
+	}
+	byOwner, err := ix.libRepo.TagsForMany(ctx, tenantID, chessType, []string{chessID})
+	if err != nil {
+		return ""
+	}
+	var groups, frees []string
+	for _, t := range byOwner[chessID] {
+		if t.Kind == types.ChessTagKindGroup {
+			groups = append(groups, t.Name)
+		} else {
+			frees = append(frees, t.Name)
+		}
+	}
+	var b strings.Builder
+	if len(groups) > 0 {
+		fmt.Fprintf(&b, "\n- Nhóm nội dung: %s", strings.Join(groups, ", "))
+	}
+	if len(frees) > 0 {
+		fmt.Fprintf(&b, "\n- Thẻ: %s", strings.Join(frees, ", "))
+	}
+	return b.String()
 }
 
 // Enabled cho biết có bật index tri thức cờ không (env CHESS_KB_INDEX truthy).
@@ -57,6 +156,7 @@ func (ix *ChessKnowledgeIndexer) IndexGame(ctx context.Context, g *types.ChessGa
 		return nil
 	}
 	title, content := buildGameKnowledgeText(g)
+	content += ix.tagLines(ctx, g.TenantID, types.ChessRefTypeGame, g.ID)
 	return ix.upsert(ctx, g.TenantID, types.ChessRefTypeGame, g.Slug, title, content)
 }
 
@@ -65,6 +165,7 @@ func (ix *ChessKnowledgeIndexer) IndexPuzzle(ctx context.Context, p *types.Chess
 		return nil
 	}
 	title, content := buildPuzzleKnowledgeText(p)
+	content += ix.tagLines(ctx, p.TenantID, types.ChessRefTypePuzzle, p.ID)
 	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePuzzle, p.Slug, title, content)
 }
 
@@ -73,6 +174,7 @@ func (ix *ChessKnowledgeIndexer) IndexLesson(ctx context.Context, l *types.Chess
 		return nil
 	}
 	title, content := buildLessonKnowledgeText(l)
+	content += ix.tagLines(ctx, l.TenantID, types.ChessRefTypeLesson, l.ID)
 	return ix.upsert(ctx, l.TenantID, types.ChessRefTypeLesson, l.Slug, title, content)
 }
 
@@ -81,6 +183,7 @@ func (ix *ChessKnowledgeIndexer) IndexPosition(ctx context.Context, p *types.Che
 		return nil
 	}
 	title, content := buildPositionKnowledgeText(p)
+	content += ix.tagLines(ctx, p.TenantID, types.ChessRefTypePosition, p.ID)
 	return ix.upsert(ctx, p.TenantID, types.ChessRefTypePosition, p.Slug, title, content)
 }
 
@@ -92,6 +195,7 @@ func (ix *ChessKnowledgeIndexer) IndexArticle(ctx context.Context, a *types.Ches
 		return nil
 	}
 	title, content := buildArticleKnowledgeText(a)
+	content += ix.tagLines(ctx, a.TenantID, types.ChessRefTypeArticle, a.ID)
 	return ix.upsert(ctx, a.TenantID, types.ChessRefTypeArticle, a.Slug, title, content)
 }
 
@@ -104,6 +208,7 @@ func (ix *ChessKnowledgeIndexer) IndexBook(ctx context.Context, b *types.ChessBo
 		return nil
 	}
 	title, content := buildBookKnowledgeText(b, chapters)
+	content += ix.tagLines(ctx, b.TenantID, types.ChessRefTypeBook, b.ID)
 	return ix.upsert(ctx, b.TenantID, types.ChessRefTypeBook, b.Slug, title, content)
 }
 
@@ -115,6 +220,7 @@ func (ix *ChessKnowledgeIndexer) IndexChapter(ctx context.Context, book *types.C
 		return nil
 	}
 	title, content := buildChapterKnowledgeText(book, ch)
+	content += ix.tagLines(ctx, ch.TenantID, types.ChessRefTypeChapter, ch.ID)
 	return ix.upsert(ctx, ch.TenantID, types.ChessRefTypeChapter, ch.Slug, title, content)
 }
 
@@ -152,6 +258,7 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 		// (vd KB cờ bị xóa để tạo lại theo runbook) → mapping MỒ CÔI: UpdateManualKnowledge
 		// sẽ báo "knowledge not found". Khi đó gỡ mapping mồ côi rồi rơi xuống nhánh TẠO MỚI.
 		if _, gerr := ix.knowledgeService.GetKnowledgeByID(ctx, existing.KnowledgeID); gerr == nil {
+			payload.TagID = ix.chessTagID(ctx, existing.KBID, chessType)
 			if _, err := ix.knowledgeService.UpdateManualKnowledge(ctx, existing.KnowledgeID, payload); err != nil {
 				logger.Warnf(ctx, "chess index: cập nhật knowledge cho %s/%s thất bại: %v", chessType, slug, err)
 				return err
@@ -170,6 +277,7 @@ func (ix *ChessKnowledgeIndexer) upsert(ctx context.Context, tenantID uint64, ch
 		logger.Warnf(ctx, "chess index: không có KB cờ để index %s/%s: %v", chessType, slug, err)
 		return err
 	}
+	payload.TagID = ix.chessTagID(ctx, kb.ID, chessType)
 	k, err := ix.knowledgeService.CreateKnowledgeFromManual(ctx, kb.ID, payload, "chess")
 	if err != nil || k == nil {
 		if err == nil {

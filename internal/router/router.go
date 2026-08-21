@@ -639,6 +639,33 @@ func RegisterChessLibraryRoutes(r *gin.RouterGroup, h *handler.ChessLibraryHandl
 		chapters.GET("/:chapter_id/revisions/:rev_id", g.Viewer(), h.GetChapterRevision)
 		chapters.POST("/:chapter_id/revisions/:rev_id/restore", g.Contributor(), h.RestoreChapterRevision)
 	}
+	// TÌM KIẾM HỢP NHẤT — một từ khóa, kết quả của cả 8 loại nội dung, xếp
+	// hạng chung. Khác /chess/refs/search (autocomplete wikilink, không chấm
+	// điểm): đây là ô tìm để TRA CỨU.
+	r.GET("/chess/search", g.Viewer(), h.SearchChess)
+
+	// HỆ THẺ THỐNG NHẤT — trục phân loại NGANG phủ cả 8 loại nội dung cờ.
+	// Gồm 2 nhóm từ vựng: thẻ "group" (8 nhóm nội dung dựng sẵn, không xóa
+	// được) và thẻ "free" (tự do). Đích chính là "/by-slug/:slug/items" — bấm
+	// một thẻ ra MỌI loại nội dung mang thẻ đó, có phân trang thật.
+	tags := r.Group("/chess/tags")
+	{
+		tags.GET("", g.Viewer(), h.ListChessTags)
+		tags.POST("", g.Contributor(), h.CreateChessTag)
+		// Route TĨNH đặt trước param ":id" (Gin không cho hai wildcard khác tên
+		// cùng cấp, và "assign"/"backfill" sẽ bị nuốt thành :id nếu đặt sau).
+		tags.PUT("/assign", g.Contributor(), h.AssignChessTags)
+		tags.POST("/backfill", g.Contributor(), h.BackfillChessTags)
+		tags.POST("/recount", g.Contributor(), h.RecountChessTags)
+		tags.GET("/of/:type/:id", g.Viewer(), h.GetChessTagsOf)
+		// POST (không phải GET) vì danh sách id có thể dài quá giới hạn URL.
+		tags.POST("/of", g.Viewer(), h.ListChessTagsOfMany)
+		tags.GET("/by-slug/:slug", g.Viewer(), h.GetChessTagBySlug)
+		tags.GET("/by-slug/:slug/items", g.Viewer(), h.ListChessTagItems)
+		tags.PUT("/:id", g.Contributor(), h.UpdateChessTag)
+		tags.PUT("/:id/merge", g.Contributor(), h.MergeChessTags)
+		tags.DELETE("/:id", g.Contributor(), h.DeleteChessTag)
+	}
 	// Bảo trì KB tri thức cờ (đẩy lại index sau khi bật CHESS_KB_INDEX). Nặng →
 	// cần Contributor. No-op khi RAG cờ chưa bật.
 	library := r.Group("/chess/library")

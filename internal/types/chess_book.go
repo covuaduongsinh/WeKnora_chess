@@ -92,6 +92,10 @@ type ChessBook struct {
 	CoverURL string `json:"cover_url" gorm:"column:cover_url;type:varchar(512)"`
 	// Tags là CSV nhẹ (khớp mẫu Tags của ChessPosition).
 	Tags string `json:"tags" gorm:"type:varchar(255)"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// SortOrder là thứ tự hiển thị mặc định (trong danh sách không lọc theo kệ).
 	SortOrder int `json:"sort_order" gorm:"default:0"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
@@ -145,6 +149,10 @@ type ChessBookChapter struct {
 	Level string `json:"level" gorm:"type:varchar(16)"`
 	// SortOrder là thứ tự chương trong sách.
 	SortOrder int `json:"sort_order" gorm:"default:0"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -208,6 +216,13 @@ type ChessBookFilter struct {
 	Status  string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/author/tags).
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ---- Bundle export/import (không kèm ID/slug/tenant để import luôn tạo mới) ----

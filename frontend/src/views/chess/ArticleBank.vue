@@ -9,7 +9,11 @@
         style="width:120px" @change="load" />
       <t-select v-model="filter.status" :options="articleStatusOptions" placeholder="Trạng thái" clearable
         style="width:150px" @change="load" />
-      <t-input v-model="filter.q" placeholder="Tìm theo tên/bí danh/tag…" clearable style="width:200px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên/bí danh…" clearable style="width:200px"
+        @change="loadDebounced" />
+      <div class="atb-tagfilter">
+        <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
+      </div>
       <div class="atb-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export
@@ -56,6 +60,7 @@
               <span class="atb-tag" :class="a.status === 'published' ? 'atb-tag--published' : 'atb-tag--draft'">
                 {{ articleStatusLabel(a.status) }}
               </span>
+              <ChessTagChips :csv="a.tags" @pick="pickTag" />
             </div>
           </div>
           <span class="atb-actions">
@@ -66,6 +71,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(a)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="articles.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
 
       <div class="atb-viewer">
@@ -129,8 +136,8 @@
                   <t-select v-model="editDraft.status" :options="articleStatusOptions" />
                 </div>
                 <div>
-                  <label>Thẻ (tùy chọn, cách nhau dấu phẩy)</label>
-                  <t-input v-model="editDraft.tags" placeholder="chien-thuat, co-ban" />
+                  <label>Thẻ</label>
+                  <ChessTagInput v-model="editDraft.tags" />
                 </div>
               </div>
               <label>Tóm tắt ngắn (hiện ở danh sách + popup wikilink)</label>
@@ -200,6 +207,10 @@ import ChessWikiLinkSuggest from '@/views/chess/components/ChessWikiLinkSuggest.
 import ChessEditorBoards from '@/views/chess/components/ChessEditorBoards.vue';
 import ChessArticleTopicManager from '@/views/chess/components/ChessArticleTopicManager.vue';
 import ChessArticleHistory from '@/views/chess/components/ChessArticleHistory.vue';
+import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import {
   listArticles, getArticleBySlug, createArticle, updateArticle, deleteArticle,
   renameArticleSlug, exportArticles, importArticles, type ChessArticle,
@@ -230,14 +241,39 @@ watch(() => props.focusSlug, (s) => focusBySlug(s));
 
 const articles = ref<ChessArticle[]>([]);
 const selected = ref<ChessArticle | null>(null);
-const filter = reactive({ category: '', level: '', status: '', q: '', topic_id: '' });
+const filter = reactive({ category: '', level: '', status: '', q: '', topic_id: '', tag: '' });
+const paging = useChessPaging(50);
+
+// pickTag: bấm chip thẻ trên một hàng = lọc danh sách theo đúng thẻ đó. Ghi đè
+// (không cộng dồn) để một cú bấm luôn cho kết quả đoán được.
+function pickTag(name: string) {
+  filter.tag = name;
+  load();
+}
 const editing = ref(false);
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm.
+// Tham số phân trang CỐ Ý không nằm trong `filter` — export dùng chung object
+// đó, và lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listArticles(filter);
+    const res: any = await listArticles({ ...filter, ...paging.params(1) });
     articles.value = res?.data || [];
+    paging.applyMeta(res, articles.value.length);
   } catch { MessagePlugin.error('Tải ngân hàng bài viết thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listArticles({ ...filter, ...paging.params(next) });
+    articles.value = articles.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, articles.value.length);
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 function select(a: ChessArticle) { selected.value = a; editing.value = false; }
 
@@ -522,6 +558,9 @@ loadTopics();
 .atb-editor-split { display: flex; gap: 12px; align-items: flex-start; }
 .atb-editor-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .atb-row2 { display: flex; gap: 12px; > div { flex: 1; min-width: 0; } }
+.atb-tagfilter {
+  width: 220px;
+}
 .atb-spacer { flex: 1; }
 .atb-back { display: none; }
 

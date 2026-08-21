@@ -2,6 +2,13 @@
   <div class="chess-manage">
     <div class="cm-header">
       <h1 class="cm-title">Quản lý cờ vua</h1>
+      <!-- Ô tìm đặt ở HEADER (ngoài mọi tab) vì nó tra CẢ 8 loại nội dung —
+           giống nút Kho tri thức bên cạnh. Enter chuyển sang tab Tìm kiếm. -->
+      <t-input v-model="headerQuery" class="cm-search" placeholder="Tìm trong kho cờ…" clearable
+        @enter="gotoSearch">
+        <template #prefix-icon><t-icon name="search" /></template>
+      </t-input>
+      <div class="cm-spacer"></div>
       <!-- Kho tri thức phục vụ CẢ 7 loại thực thể (không riêng bài viết) nên nút
            đặt ở đầu trang, ngoài mọi tab. -->
       <t-button size="small" variant="outline" @click="kbStatusVisible = true">
@@ -29,6 +36,14 @@
       <t-tab-panel value="articles" label="Ngân hàng bài viết">
         <div class="cm-pane"><ArticleBank v-if="tab === 'articles'" :focus-slug="focusArticleSlug" /></div>
       </t-tab-panel>
+      <!-- Thẻ là trục phân loại NGANG phủ cả 8 loại, nên tab này không phải
+           "loại nội dung thứ 7" mà là MỤC LỤC NGANG của 6 tab kia. -->
+      <t-tab-panel value="tags" label="Thẻ">
+        <div class="cm-pane"><TagBrowser v-if="tab === 'tags'" /></div>
+      </t-tab-panel>
+      <t-tab-panel value="search" label="Tìm kiếm">
+        <div class="cm-pane"><SearchPanel v-if="tab === 'search'" :initial-query="searchQuery" /></div>
+      </t-tab-panel>
     </t-tabs>
     <ChessKBStatusDialog v-model:visible="kbStatusVisible" />
   </div>
@@ -43,11 +58,23 @@ import PuzzleBank from './PuzzleBank.vue';
 import PositionBank from './PositionBank.vue';
 import BookLibrary from './BookLibrary.vue';
 import ArticleBank from './ArticleBank.vue';
+import TagBrowser from './TagBrowser.vue';
+import SearchPanel from './SearchPanel.vue';
 import ChessKBStatusDialog from './components/ChessKBStatusDialog.vue';
 
 const route = useRoute();
 const tab = ref('courses');
 const kbStatusVisible = ref(false);
+
+// headerQuery là ô ở header; searchQuery là thứ THỰC SỰ được gửi đi. Tách hai
+// biến để gõ dở trong header không kích hoạt tìm kiếm — chỉ Enter mới chuyển tab.
+const headerQuery = ref('');
+const searchQuery = ref('');
+function gotoSearch() {
+  if (!headerQuery.value.trim()) return;
+  searchQuery.value = headerQuery.value;
+  tab.value = 'search';
+}
 
 // Deep-link "Mở trong thư viện": ?ref=game/<slug> | puzzle/<slug> | lesson/<slug>
 // | course/<slug> | position/<slug> | book/<slug> | chapter/<slug> | article/<slug>
@@ -116,6 +143,10 @@ watch(
 }
 .cm-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .cm-title { font-size: 20px; margin: 0; color: var(--td-text-color-primary); }
+/* justify-content của .cm-header là space-between; .cm-spacer đẩy nút Kho tri
+   thức về sát mép phải để ô tìm nằm ngay cạnh tiêu đề. */
+.cm-search { width: 260px; }
+.cm-spacer { flex: 1; }
 .cm-tabs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cm-tabs :deep(.t-tabs__content) { flex: 1; min-height: 0; }
 .cm-tabs :deep(.t-tab-panel) { height: 100%; }
@@ -128,6 +159,10 @@ watch(
   .chess-manage { padding: 8px 0 0; }
   .cm-header { margin: 0 12px 6px; }
   .cm-title { font-size: 17px; }
+  /* Điện thoại: ô tìm xuống hàng riêng và chiếm trọn bề ngang. */
+  .cm-header { flex-wrap: wrap; }
+  .cm-search { width: 100%; order: 9; }
+  .cm-spacer { display: none; }
   .cm-tabs :deep(.t-tabs__nav-item) { font-size: 14px; }
 }
 </style>

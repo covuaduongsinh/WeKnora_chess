@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"github.com/Tencent/WeKnora/internal/chess"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"gorm.io/gorm"
 )
@@ -162,15 +164,12 @@ func (r *chessLibraryRepository) bookQuery(ctx context.Context, tenantID uint64,
 	if f.Status != "" {
 		q = q.Where("chess_books.status = ?", f.Status)
 	}
-	if f.Keyword != "" {
-		kw := "%" + f.Keyword + "%"
-		q = q.Where("chess_books.slug ILIKE ? OR chess_books.title ILIKE ? OR chess_books.author ILIKE ? OR chess_books.tags ILIKE ?",
-			kw, kw, kw, kw)
-	}
+	q = applyChessKeyword(q, "chess_books.search_text", f.Keyword)
 	if f.ShelfID != "" {
 		q = q.Joins("JOIN chess_shelf_books sb ON sb.book_id = chess_books.id AND sb.tenant_id = ? AND sb.shelf_id = ?",
 			tenantID, f.ShelfID)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeBook, "chess_books.id", f.Tags)
 	return q
 }
 
@@ -183,8 +182,14 @@ func (r *chessLibraryRepository) ListBooks(ctx context.Context, tenantID uint64,
 	} else {
 		q = q.Order("chess_books.sort_order ASC, chess_books.created_at DESC")
 	}
-	err := q.Limit(500).Find(&books).Error
+	err := applyChessPaging(q, f.Page, f.PageSize).Find(&books).Error
 	return books, err
+}
+
+func (r *chessLibraryRepository) CountBooks(ctx context.Context, tenantID uint64, f types.ChessBookFilter) (int64, error) {
+	var n int64
+	err := r.bookQuery(ctx, tenantID, f).Count(&n).Error
+	return n, err
 }
 
 func (r *chessLibraryRepository) GetBook(ctx context.Context, tenantID uint64, id string) (*types.ChessBook, error) {
@@ -220,6 +225,7 @@ func (r *chessLibraryRepository) BookSlugExists(ctx context.Context, tenantID ui
 }
 
 func (r *chessLibraryRepository) CreateBook(ctx context.Context, book *types.ChessBook) error {
+	book.SearchText = bookSearchText(book)
 	return r.db.WithContext(ctx).Create(book).Error
 }
 
@@ -235,14 +241,21 @@ func (r *chessLibraryRepository) UpdateBook(ctx context.Context, book *types.Che
 			"isbn": book.ISBN, "language": book.Language, "level": book.Level, "phase": book.Phase,
 			"eco": book.ECO, "status": book.Status, "description": book.Description,
 			"cover_url": book.CoverURL, "tags": book.Tags, "sort_order": book.SortOrder,
+			"search_text": bookSearchText(book),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdateBookSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessBook{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshBookSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeleteBook(ctx context.Context, tenantID uint64, id string) error {
@@ -279,13 +292,17 @@ func (r *chessLibraryRepository) SearchChapters(ctx context.Context, tenantID ui
 		Where("tenant_id = ?", tenantID)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
+		// search_text đứng đầu: nó khử dấu nên bắt được cả khi gõ không dấu,
+		// và có index trigram. Full-text giữ lại để tìm SÂU trong nội dung dài
+		// (search_text bị cắt ở 8000 ký tự).
+		needle := "%" + chess.SearchNeedle(keyword) + "%"
 		if r.db.Dialector != nil && r.db.Dialector.Name() == "postgres" {
-			q = q.Where("slug ILIKE ? OR title ILIKE ? OR "+
+			q = q.Where("search_text LIKE ? OR slug ILIKE ? OR title ILIKE ? OR "+
 				"to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')) @@ plainto_tsquery('simple', ?)",
-				kw, kw, keyword)
+				needle, kw, kw, keyword)
 		} else {
-			// SQLite ("lite"): chưa có tsvector/pg_trgm — fallback ILIKE thường trên content.
-			q = q.Where("slug ILIKE ? OR title ILIKE ? OR content ILIKE ?", kw, kw, kw)
+			// SQLite ("lite"): chưa có tsvector/pg_trgm — fallback LIKE trên content.
+			q = q.Where("search_text LIKE ? OR slug ILIKE ? OR title ILIKE ? OR content ILIKE ?", needle, kw, kw, kw)
 		}
 	}
 	var chapters []*types.ChessBookChapter
@@ -326,6 +343,7 @@ func (r *chessLibraryRepository) ChapterSlugExists(ctx context.Context, tenantID
 }
 
 func (r *chessLibraryRepository) CreateChapter(ctx context.Context, chapter *types.ChessBookChapter) error {
+	chapter.SearchText = chapterSearchText(chapter)
 	return r.db.WithContext(ctx).Create(chapter).Error
 }
 
@@ -338,14 +356,21 @@ func (r *chessLibraryRepository) UpdateChapter(ctx context.Context, chapter *typ
 		Updates(map[string]interface{}{
 			"part": chapter.Part, "title": chapter.Title, "content": chapter.Content,
 			"fen": chapter.FEN, "level": chapter.Level, "sort_order": chapter.SortOrder,
+			"search_text": chapterSearchText(chapter),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdateChapterSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessBookChapter{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshChapterSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeleteChapter(ctx context.Context, tenantID uint64, id string) error {

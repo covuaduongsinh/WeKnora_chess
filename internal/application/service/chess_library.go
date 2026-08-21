@@ -22,6 +22,12 @@ type chessLibraryService struct {
 	// fileService lưu/đọc ảnh chèn trong chương sách (Thư viện sách). Có thể
 	// nil trong test — mọi lời gọi ảnh trả lỗi rõ ràng thay vì panic.
 	fileService interfaces.FileService
+	// courseRepo CHỈ dùng cho hệ thẻ: khóa học/bài giảng nằm ở repository
+	// khác (chessCourseRepository), nhưng thẻ phải phủ CẢ 8 loại nội dung nên
+	// trang "mọi mục mang thẻ này" cần đọc được tiêu đề khóa học/bài giảng.
+	// dig tự nối vì interfaces.ChessCourseRepository đã được Provide sẵn ở
+	// container.go — KHÔNG cần sửa container.go. Có thể nil trong test.
+	courseRepo interfaces.ChessCourseRepository
 }
 
 // NewChessLibraryService tạo service kho ván, bài tập & thư viện sách cờ vua.
@@ -31,9 +37,11 @@ func NewChessLibraryService(
 	aliasRepo interfaces.ChessSlugAliasRepository,
 	indexer *ChessKnowledgeIndexer,
 	fileService interfaces.FileService,
+	courseRepo interfaces.ChessCourseRepository,
 ) interfaces.ChessLibraryService {
 	return &chessLibraryService{
-		repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo, indexer: indexer, fileService: fileService,
+		repo: repo, chessRefRepo: chessRefRepo, aliasRepo: aliasRepo, indexer: indexer,
+		fileService: fileService, courseRepo: courseRepo,
 	}
 }
 
@@ -178,6 +186,7 @@ func (s *chessLibraryService) DeleteGame(ctx context.Context, tenantID uint64, i
 	if err := s.repo.DeleteGame(ctx, tenantID, id); err != nil {
 		return err
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeGame, id)
 	if g != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeGame, g.Slug)
 		if s.indexer != nil {
@@ -330,6 +339,7 @@ func (s *chessLibraryService) DeletePuzzle(ctx context.Context, tenantID uint64,
 	if err := s.repo.DeletePuzzle(ctx, tenantID, id); err != nil {
 		return err
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypePuzzle, id)
 	if p != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypePuzzle, p.Slug)
 		if s.indexer != nil {

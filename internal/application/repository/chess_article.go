@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"github.com/Tencent/WeKnora/internal/chess"
+
 	"github.com/Tencent/WeKnora/internal/types"
 	"gorm.io/gorm"
 )
@@ -29,15 +31,12 @@ func (r *chessLibraryRepository) articleQuery(ctx context.Context, tenantID uint
 	if f.Status != "" {
 		q = q.Where("status = ?", f.Status)
 	}
-	if f.Keyword != "" {
-		kw := "%" + f.Keyword + "%"
-		q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR summary ILIKE ? OR tags ILIKE ?",
-			kw, kw, kw, kw, kw)
-	}
+	q = applyChessKeyword(q, "chess_articles.search_text", f.Keyword)
 	if f.TopicID != "" {
 		q = q.Joins("JOIN chess_article_topic_items ti ON ti.article_id = chess_articles.id "+
 			"AND ti.tenant_id = ? AND ti.topic_id = ?", tenantID, f.TopicID)
 	}
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeArticle, "chess_articles.id", f.Tags)
 	return q
 }
 
@@ -49,8 +48,14 @@ func (r *chessLibraryRepository) ListArticles(ctx context.Context, tenantID uint
 	} else {
 		q = q.Order("sort_order ASC, created_at DESC")
 	}
-	err := q.Limit(500).Find(&articles).Error
+	err := applyChessPaging(q, f.Page, f.PageSize).Find(&articles).Error
 	return articles, err
+}
+
+func (r *chessLibraryRepository) CountArticles(ctx context.Context, tenantID uint64, f types.ChessArticleFilter) (int64, error) {
+	var n int64
+	err := r.articleQuery(ctx, tenantID, f).Model(&types.ChessArticle{}).Count(&n).Error
+	return n, err
 }
 
 // SearchArticles tìm bài viết theo từ khóa (slug/title/aliases/summary, VÀ
@@ -65,14 +70,16 @@ func (r *chessLibraryRepository) SearchArticles(ctx context.Context, tenantID ui
 		Where("tenant_id = ?", tenantID)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
+		// search_text đứng đầu: khử dấu + có index trigram. Xem ghi chú ở SearchChapters.
+		needle := "%" + chess.SearchNeedle(keyword) + "%"
 		if r.db.Dialector != nil && r.db.Dialector.Name() == "postgres" {
-			q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR "+
+			q = q.Where("search_text LIKE ? OR slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR "+
 				"to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(aliases,'') || ' ' || "+
 				"coalesce(summary,'') || ' ' || coalesce(content,'')) @@ plainto_tsquery('simple', ?)",
-				kw, kw, kw, keyword)
+				needle, kw, kw, kw, keyword)
 		} else {
-			// SQLite ("lite"): chưa có tsvector/pg_trgm — fallback ILIKE thường trên content.
-			q = q.Where("slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR content ILIKE ?", kw, kw, kw, kw)
+			// SQLite ("lite"): chưa có tsvector/pg_trgm — fallback LIKE trên content.
+			q = q.Where("search_text LIKE ? OR slug ILIKE ? OR title ILIKE ? OR aliases ILIKE ? OR content ILIKE ?", needle, kw, kw, kw, kw)
 		}
 	}
 	var articles []*types.ChessArticle
@@ -113,6 +120,7 @@ func (r *chessLibraryRepository) ArticleSlugExists(ctx context.Context, tenantID
 }
 
 func (r *chessLibraryRepository) CreateArticle(ctx context.Context, article *types.ChessArticle) error {
+	article.SearchText = articleSearchText(article)
 	return r.db.WithContext(ctx).Create(article).Error
 }
 
@@ -126,15 +134,21 @@ func (r *chessLibraryRepository) UpdateArticle(ctx context.Context, article *typ
 			"title": article.Title, "summary": article.Summary, "aliases": article.Aliases,
 			"category": article.Category, "level": article.Level, "tags": article.Tags,
 			"status": article.Status, "cover_url": article.CoverURL, "content": article.Content,
-			"sort_order": article.SortOrder,
+			"sort_order": article.SortOrder, "search_text": articleSearchText(article),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdateArticleSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessArticle{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshArticleSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeleteArticle(ctx context.Context, tenantID uint64, id string) error {

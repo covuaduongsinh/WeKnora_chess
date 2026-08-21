@@ -30,6 +30,30 @@ Panel cần quyền **Contributor** trở lên. Các mục `curl` bên dưới g
 > chưa tìm thấy — phải đợi embedding nền chạy hết. Đây đúng là chỗ từng bị hiểu nhầm
 > thành "thành công giả" ở đợt bật RAG đầu tiên.
 
+## 0b. BẮT BUỘC sau khi chạy migration 000073/000074
+
+Hai migration này thêm **hệ thẻ thống nhất** và cột **`search_text`** (khử dấu).
+Cả hai đều để **rỗng** cho dữ liệu cũ — phải nạp một lần:
+
+> **Quản lý cờ vua → tab "Thẻ" → nút "Nạp thẻ từ dữ liệu cũ"**
+> (tương đương `POST /api/v1/chess/tags/backfill`, cần quyền Contributor)
+
+Một nút làm **hai** việc: tách các thẻ CSV cũ (thế cờ/sách/bài viết) thành thẻ
+thật, và tính `search_text` cho toàn bộ bản ghi.
+
+⚠️ **Không chạy bước này thì ô tìm sẽ không ra gì với dữ liệu cũ** — cột
+`search_text` rỗng nên mọi truy vấn `LIKE` đều trượt. Idempotent, chạy lại vô hại.
+
+Từ đây trở đi mọi lần tạo/sửa tự điền, không phải làm lại.
+
+**Nhãn tài liệu trong KB cờ:** từ đợt này, tài liệu cờ được gắn nhãn theo LOẠI
+("Ván cờ", "Sách", "Bài viết"…) để mở KB lên còn lọc được. Nhãn chỉ gắn lúc
+index, nên tài liệu index từ TRƯỚC đó chưa có — chạy "Đẩy lại index" một lần là
+có. *Lưu ý:* tool `knowledge_search` hiện chưa nhận tham số lọc theo nhãn, nên
+đây là tiện ích cho NGƯỜI xem KB, chưa phải bộ lọc cho agent.
+
+---
+
 ## 0. Tiền điều kiện
 - Tenant có **≥ 1 KB đã cấu hình model embedding** (KB cờ sẽ SAO CHÉP cấu hình embedding đó khi tự tạo). *(Thầy đã xác nhận local có embedding.)*
 - Stack chạy đầy đủ (embedding + vector store + worker).

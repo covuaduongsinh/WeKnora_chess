@@ -27,6 +27,14 @@ type ChessGame struct {
 	PGN string `json:"pgn" gorm:"type:text"`
 	// PlyCount là số nửa-nước.
 	PlyCount int `json:"ply_count" gorm:"default:0"`
+	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
+	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// Rỗng = không phân cấp.
+	Level string `json:"level" gorm:"type:varchar(16);index"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -56,6 +64,14 @@ type ChessPuzzle struct {
 	Difficulty string `json:"difficulty" gorm:"type:varchar(32);index"`
 	// Source là nguồn (tùy chọn).
 	Source string `json:"source" gorm:"type:varchar(255)"`
+	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
+	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// Rỗng = không phân cấp.
+	Level string `json:"level" gorm:"type:varchar(16);index"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -70,18 +86,38 @@ type ChessGameFilter struct {
 	Black  string
 	ECO    string
 	Result string
+	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
+	// migration 000073 để ván cờ cùng trục phân loại với mọi loại nội dung khác.
+	Level string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/white/black/event) — dùng cho
 	// autocomplete wikilink. Rỗng = không lọc.
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessPuzzleFilter là bộ lọc khi liệt kê bài tập.
 type ChessPuzzleFilter struct {
 	Theme      string
 	Difficulty string
+	// Level là cấp độ 6 bậc Dương Sinh — cột thêm ở migration 000073 (khác
+	// Difficulty vốn là độ khó của riêng bài tập).
+	Level string
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/theme) — dùng cho
 	// autocomplete wikilink. Rỗng = không lọc.
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessRefSearchItem là một mục gợi ý khi tìm tham chiếu cờ cho autocomplete

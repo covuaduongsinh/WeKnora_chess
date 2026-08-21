@@ -20,8 +20,10 @@ func NewChessLibraryRepository(db *gorm.DB) interfaces.ChessLibraryRepository {
 
 // ---- Ván đấu ----
 
-func (r *chessLibraryRepository) ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error) {
-	q := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID)
+// gameQuery dựng query lọc chung cho List/Count/Export — tách ra để số đếm
+// và danh sách KHÔNG BAO GIỜ lệch điều kiện.
+func (r *chessLibraryRepository) gameQuery(ctx context.Context, tenantID uint64, f types.ChessGameFilter) *gorm.DB {
+	q := r.db.WithContext(ctx).Model(&types.ChessGame{}).Where("tenant_id = ?", tenantID)
 	if f.White != "" {
 		q = q.Where("white ILIKE ?", "%"+f.White+"%")
 	}
@@ -34,13 +36,25 @@ func (r *chessLibraryRepository) ListGames(ctx context.Context, tenantID uint64,
 	if f.Result != "" {
 		q = q.Where("result = ?", f.Result)
 	}
-	if f.Keyword != "" {
-		kw := "%" + f.Keyword + "%"
-		q = q.Where("slug ILIKE ? OR white ILIKE ? OR black ILIKE ? OR event ILIKE ?", kw, kw, kw, kw)
+	if f.Level != "" {
+		q = q.Where("level = ?", f.Level)
 	}
+	q = applyChessKeyword(q, "chess_games.search_text", f.Keyword)
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypeGame, "chess_games.id", f.Tags)
+	return q
+}
+
+func (r *chessLibraryRepository) ListGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) ([]*types.ChessGame, error) {
 	var games []*types.ChessGame
-	err := q.Order("created_at DESC").Limit(500).Find(&games).Error
+	q := applyChessPaging(r.gameQuery(ctx, tenantID, f).Order("created_at DESC"), f.Page, f.PageSize)
+	err := q.Find(&games).Error
 	return games, err
+}
+
+func (r *chessLibraryRepository) CountGames(ctx context.Context, tenantID uint64, f types.ChessGameFilter) (int64, error) {
+	var n int64
+	err := r.gameQuery(ctx, tenantID, f).Count(&n).Error
+	return n, err
 }
 
 func (r *chessLibraryRepository) GetGame(ctx context.Context, tenantID uint64, id string) (*types.ChessGame, error) {
@@ -76,12 +90,16 @@ func (r *chessLibraryRepository) GameSlugExists(ctx context.Context, tenantID ui
 }
 
 func (r *chessLibraryRepository) CreateGame(ctx context.Context, game *types.ChessGame) error {
+	game.SearchText = gameSearchText(game)
 	return r.db.WithContext(ctx).Create(game).Error
 }
 
 func (r *chessLibraryRepository) CreateGames(ctx context.Context, games []*types.ChessGame) error {
 	if len(games) == 0 {
 		return nil
+	}
+	for _, g := range games {
+		g.SearchText = gameSearchText(g)
 	}
 	return r.db.WithContext(ctx).CreateInBatches(games, 100).Error
 }
@@ -93,15 +111,22 @@ func (r *chessLibraryRepository) UpdateGame(ctx context.Context, game *types.Che
 		Updates(map[string]interface{}{
 			"white": game.White, "black": game.Black, "result": game.Result,
 			"eco": game.ECO, "event": game.Event, "date": game.Date,
-			"pgn": game.PGN, "ply_count": game.PlyCount,
+			"pgn": game.PGN, "ply_count": game.PlyCount, "level": game.Level,
+			"search_text": gameSearchText(game),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdateGameSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessGame{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshGameSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeleteGame(ctx context.Context, tenantID uint64, id string) error {
@@ -118,17 +143,25 @@ func (r *chessLibraryRepository) puzzleQuery(ctx context.Context, tenantID uint6
 	if f.Difficulty != "" {
 		q = q.Where("difficulty = ?", f.Difficulty)
 	}
-	if f.Keyword != "" {
-		kw := "%" + f.Keyword + "%"
-		q = q.Where("slug ILIKE ? OR title ILIKE ? OR theme ILIKE ?", kw, kw, kw)
+	if f.Level != "" {
+		q = q.Where("level = ?", f.Level)
 	}
+	q = applyChessKeyword(q, "chess_puzzles.search_text", f.Keyword)
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypePuzzle, "chess_puzzles.id", f.Tags)
 	return q
 }
 
 func (r *chessLibraryRepository) ListPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) ([]*types.ChessPuzzle, error) {
 	var puzzles []*types.ChessPuzzle
-	err := r.puzzleQuery(ctx, tenantID, f).Order("created_at DESC").Limit(500).Find(&puzzles).Error
+	q := applyChessPaging(r.puzzleQuery(ctx, tenantID, f).Order("created_at DESC"), f.Page, f.PageSize)
+	err := q.Find(&puzzles).Error
 	return puzzles, err
+}
+
+func (r *chessLibraryRepository) CountPuzzles(ctx context.Context, tenantID uint64, f types.ChessPuzzleFilter) (int64, error) {
+	var n int64
+	err := r.puzzleQuery(ctx, tenantID, f).Model(&types.ChessPuzzle{}).Count(&n).Error
+	return n, err
 }
 
 func (r *chessLibraryRepository) GetPuzzle(ctx context.Context, tenantID uint64, id string) (*types.ChessPuzzle, error) {
@@ -164,6 +197,7 @@ func (r *chessLibraryRepository) PuzzleSlugExists(ctx context.Context, tenantID 
 }
 
 func (r *chessLibraryRepository) CreatePuzzle(ctx context.Context, puzzle *types.ChessPuzzle) error {
+	puzzle.SearchText = puzzleSearchText(puzzle)
 	return r.db.WithContext(ctx).Create(puzzle).Error
 }
 
@@ -174,14 +208,21 @@ func (r *chessLibraryRepository) UpdatePuzzle(ctx context.Context, puzzle *types
 		Updates(map[string]interface{}{
 			"title": puzzle.Title, "fen": puzzle.FEN, "solution": puzzle.Solution,
 			"theme": puzzle.Theme, "difficulty": puzzle.Difficulty, "source": puzzle.Source,
+			"level": puzzle.Level, "search_text": puzzleSearchText(puzzle),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdatePuzzleSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessPuzzle{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshPuzzleSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeletePuzzle(ctx context.Context, tenantID uint64, id string) error {

@@ -22,6 +22,10 @@ type ChessCourse struct {
 	CoverURL string `json:"cover_url" gorm:"type:varchar(512)"`
 	// SortOrder là thứ tự hiển thị.
 	SortOrder int `json:"sort_order" gorm:"default:0"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -52,8 +56,16 @@ type ChessLesson struct {
 	FEN string `json:"fen" gorm:"type:varchar(128)"`
 	// PGN là ván minh họa (tùy chọn).
 	PGN string `json:"pgn" gorm:"type:text"`
+	// Level là cấp độ 6 bậc Dương Sinh (tot|ma|tuong|xe|hau|vua) — cột thêm ở
+	// migration 000073 để mọi loại nội dung cờ dùng CHUNG một trục cấp độ.
+	// Rỗng = không phân cấp.
+	Level string `json:"level" gorm:"type:varchar(16);index"`
 	// SortOrder là thứ tự bài trong khóa.
 	SortOrder int `json:"sort_order" gorm:"default:0"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// CreatedAt / UpdatedAt là thời gian tạo/cập nhật.
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

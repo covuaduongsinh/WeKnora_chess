@@ -15,7 +15,11 @@ import (
 // Alias repo TÁI DÙNG fakePositionAliasRepo (cùng package, không cần định nghĩa lại).
 
 type fakeBookRepo struct {
-	interfaces.ChessLibraryRepository
+	// fakeTagBase (chess_library_tag_test.go) mang phần lưu trữ HỆ THẺ và tự
+	// embed interface repo. Phải embed nó CHỨ KHÔNG embed interface trực tiếp:
+	// mọi đường Create/Update/Delete nay đều gọi repo thẻ, còn embed cả hai ở
+	// cùng độ sâu sẽ làm method thẻ nhập nhằng.
+	fakeTagBase
 	shelves    map[string]*types.ChessShelf
 	shelfBooks map[string]map[string]int // shelfID -> bookID -> sortOrder
 	books      map[string]*types.ChessBook
@@ -27,7 +31,8 @@ type fakeBookRepo struct {
 
 func newFakeBookRepo() *fakeBookRepo {
 	return &fakeBookRepo{
-		shelves: map[string]*types.ChessShelf{}, shelfBooks: map[string]map[string]int{},
+		fakeTagBase: newFakeTagBase(),
+		shelves:     map[string]*types.ChessShelf{}, shelfBooks: map[string]map[string]int{},
 		books: map[string]*types.ChessBook{}, chapters: map[string]*types.ChessBookChapter{},
 		revisions: map[string]*types.ChessChapterRevision{}, revCounter: map[string]int{},
 	}

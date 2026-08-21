@@ -2,11 +2,17 @@
   <!-- `is-detail`: trên điện thoại chỉ hiện MỘT trong hai khung (danh sách ↔ chi tiết) -->
   <div class="gl" :class="{ 'is-detail': !!selected }">
     <div class="gl-toolbar">
-      <t-input v-model="filter.white" placeholder="Trắng" clearable style="width:140px" @change="load" />
-      <t-input v-model="filter.black" placeholder="Đen" clearable style="width:140px" @change="load" />
-      <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="load" />
+      <t-input v-model="filter.white" placeholder="Trắng" clearable style="width:140px" @change="loadDebounced" />
+      <t-input v-model="filter.black" placeholder="Đen" clearable style="width:140px" @change="loadDebounced" />
+      <t-input v-model="filter.eco" placeholder="ECO" clearable style="width:90px" @change="loadDebounced" />
       <t-select v-model="filter.result" :options="resultOptions" placeholder="Kết quả" clearable
         style="width:120px" @change="load" />
+      <t-select v-model="filter.level" :options="chessLevelOptions" placeholder="Cấp độ" clearable
+        style="width:110px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm nhanh…" clearable style="width:150px" @change="loadDebounced" />
+      <div class="gl-tagfilter">
+        <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
+      </div>
       <div class="gl-spacer"></div>
       <t-button variant="outline" size="small" @click="doExport">
         <template #icon><t-icon name="download" /></template>Export PGN
@@ -29,9 +35,14 @@
               <span v-if="g.eco" class="gl-tag">{{ g.eco }}</span>
               <span v-if="g.event">{{ g.event }}</span>
               <span>{{ g.ply_count }} nửa-nước</span>
+              <span v-if="g.level" class="gl-tag">{{ chessLevelLabel(g.level) }}</span>
+              <ChessTagChips :tags="tagsById[g.id]" @pick="pickTag" />
             </div>
           </div>
           <span class="gl-row-actions">
+            <t-button size="small" variant="text" title="Gắn thẻ" @click.stop="openTags(g)">
+              <t-icon name="bookmark" />
+            </t-button>
             <t-button size="small" variant="text" :title="t('chess.ref.copyLink')" @click.stop="copyWikilink(g)">
               <t-icon name="link" />
             </t-button>
@@ -39,6 +50,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(g)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="games.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
       <div class="gl-viewer">
         <t-button class="gl-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
@@ -85,6 +98,9 @@
         <t-select v-model="savePosDialog.level" :options="positionLevelOptions" clearable />
       </div>
     </t-dialog>
+
+    <ChessTagAssignDialog v-model:visible="tagDialog.visible" chess-type="game"
+      :chess-id="tagDialog.id" :item-title="tagDialog.title" @saved="loadTags" />
   </div>
 </template>
 
@@ -94,13 +110,20 @@ import { useI18n } from 'vue-i18n';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
+import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
+import ChessTagAssignDialog from '@/views/chess/components/ChessTagAssignDialog.vue';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listGames, getGameBySlug, deleteGame, importGames, exportGamesPGN, renameGameSlug, type ChessGame,
   listPositionsByGame, createPosition, type ChessPosition,
+  getChessTagsOfMany, type ChessTag,
 } from '@/api/chess';
 import { downloadText } from '@/utils/fileTransfer';
 import { positionCategoryOptions, positionLevelOptions } from '@/utils/chessPositionOptions';
+import { chessLevelOptions, chessLevelLabel } from '@/utils/chessTaxonomy';
 import { useRouter } from 'vue-router';
 
 const { t } = useI18n();
@@ -139,7 +162,35 @@ const resultOptions = [
 
 const games = ref<ChessGame[]>([]);
 const selected = ref<ChessGame | null>(null);
-const filter = reactive({ white: '', black: '', eco: '', result: '' });
+const filter = reactive({ white: '', black: '', eco: '', result: '', level: '', q: '', tag: '' });
+const paging = useChessPaging(50);
+// Ván cờ KHÔNG có cột `tags` (và cũng không có hộp thoại sửa — ván nhập từ
+// PGN), nên thẻ nạp theo LÔ cho cả trang và sửa qua hộp thoại gắn thẻ dùng chung.
+const tagsById = ref<Record<string, ChessTag[]>>({});
+const tagDialog = reactive({ visible: false, id: '', title: '' });
+
+function openTags(g: ChessGame) {
+  tagDialog.id = g.id;
+  tagDialog.title = `${g.white || '?'} – ${g.black || '?'}`;
+  tagDialog.visible = true;
+}
+
+// pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
+function pickTag(name: string) {
+  filter.tag = name;
+  load();
+}
+
+// loadTags nạp thẻ cho toàn bộ hàng đang hiện — MỘT request cho cả trang.
+// Best-effort: lỗi thì hàng chỉ mất chip thẻ, danh sách vẫn dùng được.
+async function loadTags() {
+  const ids = games.value.map((g) => g.id).filter(Boolean);
+  if (!ids.length) { tagsById.value = {}; return; }
+  try {
+    const res: any = await getChessTagsOfMany('game', ids);
+    tagsById.value = res?.data || {};
+  } catch { tagsById.value = {}; }
+}
 const importDialog = reactive({ visible: false, pgn: '' });
 
 interface SavePositionDialogState {
@@ -191,11 +242,30 @@ const viewerData = computed<ChessBoardData>(() => ({
   caption: selected.value ? `${selected.value.white} – ${selected.value.black}` : '',
 }));
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm. Tham số
+// phân trang CỐ Ý không nằm trong `filter` — export dùng chung object đó, và
+// lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listGames(filter);
+    const res: any = await listGames({ ...filter, ...paging.params(1) });
     games.value = res?.data || [];
+    paging.applyMeta(res, games.value.length);
+    await loadTags();
   } catch { MessagePlugin.error('Tải kho ván thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listGames({ ...filter, ...paging.params(next) });
+    games.value = games.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, games.value.length);
+    await loadTags();
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
 }
 
 // Thế cờ đã trích từ ván đang xem (Ngân hàng thế cờ, nguồn source_game_id).
@@ -296,6 +366,9 @@ load();
   &:hover { color: var(--td-brand-color); }
 }
 .gl-extracted-ply { color: var(--td-text-color-placeholder); font-size: 11px; }
+.gl-tagfilter {
+  width: 170px;
+}
 .gl-spacer { flex: 1; }
 .gl-back { display: none; }
 

@@ -28,17 +28,22 @@ func (r *chessLibraryRepository) positionQuery(ctx context.Context, tenantID uin
 	if f.SourceGameID != "" {
 		q = q.Where("source_game_id = ?", f.SourceGameID)
 	}
-	if f.Keyword != "" {
-		kw := "%" + f.Keyword + "%"
-		q = q.Where("slug ILIKE ? OR title ILIKE ? OR tags ILIKE ?", kw, kw, kw)
-	}
+	q = applyChessKeyword(q, "chess_positions.search_text", f.Keyword)
+	q = r.applyTagFilter(q, tenantID, types.ChessRefTypePosition, "chess_positions.id", f.Tags)
 	return q
 }
 
 func (r *chessLibraryRepository) ListPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) ([]*types.ChessPosition, error) {
 	var positions []*types.ChessPosition
-	err := r.positionQuery(ctx, tenantID, f).Order("created_at DESC").Limit(500).Find(&positions).Error
+	q := applyChessPaging(r.positionQuery(ctx, tenantID, f).Order("created_at DESC"), f.Page, f.PageSize)
+	err := q.Find(&positions).Error
 	return positions, err
+}
+
+func (r *chessLibraryRepository) CountPositions(ctx context.Context, tenantID uint64, f types.ChessPositionFilter) (int64, error) {
+	var n int64
+	err := r.positionQuery(ctx, tenantID, f).Model(&types.ChessPosition{}).Count(&n).Error
+	return n, err
 }
 
 func (r *chessLibraryRepository) GetPosition(ctx context.Context, tenantID uint64, id string) (*types.ChessPosition, error) {
@@ -74,10 +79,14 @@ func (r *chessLibraryRepository) PositionSlugExists(ctx context.Context, tenantI
 }
 
 func (r *chessLibraryRepository) CreatePosition(ctx context.Context, position *types.ChessPosition) error {
+	position.SearchText = positionSearchText(position)
 	return r.db.WithContext(ctx).Create(position).Error
 }
 
 func (r *chessLibraryRepository) CreatePositions(ctx context.Context, positions []*types.ChessPosition) error {
+	for _, p := range positions {
+		p.SearchText = positionSearchText(p)
+	}
 	if len(positions) == 0 {
 		return nil
 	}
@@ -97,14 +106,21 @@ func (r *chessLibraryRepository) UpdatePosition(ctx context.Context, position *t
 			"assessment": position.Assessment, "annotation": position.Annotation,
 			"tags": position.Tags, "source": position.Source,
 			"source_game_id": position.SourceGameID, "source_ply": position.SourcePly,
+			"search_text": positionSearchText(position),
 		}).Error
 }
 
 func (r *chessLibraryRepository) UpdatePositionSlug(ctx context.Context, tenantID uint64, id, slug string) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Model(&types.ChessPosition{}).
 		Where("tenant_id = ? AND id = ?", tenantID, id).
-		Update("slug", slug).Error
+		Update("slug", slug).Error; err != nil {
+		return err
+	}
+	// Slug nằm trong search_text nên phải tính lại — nếu không, tìm theo
+	// slug mới sẽ trượt (lỗi câm: bản ghi đúng, chỉ là tìm không ra).
+	r.refreshPositionSearchText(ctx, tenantID, id)
+	return nil
 }
 
 func (r *chessLibraryRepository) DeletePosition(ctx context.Context, tenantID uint64, id string) error {

@@ -6,6 +6,12 @@
         style="width:160px" @change="load" />
       <t-select v-model="filter.difficulty" :options="diffOptions" placeholder="Độ khó" clearable
         style="width:140px" @change="load" />
+      <t-select v-model="filter.level" :options="chessLevelOptions" placeholder="Cấp độ" clearable
+        style="width:120px" @change="load" />
+      <t-input v-model="filter.q" placeholder="Tìm theo tên…" clearable style="width:160px" @change="loadDebounced" />
+      <div class="pb-tagfilter">
+        <ChessTagInput v-model="filter.tag" placeholder="Lọc theo thẻ…" />
+      </div>
       <div class="pb-spacer"></div>
       <t-button variant="outline" size="small" @click="practice">
         <template #icon><t-icon name="play-circle" /></template>Luyện ngẫu nhiên
@@ -31,6 +37,8 @@
             <div class="pb-meta">
               <span v-if="p.theme" class="pb-tag">{{ p.theme }}</span>
               <span v-if="p.difficulty" class="pb-tag pb-tag--diff">{{ diffLabel(p.difficulty) }}</span>
+              <span v-if="p.level" class="pb-tag">{{ chessLevelLabel(p.level) }}</span>
+              <ChessTagChips :tags="tagsById[p.id]" @pick="pickTag" />
             </div>
           </div>
           <span class="pb-actions">
@@ -42,6 +50,8 @@
             <t-button size="small" variant="text" theme="danger" @click.stop="remove(p)"><t-icon name="delete" /></t-button>
           </span>
         </div>
+        <ChessListFooter :loaded="puzzles.length" :total="paging.total.value" :has-more="paging.hasMore.value"
+          :loading="paging.loadingMore.value" @more="loadMore" />
       </div>
       <div class="pb-viewer">
         <t-button class="pb-back" size="small" variant="text" @click="selected = null">‹ Danh sách</t-button>
@@ -72,6 +82,10 @@
         <t-select v-model="dialog.theme" :options="themeOptions" creatable filterable clearable />
         <label>Độ khó</label>
         <t-select v-model="dialog.difficulty" :options="diffOptions" clearable />
+        <label>Cấp độ (lộ trình 6 cấp)</label>
+        <t-select v-model="dialog.level" :options="chessLevelOptions" clearable />
+        <label>Thẻ</label>
+        <ChessTagInput v-model="dialog.tags" />
       </div>
     </t-dialog>
   </div>
@@ -83,13 +97,19 @@ import { useI18n } from 'vue-i18n';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import ChessBoardDisplay from '@/views/chat/components/tool-results/ChessBoardDisplay.vue';
 import ChessBacklinks from '@/views/chess/components/ChessBacklinks.vue';
+import ChessTagInput from '@/views/chess/components/ChessTagInput.vue';
+import ChessTagChips from '@/views/chess/components/ChessTagChips.vue';
+import ChessListFooter from '@/views/chess/components/ChessListFooter.vue';
+import { useChessPaging, debounceFn } from '@/views/chess/composables/useChessPaging';
 import type { ChessBoardData } from '@/types/tool-results';
 import {
   listPuzzles, getPuzzleBySlug, createPuzzle, updatePuzzle, deletePuzzle, randomPuzzle,
   exportPuzzles, importPuzzles, renamePuzzleSlug, type ChessPuzzle,
+  assignChessTags, getChessTagsOfMany, type ChessTag,
 } from '@/api/chess';
 import { downloadText, pickTextFile } from '@/utils/fileTransfer';
 import { isValidFEN } from '@/utils/chessBlocks';
+import { chessLevelOptions, chessLevelLabel } from '@/utils/chessTaxonomy';
 
 const { t } = useI18n();
 
@@ -128,7 +148,17 @@ const diffLabel = (v: string) => diffOptions.find(o => o.value === v)?.label || 
 
 const puzzles = ref<ChessPuzzle[]>([]);
 const selected = ref<ChessPuzzle | null>(null);
-const filter = reactive({ theme: '', difficulty: '' });
+const filter = reactive({ theme: '', difficulty: '', level: '', q: '', tag: '' });
+const paging = useChessPaging(50);
+// Bài tập KHÔNG có cột `tags` nên thẻ của cả trang được nạp theo LÔ sau mỗi
+// lần tải danh sách (một request cho toàn trang, không phải mỗi hàng một request).
+const tagsById = ref<Record<string, ChessTag[]>>({});
+
+// pickTag: bấm chip thẻ trên một hàng = lọc theo đúng thẻ đó (ghi đè, không cộng dồn).
+function pickTag(name: string) {
+  filter.tag = name;
+  load();
+}
 const revealed = ref(false);
 const revealKey = ref(0);
 
@@ -138,11 +168,40 @@ const viewerData = computed<ChessBoardData>(() => ({
   caption: selected.value?.title || 'Bài tập',
 }));
 
+// load() luôn về TRANG 1 và thay thế danh sách; loadMore() nối thêm. Tham số
+// phân trang CỐ Ý không nằm trong `filter` — export dùng chung object đó, và
+// lọt page/page_size vào URL export sẽ cắt cụt file xuất ra.
 async function load() {
+  paging.reset();
   try {
-    const res: any = await listPuzzles(filter);
+    const res: any = await listPuzzles({ ...filter, ...paging.params(1) });
     puzzles.value = res?.data || [];
+    paging.applyMeta(res, puzzles.value.length);
+    await loadTags();
   } catch { MessagePlugin.error('Tải bài tập thất bại'); }
+}
+const loadDebounced = debounceFn(load);
+
+async function loadMore() {
+  paging.loadingMore.value = true;
+  try {
+    const next = paging.page.value + 1;
+    const res: any = await listPuzzles({ ...filter, ...paging.params(next) });
+    puzzles.value = puzzles.value.concat(res?.data || []);
+    paging.page.value = next;
+    paging.applyMeta(res, puzzles.value.length);
+    await loadTags();
+  } catch { MessagePlugin.error('Tải thêm thất bại'); } finally { paging.loadingMore.value = false; }
+}
+// loadTags nạp thẻ cho toàn bộ hàng đang hiện. Best-effort: lỗi thì hàng chỉ
+// mất chip thẻ, không làm hỏng danh sách.
+async function loadTags() {
+  const ids = puzzles.value.map((p) => p.id).filter(Boolean);
+  if (!ids.length) { tagsById.value = {}; return; }
+  try {
+    const res: any = await getChessTagsOfMany('puzzle', ids);
+    tagsById.value = res?.data || {};
+  } catch { tagsById.value = {}; }
 }
 function select(p: ChessPuzzle) { selected.value = p; revealed.value = false; revealKey.value++; }
 async function practice() {
@@ -183,8 +242,14 @@ interface PuzzleDialogState {
   solution: string;
   theme: string;
   difficulty: string;
+  /** Cấp độ 6 bậc — cột mới từ migration 000073 (khác Difficulty của riêng bài tập). */
+  level: string;
+  /** CSV tên thẻ; lưu qua endpoint hệ thẻ, KHÔNG nằm trong bản ghi bài tập. */
+  tags: string;
 }
-const dialog = reactive<PuzzleDialogState>({ visible: false, id: '', title: '', fen: '', solution: '', theme: '', difficulty: '' });
+const dialog = reactive<PuzzleDialogState>({
+  visible: false, id: '', title: '', fen: '', solution: '', theme: '', difficulty: '', level: '', tags: '',
+});
 function openDialog(p?: ChessPuzzle) {
   dialog.visible = true;
   dialog.id = p?.id || '';
@@ -193,6 +258,9 @@ function openDialog(p?: ChessPuzzle) {
   dialog.solution = p?.solution || '';
   dialog.theme = p?.theme || '';
   dialog.difficulty = p?.difficulty || '';
+  dialog.level = p?.level || '';
+  // Thẻ không nằm trong bản ghi bài tập (không có cột `tags`) — lấy từ hệ thẻ.
+  dialog.tags = (p ? (tagsById.value[p.id] || []) : []).map((t) => t.name).join(', ');
 }
 async function save() {
   if (!dialog.fen.trim()) { MessagePlugin.warning('Nhập thế cờ FEN'); return; }
@@ -202,12 +270,20 @@ async function save() {
   }
   const payload = {
     title: dialog.title, fen: dialog.fen, solution: dialog.solution,
-    theme: dialog.theme, difficulty: dialog.difficulty,
+    theme: dialog.theme, difficulty: dialog.difficulty, level: dialog.level,
   };
   try {
-    const editingId = dialog.id;
+    let editingId = dialog.id;
     if (editingId) await updatePuzzle(editingId, payload);
-    else await createPuzzle(payload);
+    else {
+      const created: any = await createPuzzle(payload);
+      editingId = created?.data?.id || '';
+    }
+    // Thẻ lưu qua endpoint riêng vì bài tập không có cột `tags` trong bản ghi.
+    if (editingId) {
+      const names = dialog.tags.split(',').map((x) => x.trim()).filter(Boolean);
+      try { await assignChessTags('puzzle', editingId, names); } catch { /* thẻ lỗi không chặn lưu bài tập */ }
+    }
     dialog.visible = false;
     await load();
     // Nếu đang sửa bài tập đang xem → cập nhật viewer để bàn cờ phản ánh thay đổi.
@@ -269,6 +345,9 @@ load();
 .pb-title { font-weight: 600; color: var(--td-text-color-primary); }
 /* flex-wrap: các trang cờ khác đều có, riêng đây thiếu → tag tràn khi khung hẹp */
 .pb-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pb-tagfilter {
+  width: 180px;
+}
 .pb-spacer { flex: 1; }
 .pb-back { display: none; }
 .pb-tag { background: var(--td-brand-color-light); color: var(--td-brand-color); padding: 0 6px; border-radius: 4px; font-size: 12px; }

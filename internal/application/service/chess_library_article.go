@@ -77,6 +77,7 @@ func (s *chessLibraryService) CreateArticle(ctx context.Context, article *types.
 	if err := s.repo.CreateArticle(ctx, article); err != nil {
 		return nil, err
 	}
+	article.Tags = s.applyChessTags(ctx, article.TenantID, types.ChessRefTypeArticle, article.ID, article.Tags)
 	s.syncArticleChessRefs(ctx, article)
 	s.syncArticleAliases(ctx, article)
 	s.reindexArticle(ctx, article)
@@ -110,6 +111,7 @@ func (s *chessLibraryService) UpdateArticle(ctx context.Context, article *types.
 	if err != nil || updated == nil {
 		return updated, err
 	}
+	updated.Tags = s.applyChessTags(ctx, updated.TenantID, types.ChessRefTypeArticle, updated.ID, updated.Tags)
 	s.syncArticleChessRefs(ctx, updated)
 	s.syncArticleAliases(ctx, updated)
 	s.reindexArticle(ctx, updated)
@@ -187,6 +189,7 @@ func (s *chessLibraryService) DeleteArticle(ctx context.Context, tenantID uint64
 	}
 	_ = s.repo.RemoveArticleFromAllTopics(ctx, tenantID, id)
 	_ = s.repo.DeleteArticleRevisionsByArticle(ctx, tenantID, id)
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeArticle, id)
 	if a != nil {
 		s.pruneChessRefs(ctx, tenantID, types.ChessRefTypeArticle, a.Slug)
 		if s.chessRefRepo != nil && a.Slug != "" {

@@ -210,6 +210,7 @@ func (s *chessLibraryService) CreateBook(ctx context.Context, book *types.ChessB
 	if err := s.repo.CreateBook(ctx, book); err != nil {
 		return nil, err
 	}
+	book.Tags = s.applyChessTags(ctx, book.TenantID, types.ChessRefTypeBook, book.ID, book.Tags)
 	if s.indexer != nil {
 		_ = s.indexer.IndexBook(ctx, book, nil) // no-op nếu draft hoặc CHESS_KB_INDEX tắt
 	}
@@ -240,6 +241,7 @@ func (s *chessLibraryService) UpdateBook(ctx context.Context, book *types.ChessB
 	if n, err := s.repo.CountChapters(ctx, book.TenantID, book.ID); err == nil {
 		updated.ChapterCount = n
 	}
+	updated.Tags = s.applyChessTags(ctx, updated.TenantID, types.ChessRefTypeBook, updated.ID, updated.Tags)
 	s.reindexBookAndChapters(ctx, updated)
 	return updated, nil
 }
@@ -339,6 +341,11 @@ func (s *chessLibraryService) DeleteBook(ctx context.Context, tenantID uint64, i
 	}
 	if err := s.repo.DeleteBook(ctx, tenantID, id); err != nil {
 		return err
+	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeBook, id)
+
+	for _, ch := range chapters {
+		s.removeChessTags(ctx, tenantID, types.ChessRefTypeChapter, ch.ID)
 	}
 
 	for _, ch := range chapters {
@@ -528,6 +535,7 @@ func (s *chessLibraryService) DeleteChapter(ctx context.Context, tenantID uint64
 	if err := s.repo.DeleteChapter(ctx, tenantID, id); err != nil {
 		return err
 	}
+	s.removeChessTags(ctx, tenantID, types.ChessRefTypeChapter, id)
 	if ch == nil {
 		return nil
 	}

@@ -49,6 +49,10 @@ type ChessArticle struct {
 	Level string `json:"level" gorm:"type:varchar(16);index"`
 	// Tags là CSV nhẹ (khớp mẫu Tags của ChessPosition/ChessBook).
 	Tags string `json:"tags" gorm:"type:varchar(255)"`
+	// SearchText là bản KHỬ DẤU + hạ chữ thường của các trường tìm kiếm được,
+	// do repository dựng lại ở MỖI lần ghi (chess.SearchText). Nhờ nó ô tìm
+	// hoạt động khi gõ không dấu. Không lộ ra API — đây là chi tiết lưu trữ.
+	SearchText string `json:"-" gorm:"column:search_text;type:text"`
 	// Status là trạng thái xuất bản NỘI BỘ: "draft" (bản thảo, KHÔNG index RAG)
 	// | "published" (đã duyệt, index vào KB tri thức cờ nếu CHESS_KB_INDEX bật).
 	Status string `json:"status" gorm:"type:varchar(16);default:draft;index"`
@@ -148,6 +152,13 @@ type ChessArticleFilter struct {
 	// Keyword là tìm kiếm tự do (ILIKE trên slug/title/aliases/summary/tags) —
 	// dùng cho autocomplete wikilink. Rỗng = không lọc.
 	Keyword string
+	// Tags lọc theo hệ thẻ thống nhất (chess_tag_items). Rỗng = không lọc.
+	Tags ChessTagSelector
+	// Page / PageSize: phân trang thật. PageSize <= 0 nghĩa là KHÔNG phân
+	// trang (trả toàn bộ) — giữ nguyên hành vi cho các nơi cần đủ dữ liệu như
+	// export, backfill và picker chèn wikilink.
+	Page     int
+	PageSize int
 }
 
 // ChessArticleTopicFilter là bộ lọc khi liệt kê chuyên mục.
