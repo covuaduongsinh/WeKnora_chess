@@ -1264,6 +1264,11 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 func duplicateKBCopySuffix(locale string) string {
 	locale = strings.ToLower(locale)
 	switch {
+	// Fork Dương Sinh: middleware/language.go đặt fallback locale là "vi-VN"
+	// (không phải zh-CN như upstream), nên nhánh "vi" là nhánh CHẠY THẬT ở
+	// production — thiếu nó thì tên bản sao ra tiếng Anh giữa giao diện Việt.
+	case strings.HasPrefix(locale, "vi"):
+		return " Bản sao"
 	case strings.HasPrefix(locale, "zh"):
 		return " 副本"
 	case strings.HasPrefix(locale, "ko"):
@@ -1278,6 +1283,8 @@ func duplicateKBCopySuffix(locale string) string {
 func duplicateKBDefaultName(locale string) string {
 	locale = strings.ToLower(locale)
 	switch {
+	case strings.HasPrefix(locale, "vi"):
+		return "Kho tri thức"
 	case strings.HasPrefix(locale, "zh"):
 		return "知识库"
 	case strings.HasPrefix(locale, "ko"):
