@@ -26,6 +26,38 @@ type fakeTagBase struct {
 	csv   map[string]string          // "<chessType>:<chessID>" -> CSV đã ghi lại
 }
 
+// describeChessItem tra cứu thực thể để dựng mục lục ngang. fakeTagBase embed
+// interface (nil) nên MỌI Get* không override sẽ panic nil-pointer. Trả
+// (nil, nil) = "không tìm thấy" — đúng kịch bản các test dùng ID giả và kỳ vọng
+// mục mồ côi bị bỏ qua khi hiển thị, trong khi tổng số vẫn đếm đúng.
+func (f fakeTagBase) GetGame(ctx context.Context, tenantID uint64, id string) (*types.ChessGame, error) {
+	return nil, nil
+}
+
+func (f fakeTagBase) GetPuzzle(ctx context.Context, tenantID uint64, id string) (*types.ChessPuzzle, error) {
+	return nil, nil
+}
+
+func (f fakeTagBase) GetPosition(
+	ctx context.Context, tenantID uint64, id string,
+) (*types.ChessPosition, error) {
+	return nil, nil
+}
+
+func (f fakeTagBase) GetArticle(ctx context.Context, tenantID uint64, id string) (*types.ChessArticle, error) {
+	return nil, nil
+}
+
+func (f fakeTagBase) GetBook(ctx context.Context, tenantID uint64, id string) (*types.ChessBook, error) {
+	return nil, nil
+}
+
+func (f fakeTagBase) GetChapter(
+	ctx context.Context, tenantID uint64, id string,
+) (*types.ChessBookChapter, error) {
+	return nil, nil
+}
+
 func newFakeTagBase() fakeTagBase {
 	return fakeTagBase{
 		tags:  map[string]*types.ChessTag{},

@@ -56,7 +56,12 @@ func (r *fakeArticleRepo) GetArticle(ctx context.Context, tenantID uint64, id st
 	if !ok {
 		return nil, fmt.Errorf("article not found: %s", id)
 	}
-	return a, nil
+	// Trả BẢN SAO: GORM luôn dựng struct mới cho mỗi truy vấn. Fake trả con trỏ
+	// gốc thì caller sửa tại chỗ (vd RestoreArticleRevision gán Title/Content rồi
+	// gọi Update) sẽ vô tình đổi luôn bản trong 'DB', khiến so sánh cũ-mới thấy
+	// giống nhau và bỏ qua việc tạo phiên bản — sai lệch so với thực tế.
+	cp := *a
+	return &cp, nil
 }
 
 func (r *fakeArticleRepo) GetArticleBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessArticle, error) {
@@ -311,6 +316,29 @@ func (r *fakeArticleAliasRepo) AddAlias(ctx context.Context, tenantID uint64, ch
 }
 
 func (r *fakeArticleAliasRepo) ReplaceSynonyms(ctx context.Context, tenantID uint64, chessType, targetSlug string, aliasSlugs []string) error {
+	// Bảng thật có UNIQUE (tenant_id, chess_type, old_slug): MỘT bí danh chỉ trỏ
+	// tới ĐÚNG MỘT đích. Ghi lại bí danh đó với đích mới là UPDATE dòng cũ (ON
+	// CONFLICT old_slug), không tạo dòng thứ hai — nên không thể còn bí danh mồ
+	// côi ở đích cũ. Fake phải mô phỏng đúng ràng buộc này, nếu không
+	// RenameArticleSlug sẽ bị coi là để lại bí danh mồ côi trong khi thực tế không.
+	for _, a := range aliasSlugs {
+		for key, list := range r.synonyms {
+			if key == chessType+"/"+targetSlug {
+				continue
+			}
+			kept := make([]string, 0, len(list))
+			for _, x := range list {
+				if x != a {
+					kept = append(kept, x)
+				}
+			}
+			if len(kept) == 0 {
+				delete(r.synonyms, key)
+			} else {
+				r.synonyms[key] = kept
+			}
+		}
+	}
 	r.synonyms[chessType+"/"+targetSlug] = append([]string{}, aliasSlugs...)
 	return nil
 }

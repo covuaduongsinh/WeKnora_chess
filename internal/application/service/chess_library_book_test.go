@@ -167,7 +167,12 @@ func (r *fakeBookRepo) GetBook(ctx context.Context, tenantID uint64, id string) 
 	if !ok {
 		return nil, fmt.Errorf("book not found: %s", id)
 	}
-	return b, nil
+	// Trả BẢN SAO: GORM luôn dựng struct mới cho mỗi truy vấn. Fake trả con trỏ
+	// gốc thì caller sửa tại chỗ (vd RestoreArticleRevision gán Title/Content rồi
+	// gọi Update) sẽ vô tình đổi luôn bản trong 'DB', khiến so sánh cũ-mới thấy
+	// giống nhau và bỏ qua việc tạo phiên bản — sai lệch so với thực tế.
+	cp := *b
+	return &cp, nil
 }
 func (r *fakeBookRepo) GetBookBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessBook, error) {
 	for _, b := range r.books {
@@ -257,7 +262,12 @@ func (r *fakeBookRepo) GetChapter(ctx context.Context, tenantID uint64, id strin
 	if !ok {
 		return nil, fmt.Errorf("chapter not found: %s", id)
 	}
-	return ch, nil
+	// Trả BẢN SAO: GORM luôn dựng struct mới cho mỗi truy vấn. Fake trả con trỏ
+	// gốc thì caller sửa tại chỗ (vd RestoreArticleRevision gán Title/Content rồi
+	// gọi Update) sẽ vô tình đổi luôn bản trong 'DB', khiến so sánh cũ-mới thấy
+	// giống nhau và bỏ qua việc tạo phiên bản — sai lệch so với thực tế.
+	cp := *ch
+	return &cp, nil
 }
 func (r *fakeBookRepo) GetChapterBySlug(ctx context.Context, tenantID uint64, slug string) (*types.ChessBookChapter, error) {
 	for _, ch := range r.chapters {
