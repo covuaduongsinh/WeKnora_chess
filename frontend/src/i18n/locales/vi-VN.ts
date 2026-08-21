@@ -679,6 +679,11 @@ export default {
     batchReparseFailed: "Dựng lại hàng loạt thất bại",
     batchReparseSkippedInFlight: "Đã bỏ qua {count} tài liệu đang phân tích dở",
     allTags: "Tất cả thẻ",
+    batchTagDialogHeading: "Gắn thẻ hàng loạt",
+    batchTagSelectedSection: "Đã chọn",
+    batchTagAvailableSection: "Có thể chọn",
+    batchTagSuccess: "Đã gắn thẻ cho {count} tài liệu",
+    batchTagFailed: "Gắn thẻ hàng loạt thất bại",
   },
   uploadConfirm: {
     title: "Xác nhận tải tài liệu lên",

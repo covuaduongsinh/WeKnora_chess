@@ -23,6 +23,8 @@
 | Agent tools | `internal/agent/tools/chess_*.go` (6 tool + common + demo_test) |
 | Repository | `internal/application/repository/chess_*`, `wiki_chess_ref.go` |
 | Service | `internal/application/service/chess_*` |
+| Router | `internal/router/routes_chess.go` (từ 22/8/2026 — tách khỏi router.go khi upstream 0.7.2 module hoá) |
+| Model-handle policy | `internal/modelcontext/tool_policy_chess.go` (init() bơm policy cho 7 tool cờ, 0 dòng sửa upstream) |
 | Handler | `internal/handler/chess_*` |
 | Types | `internal/types/(interfaces/)chess_*`, `wiki_chess_ref.go` |
 | Frontend | `frontend/src/views/chess/**`, `views/chat/components/tool-results/ChessBoardDisplay.vue`, `api/chess/`, `stores/chessWikiDraft.ts`, `utils/chessBlocks.ts`, `utils/chessRef.ts` |
@@ -74,6 +76,8 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 
 ### C4 — i18n & prompt templates (Việt hóa + bỏ tiếng Trung)
 - **Bỏ** `frontend/src/i18n/locales/zh-CN.ts` (D) · **Thêm** `locales/vi-VN.ts` (A).
+- **QUY TẮC mỗi chặng merge:** chạy `grep -rn "locales/zh-CN" frontend/src` — upstream liên tục thêm test/helper đọc `zh-CN.ts` (đã gặp 3 lần: `TagEditDialog.test.ts`, `workspaceTerminology.test.ts`, rồi `BatchTagDialog.test.ts` + `localeKeyAudit.ts`). File đó fork đã xoá nên sẽ `ENOENT`/`ERR_MODULE_NOT_FOUND`; chuyển mọi tham chiếu sang `vi-VN`.
+- `frontend/src/i18n/localeKeyAudit.ts`, `frontend/src/views/knowledge/components/BatchTagDialog.test.ts`, `frontend/src/i18n/locales/workspaceTerminology.test.ts` (M, 22/8/2026) — đều đổi `zh-CN` → `vi-VN`.
 - `frontend/src/views/knowledge/components/TagEditDialog.test.ts` (M, từ 22/8/2026) — drift-guard i18n của upstream đọc danh sách locale; fork đổi `zh-CN` → `vi-VN`. **Mỗi lần upstream thêm test drift-guard kiểu này, kiểm xem nó có đọc `zh-CN.ts` không** — file đó không còn tồn tại trong fork nên test sẽ fail với `ENOENT`.
 - Sửa: `i18n/index.ts`, `i18n/embed.ts`, `locales/en-US.ts`, `locales/ko-KR.ts`, `locales/ru-RU.ts`.
 - Prompt: `config/prompt_templates/` → `agent_system_prompt.yaml`, `context_template.yaml`, `fallback.yaml`, `intent_prompts.yaml`, `rewrite.yaml`, `system_prompt.yaml`.
@@ -507,9 +511,9 @@ Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merg
 
 **Hai test upstream tự hỏng ở chính tag v0.7.0** (không phải do merge, đã xác minh bằng `git show v0.7.0:...`):
 - `workspaceTerminology.test.ts` (test MỚI, gác thuật ngữ tenant→workspace): `README_CN.md` **của chính upstream** còn 2 chỗ `租户`; `en-US`/`ko-KR`/`ru-RU` còn "tenant/테넌트" trong `capabilityManageStorageBackendsHint`. `upstream/main` đã sửa cả 4 → áp bản sửa đó.
-- Test này cũng **import `zh-CN.ts`** (fork đã xoá) → đổi sang `vi-VN` với regex cấm `tenants?`. Và nó **quét cả `mcp-server/.venv/site-packages`** (artifact pip, đầy `租户`) → thêm danh sách bỏ qua `.venv`/`node_modules`/`site-packages`/`*.egg-info`. **File này vào inventory C4.**
+- Test này cũng **import `zh-CN.ts`** (fork đã xoá) → đổi sang `vi-VN` với regex cấm `\btenants?\b`. Và nó **quét cả `mcp-server/.venv/site-packages`** (artifact pip, đầy `租户`) → thêm danh sách bỏ qua `.venv`/`node_modules`/`site-packages`/`*.egg-info`. **File này vào inventory C4.**
 - Nhân đó **Việt hoá 28 chỗ "tenant" → "không gian làm việc"** trong `vi-VN.ts` cho khớp thuật ngữ mới.
-  - ⚠️ **Bẫy đã dính:** regex `tenant` thay cả **TÊN KEY** `tenant:` → vỡ cú pháp TS (`Expected "}" but found "gian"`). Phải loại trừ dòng dạng `^\s*tenant\s*:`. Cùng loại bẫy với escape `\"` ở G2: **sửa file locale xong PHẢI chạy `npm run build`** — `npm test` và `vue-tsc` KHÔNG parse file locale nên không bắt được.
+  - ⚠️ **Bẫy đã dính:** regex `\btenant\b` thay cả **TÊN KEY** `tenant:` → vỡ cú pháp TS (`Expected "}" but found "gian"`). Phải loại trừ dòng dạng `^\s*tenant\s*:`. Cùng loại bẫy với escape `\"` ở G2: **sửa file locale xong PHẢI chạy `npm run build`** — `npm test` và `vue-tsc` KHÔNG parse file locale nên không bắt được.
 
 **Ghi nhận:** upstream sửa **migration CŨ `000041`** (đã chạy production) — kiểm ra chỉ đổi **comment SQL** (`COMMENT ON COLUMN` + chú thích), không đổi schema → vô hại, production không cần làm gì.
 
@@ -527,6 +531,44 @@ Chặng đầu của kế hoạch 0.6.2 → 0.7.2. Đo trước bằng `git merg
 - **Test `workspaceTerminology` lại fail — v0.7.1 CŨNG tự fail test của chính nó**: `.env.example` (5 chỗ) và `docker-compose.yml` (3 chỗ) còn `租户`. `upstream/main` đã dọn sạch cả hai → áp cách dọn đó (`租户` → `空间`). *(Ở chặng 0.7.0 test này đã pass; 0.7.1 mang 租户 mới vào — nên phải chạy lại test mỗi chặng, không suy ra từ chặng trước.)*
 
 **Kiểm chứng:** `go build ./...` sạch · `go vet ./internal/...` sạch · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **286/286** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà lại 10 điểm móc nối fork — còn nguyên.
+
+### G5: merge upstream `v0.7.2` (2026-08-22) — HOÀN TẤT đồng bộ 0.6.2 → 0.7.2
+17 file conflict (nhiều nhất), nhưng phần lớn cơ học: 6 file `mcp-server/`, 5 file i18n. Nội dung 0.7.2: **cây thư mục KB**, **sửa chunk + lịch sử phiên bản + revert**, **lịch sử/diff trang wiki**, URL tệp tải thẳng, gắn thẻ tài liệu hàng loạt, MCP server 1.1.x, đọc HTML cục bộ, Feishu Drive data source.
+
+**Việc lớn nhất — `router.go`: upstream rút 2636 dòng xuống 305**, tách thành `routes_agent.go`/`routes_chat.go`/`routes_knowledge.go`/`routes_infra.go`/`routes_auth_tenant.go`/`files.go`/`static.go`. Nhân dịp đó **tách 4 nhóm route cờ ra file RIÊNG `internal/router/routes_chess.go`** thay vì nhét lại vào `router.go`. Từ nay `router.go` chỉ còn 2 điểm chạm của fork (4 field `Chess*Handler` trong `RouterParams` + 4 dòng gọi trong `NewRouter`) — các chặng merge sau gần như không còn conflict router. **Đây là cải thiện thật, không phải chỉ resolve xong cho có.**
+
+**Hợp đồng MỚI của upstream mà lớp cờ phải tuân theo — `model-handle policy`:** 0.7.2 refactor "consolidate model-handle codecs" và thêm test bắt buộc **mọi tool lộ ra UI phải khai policy**; im lặng bị coi là lỗi (tool mới sẽ vô tình thoát khỏi cơ chế nén handle). 7 tool cờ chưa khai → `go test ./internal/agent/tools/` **FAIL**. Khai bằng file RIÊNG `internal/modelcontext/tool_policy_chess.go` dùng `init()` bơm vào map — **0 dòng sửa `tool_policy.go` của upstream**. Policy **rỗng** là đúng cho cả 7 (đầu vào là FEN/PGN/slug, không phải `knowledge_id`; đầu ra là bàn cờ do frontend render, không phải đoạn trích để LLM trích dẫn). *Nếu sau này thêm tool cờ đọc kho tri thức thì phải khai `sourceIDKeys`/`sourceOutput` thật.*
+
+- **`WikiBrowser.vue` (7 khối)**: upstream làm lại reader (sửa tại chỗ + drawer lịch sử). Khối meta cũ **bị xoá hẳn**, thay bằng `wiki-reader-aside-meta` + thanh nút icon → **chuyển nút "Tạo bài giảng" của fork vào thanh nút mới**, theo đúng khuôn `t-tooltip` + `wiki-action-btn` của nút "View in Graph". Ba khối map (`theme`/`label`/`color`): upstream bỏ mục `log` (0.7.2 gỡ wiki log) còn fork thêm 8 mục `chess_*` → gộp: bỏ `log`, giữ `chess_*`. Khối render content: giữ cách render theo đoạn (nhúng bàn cờ) của fork + thêm điều kiện `v-if="!editingPage"` của upstream.
+- **`container.go`**: upstream bỏ `NewWikiLogEntryRepository` → giữ `NewWikiChessRefRepository`, bỏ dòng kia.
+- **`mcp-server/` (38 khối, 6 file)**: **CỐ Ý lấy nguyên bản upstream, bỏ phần Việt hoá docstring của fork.** Đây là CLI Python phụ trợ, không phải giao diện Thầy dùng; giữ Việt hoá ở đây chỉ tạo nợ merge lặp lại mỗi chặng. `test_imports.py` bị upstream xoá → theo upstream.
+- **`wiki_page_test.go` + `wiki_page_revision_test.go`**: lại chuyện `NewWikiPageService` thiếu tham số — **lần thứ hai liên tiếp**. Đây là hệ quả cố hữu của việc fork chèn tham số vào constructor dùng chung.
+
+**`zh-CN.ts` — mẫu lỗi lặp lần thứ BA:** upstream 0.7.2 thêm `BatchTagDialog.test.ts` và `src/i18n/localeKeyAudit.ts` đều **đọc `zh-CN.ts`** (fork đã xoá) → `ENOENT` / `ERR_MODULE_NOT_FOUND`. **Quy tắc rút ra: mỗi chặng merge phải `grep -rn "locales/zh-CN" frontend/src` và chuyển mọi tham chiếu sang `vi-VN`.** Đã ghi vào mục C4.
+
+**`localeKeyAudit` — test rất giá trị, và nó bắt đúng nợ thật:** phát hiện `knowledgeEditor.wikiBrowser.createLesson` và `language.viVN` (hai khoá fork tự thêm) **thiếu ở ko-KR và ru-RU**, cùng `language.zhCN` **thừa** ở hai locale đó. Đã bổ sung/dọn. Riêng **vi-VN CỐ Ý chưa đưa vào danh sách gác** vì còn ~700 khoá upstream chưa dịch — chúng không hiện key thô nhờ `fallbackLocale` đã sửa ở G3; khi dịch xong thì thêm `'vi-VN'` vào `LOCALE_ORDER` (đã ghi comment tại chỗ + backlog).
+  - ⚠️ **Bẫy dấu phẩy lặp lại lần thứ ba** khi chèn khoá vào cuối container: dòng cuối không có `,` → vỡ cú pháp TS mà `npm test`/`vue-tsc` **không bắt được**, chỉ `npm run build` (esbuild) mới báo. Đã có script tự thêm phẩy; lần sau chèn khoá i18n thì chạy luôn bước đó.
+  - ⚠️ **Bẫy ký tự điều khiển:** viết `\b\bb` trong heredoc bash→python sinh ra **ký tự BACKSPACE thật (0x08)** trong file thay vì dấu gạch chéo + b. Đã lọt vào `workspaceTerminology.test.ts` và cả nhật ký này rồi phải quét lại bằng `grep -rlP '\bx08'`. Khi cần ký tự `\b` trong chuỗi Python qua heredoc, dùng `chr(92)`.
+
+**Kiểm chứng chặng cuối:** `go build ./...` sạch · `go vet ./internal/...` **sạch tuyệt đối** · `go test ./internal/chess/ ./internal/agent/tools/` PASS · `npm test` **385/385** · `vue-tsc --noEmit` **0 lỗi** · `npm run build` sạch. Rà 13 điểm móc nối fork — còn nguyên. `VERSION` = 0.7.2.
+  - `go test ./internal/modelcontext/` **không chạy được trên Windows**: gói này nay kéo `internal/types` nên dính crash SIGSEGV `gojieba.NewJieba` — trace cho thấy crash trong `init()`, **trước khi hàm test nào chạy**. Lỗi môi trường đã biết, không phải code. Cần CI/Linux.
+
+---
+
+## TỔNG KẾT đồng bộ upstream 0.6.2 → 0.7.2 (nhánh `chore/upstream-sync`)
+5 commit: G1 dời dải migration + G2..G5 bốn chặng merge. Khoảng cách ban đầu 603 commit / 1.771 file; tổng cộng **41 file conflict** đã giải (7 + 11 + 6 + 17).
+
+**Ba việc để lại lâu dài, quan trọng hơn bản thân việc merge:**
+1. **Migration cờ ở dải riêng `000900+`** — chấm dứt va chạm số vĩnh viễn (upstream đã tới `000084` và còn đi tiếp).
+2. **`routes_chess.go` + `tool_policy_chess.go`** — hai móc nối lớn nhất nay nằm ở file riêng của fork, `router.go` và `tool_policy.go` của upstream còn tối thiểu/0 dòng sửa.
+3. **`fallbackLocale: ['en-US','vi-VN']`** — khoá i18n upstream chưa dịch hiện tiếng Anh thay vì key thô. Sửa gốc rễ một lần, áp cho mọi chặng sau.
+
+**CHƯA làm / còn nợ:**
+- [ ] **Dịch ~700 khoá i18n** của 0.7.0/0.7.2 sang tiếng Việt (`integrations` 224, `system` 223, `agentEditor` 53, `settings` 43…), rồi thêm `'vi-VN'` vào `LOCALE_ORDER` của `localeKeyAudit.ts`.
+- [ ] **Chưa deploy production.** Phải theo `docs/deploy/upstream-sync.md`: backup → đặt `schema_migrations.version = 61` → deploy → nghiệm thu 912/false. **Bốn chặng gộp một lần deploy thì chỉ cần force về 61 MỘT lần** (runner chạy 62→79 rồi 900→912).
+- [ ] **Chưa chạy thật** (máy này không mở được trình duyệt): cần Thầy duyệt 8 tab Quản lý cờ vua, HLV AI gọi tool + `knowledge_search`, trang in, wikilink/backlink.
+- [ ] `go test` tầng service/modelcontext cần CI hoặc Linux (SIGSEGV gojieba trên Windows).
+- [ ] Việt hoá lại `mcp-server/` nếu sau này thực sự dùng (đợt này cố ý bỏ).
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).
