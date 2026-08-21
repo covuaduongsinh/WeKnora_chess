@@ -451,9 +451,9 @@ func TestDuplicateKnowledgeBase_CreatesSettingsOnlyDuplicate(t *testing.T) {
 	require.NotEmpty(t, target.ID)
 	assert.Equal(t, uint64(1), target.TenantID)
 	assert.Equal(t, "copy-user", target.CreatorID)
-	// Fork bỏ tiếng Trung: unit test không chạy middleware nên locale rỗng →
-	// nhánh default (" Copy"). Ở runtime, middleware đặt vi-VN → " Bản sao".
-	assert.Equal(t, "Source KB Copy", target.Name)
+	// Fork Dương Sinh: locale mặc định là vi → hậu tố " Bản sao".
+	// Test dùng en-US bên dưới vẫn giữ " Copy", chứng minh nhánh locale còn đúng.
+	assert.Equal(t, "Source KB Bản sao", target.Name)
 	assert.Equal(t, source.Description, target.Description)
 	assert.Equal(t, source.ChunkingConfig, target.ChunkingConfig)
 	assert.Equal(t, source.ImageProcessingConfig, target.ImageProcessingConfig)
@@ -493,7 +493,7 @@ func TestDuplicateKnowledgeBase_UsesDistinctNameWhenDuplicateExists(t *testing.T
 	}
 	repo.rows["existing-copy"] = &types.KnowledgeBase{
 		ID:       "existing-copy",
-		Name:     "Source KB Copy",
+		Name:     "Source KB Bản sao",
 		Type:     types.KnowledgeBaseTypeDocument,
 		TenantID: 1,
 	}
@@ -502,7 +502,7 @@ func TestDuplicateKnowledgeBase_UsesDistinctNameWhenDuplicateExists(t *testing.T
 	target, err := svc.DuplicateKnowledgeBase(ctxWithTenant(1), "src")
 	require.NoError(t, err)
 
-	assert.Equal(t, "Source KB Copy 2", target.Name)
+	assert.Equal(t, "Source KB Bản sao 2", target.Name)
 }
 
 func TestDuplicateKnowledgeBase_UsesLocalizedEnglishSuffix(t *testing.T) {
