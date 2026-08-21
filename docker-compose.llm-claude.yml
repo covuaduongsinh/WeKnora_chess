@@ -1,0 +1,53 @@
+# Overlay opt-in TẦNG 2 — cầu nối "Claude Agent SDK" (Meridian, MIT) để tiêu túi
+# credit đã bao trong gói Claude Pro/Max ($20/$100/$200 mỗi tháng, KHÔNG cộng dồn
+# sang tháng sau, KHÔNG trừ vào hạn mức Claude Code tương tác).
+#
+# ⚠️ CHỒNG LÊN docker-compose.llm.yml (cần bật trước): overlay này chỉ thêm một
+# service — nó KHÔNG tự đổi model nào trong config/litellm/config.yaml. Sau khi
+# service này chạy, phải TỰ TAY sửa khối `ds-smart` trong config đó (xem
+# docs/llm-gateway.md mục "Giai đoạn 2") rồi restart llm-gateway. Cố ý làm vậy
+# để bật overlay này không âm thầm đổi hành vi Giai đoạn 1 đang chạy tốt.
+#
+# Cách dùng:
+#   Đặt CLAUDE_BRIDGE_ENABLED=true + MERIDIAN_PROFILES trong .env, rồi:
+#   scripts/deploy/dc.sh up -d
+#
+# Runbook đầy đủ (gồm cách lấy token bằng `claude setup-token`): docs/llm-gateway.md
+
+services:
+  claude-bridge:
+    # Build thẳng từ repo nguồn (MIT, rynfar/meridian), KHÔNG dùng image dựng sẵn
+    # không rõ nguồn gốc. Ghim theo TAG cụ thể (không phải "main") để build có
+    # thể lặp lại — xác nhận tag này tồn tại lúc viết overlay này (2026-08-21).
+    # Nâng phiên bản là thao tác có chủ đích: đổi tag rồi build lại.
+    build:
+      context: https://github.com/rynfar/meridian.git#meridian-v1.62.7
+    container_name: WeKnora-claude-bridge
+    networks:
+      - WeKnora-network
+    restart: unless-stopped
+    environment:
+      # BẮT BUỘC. Lấy token bằng `claude setup-token` chạy trên MÁY CÓ TRÌNH
+      # DUYỆT của Thầy (đăng nhập bằng chính tài khoản Claude Pro/Max của
+      # Thầy — bước này chỉ Thầy làm được, tôi không thể đăng nhập thay).
+      # VPS Hetzner headless không cần trình duyệt nhờ đường "OAuth-token
+      # profile" này — không mount thư mục ~/.claude nào cả.
+      - MERIDIAN_PROFILES=${MERIDIAN_PROFILES:?MERIDIAN_PROFILES chua duoc dat trong .env — xem docs/llm-gateway.md muc "Giai doan 2"}
+      - MERIDIAN_DEFAULT_PROFILE=${MERIDIAN_DEFAULT_PROFILE:-ds}
+    # Chỉ kiểm tiến trình còn phản hồi HTTP hay không (liveliness), KHÔNG xác
+    # nhận token còn hợp lệ — cùng triết lý với healthcheck của llm-gateway.
+    # /v1/models là endpoint có thật (xác nhận qua README dự án) nên bất kỳ
+    # phản hồi HTTP nào (kể cả 401 do thiếu header Authorization) đã đủ chứng
+    # minh tiến trình đang sống; `-f` sẽ khiến curl coi 4xx là "chết" nên CỐ Ý
+    # không dùng `-f`.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- --timeout=5 http://127.0.0.1:3456/v1/models >/dev/null 2>&1 || wget -q -S -O /dev/null --timeout=5 http://127.0.0.1:3456/v1/models 2>&1 | grep -q 'HTTP/' "]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+    # Node.js đơn tiến trình, không xử lý embedding/model nặng — trần thấp là đủ.
+    mem_limit: 384m
+    # CỐ Ý không publish port ra host: chỉ phục vụ nội bộ WeKnora-network,
+    # và chỉ được `config/litellm/config.yaml` gọi tới sau khi Thầy tự sửa
+    # khối `ds-smart` theo runbook.

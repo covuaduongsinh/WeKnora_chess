@@ -1,0 +1,74 @@
+# Overlay opt-in: cổng LLM (LiteLLM) — gom mọi lời gọi model về MỘT endpoint
+# OpenAI-compatible nội bộ, để WeKnora không phải biết gì về nhà cung cấp.
+#
+# Cách dùng:
+#   Đặt LLM_GATEWAY_ENABLED=true trong .env, rồi:
+#   scripts/deploy/dc.sh up -d
+#
+#   Hoặc chạy tay:
+#   docker compose -f docker-compose.yml -f docker-compose.llm.yml up -d
+#
+# Overlay này:
+#   - Thêm service llm-gateway (LiteLLM Proxy, image công khai — KHÔNG cần build).
+#   - Nối "llm-gateway" vào SSRF_WHITELIST_EXTRA của app (BẮT BUỘC, xem ghi chú dưới).
+#
+# Không sửa docker-compose.yml gốc nên các triển khai hiện có không bị ảnh hưởng.
+# Runbook đầy đủ: docs/llm-gateway.md
+
+services:
+  llm-gateway:
+    # Ghim tag "stable" thay vì "main" để một bản LiteLLM hỏng không tự lọt vào
+    # production khi pull. Nâng phiên bản là thao tác có chủ đích.
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: WeKnora-llm-gateway
+    networks:
+      - WeKnora-network
+    restart: unless-stopped
+    # Mount config từ host: đổi model/fallback chỉ cần sửa file + restart,
+    # KHÔNG phải rebuild (cùng khuôn với config/builtin_agents.yaml của lớp cờ).
+    volumes:
+      - ./config/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    environment:
+      # Khóa bảo vệ chính cổng này. WeKnora sẽ dùng đúng chuỗi này làm api_key
+      # khi khai model. Không đặt = ai vào được mạng docker cũng gọi được.
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY chua duoc dat trong .env}
+      # Khóa các nhà cung cấp. Chỉ cần khai cái nào thật sự dùng trong
+      # config/litellm/config.yaml; phần còn lại để rỗng là được.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${LLM_GATEWAY_OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${LLM_GATEWAY_ANTHROPIC_API_KEY:-}
+      # Tắt telemetry ra ngoài.
+      - LITELLM_DONT_SHOW_FEEDBACK_BOX=True
+      - LITELLM_LOG=${LITELLM_LOG:-INFO}
+    # Liveliness chỉ kiểm tiến trình còn sống, KHÔNG gọi thử nhà cung cấp —
+    # nên key sai/hết quota sẽ không làm container thành unhealthy và chặn app.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    # VPS Hetzner chỉ ~8GB và đã chật (postgres + qdrant + app + docreader +
+    # frontend + chess-engine). Chặn trần để LiteLLM không bóp chết phần còn lại.
+    # Nếu container bị OOM-kill (docker inspect → OOMKilled: true) thì nới lên.
+    mem_limit: 768m
+    # CỐ Ý không publish port ra host: cổng này chỉ phục vụ nội bộ
+    # WeKnora-network. Muốn soi từ ngoài thì dùng `docker compose exec`.
+
+  app:
+    # Dùng định dạng list cho khớp environment ở docker-compose.yml (tránh lỗi merge).
+    environment:
+      # ⚠️ BẮT BUỘC — nếu thiếu dòng này thì lưu model sẽ báo lỗi Base URL và
+      # mọi lời gọi runtime đều bị chặn. Lý do: internal/utils/security.go
+      # (isSSRFSafeURL + SSRFSafeDialContext) chặn mặc định mọi IP riêng, mà
+      # llm-gateway nằm trên dải 172.x của WeKnora-network. Whitelist được kiểm
+      # TRƯỚC mọi tầng khác (ValidateURLForSSRF:1190) nên một dòng này là đủ.
+      #
+      # Viết dạng "${VAR:-mặc-định-của-compose-gốc},llm-gateway" để NỐI THÊM chứ
+      # không ghi đè: giá trị Thầy đặt trong .env (nếu có) vẫn được giữ nguyên.
+      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-searxng,qdrant,milvus,weaviate,doris-fe},llm-gateway
+    depends_on:
+      llm-gateway:
+        condition: service_healthy

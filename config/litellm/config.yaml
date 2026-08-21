@@ -1,0 +1,97 @@
+# LiteLLM Proxy — cổng LLM dùng chung cho WeKnora_chess
+#
+# File này được MOUNT TỪ HOST (xem docker-compose.llm.yml) → sửa xong chỉ cần:
+#   scripts/deploy/dc.sh restart llm-gateway
+# KHÔNG phải rebuild image.
+#
+# Ý tưởng: WeKnora chỉ thấy 4 cái tên dưới đây (ds-fast / ds-chat / ds-smart /
+# ds-embed). Đằng sau mỗi tên là nhà cung cấp nào, hết quota thì rơi sang đâu —
+# đổi ở đây, WeKnora không cần biết và không phải sửa gì.
+#
+# ⚠️ TÊN MODEL CỦA GOOGLE ĐỔI THEO THỜI GIAN. Trước khi chạy lần đầu, liệt kê
+#    model đang khả dụng với key của Thầy rồi điền lại cho khớp:
+#      curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
+#        | grep -o '"name": "models/[^"]*"'
+#    Điền sai tên thì lời gọi sẽ lỗi 404 model-not-found, thấy ngay trong log.
+
+model_list:
+
+  # ── ds-fast ──────────────────────────────────────────────────────────────
+  # Việc rẻ tiền, tần suất CAO: viết lại truy vấn, nhận diện ý định, đặt tiêu đề
+  # hội thoại. Đây là nhóm tốn nhiều lượt gọi nhất nhưng đòi hỏi chất lượng thấp
+  # nhất — tách riêng ra model rẻ là chỗ tiết kiệm lớn nhất.
+  - model_name: ds-fast
+    litellm_params:
+      model: gemini/gemini-flash-lite-latest
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ── ds-chat ──────────────────────────────────────────────────────────────
+  # Xương sống: trả lời RAG + agent "HLV Cờ vua".
+  # ⚠️ Agent cờ gọi 7 tool qua function-calling chuẩn OpenAI, nên model gán ở đây
+  #    BẮT BUỘC phải hỗ trợ tool calling tốt. Đừng gán model chỉ biết sinh văn bản.
+  - model_name: ds-chat
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Đích dự phòng của ds-chat khi Gemini hết hạn ngạch ngày (429) hoặc lỗi.
+  # CỐ Ý để tên riêng thay vì khai trùng "ds-chat": như vậy WeKnora không bao giờ
+  # tự chọn thẳng vào nhánh trả phí, chỉ router mới đẩy sang khi cần.
+  # Bỏ trống DEEPSEEK_API_KEY thì nhánh này im lặng không dùng được — khi đó
+  # hết quota là lỗi thẳng, đúng ý "không tự tiêu tiền".
+  - model_name: ds-chat-backup
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # ── ds-smart ─────────────────────────────────────────────────────────────
+  # Việc nặng, tần suất THẤP: Wiki synthesis, soạn giáo trình/nội dung dài.
+  #
+  # GIAI ĐOẠN 1 (hiện tại): trỏ tạm về Gemini để cấu hình đầy đủ ngay từ đầu —
+  # WeKnora tham chiếu tên "ds-smart" mà ở đây không khai là lỗi lúc chạy.
+  #
+  # GIAI ĐOẠN 2 (tùy chọn): đổi 3 dòng dưới sang cầu nối Claude Agent SDK để
+  # tiêu túi credit đã bao trong gói Max ($100/$200 mỗi tháng, KHÔNG cộng dồn):
+  #     model: openai/claude-sonnet-4-6
+  #     api_base: http://claude-bridge:3456/v1
+  #     api_key: dummy
+  # Xem docs/llm-gateway.md mục "Giai đoạn 2" trước khi bật.
+  - model_name: ds-smart
+    litellm_params:
+      model: gemini/gemini-flash-latest
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ── ds-embed ─────────────────────────────────────────────────────────────
+  # ⚠️ KHAI SẴN NHƯNG CHƯA DÙNG. Đổi model embedding là đổi số chiều vector và
+  #    cả không gian vector ⇒ PHẢI index lại toàn bộ KB "Tri thức cờ vua" (cả 8
+  #    loại nội dung). Giữ nguyên embedding hiện có; nếu về sau thật sự cần đổi
+  #    thì làm thành một đợt riêng theo docs/chess-rag-enable.md.
+  - model_name: ds-embed
+    litellm_params:
+      model: gemini/gemini-embedding-001
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  num_retries: 2
+  # Hết hạn ngạch ngày của free tier (429) → rơi sang nhánh dự phòng thay vì
+  # ném lỗi vào mặt người dùng. ds-fast rơi về ds-chat vì cùng nhà cung cấp
+  # nhưng khác hạn ngạch model.
+  fallbacks:
+    - ds-chat: ["ds-chat-backup"]
+    - ds-fast: ["ds-chat"]
+    - ds-smart: ["ds-chat"]
+
+litellm_settings:
+  # ⚠️ QUAN TRỌNG — đừng tắt. WeKnora gửi kèm frequency_penalty /
+  # presence_penalty / parallel_tool_calls (internal/models/chat/openai_request.go:118-174).
+  # Gemini không nhận hết các tham số này; không có drop_params thì LiteLLM trả
+  # lỗi 400 cho MỌI request thay vì lặng lẽ bỏ tham số thừa.
+  drop_params: true
+  # Trần chống cháy túi cho các nhánh TRẢ PHÍ. Free tier không tính vào đây.
+  # Lưu ý: không cắm database thì hạn mức này chỉ sống trong bộ nhớ tiến trình
+  # và reset khi restart container — coi là lưới an toàn, không phải kế toán.
+  max_budget: 5
+  budget_duration: 30d
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
