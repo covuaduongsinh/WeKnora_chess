@@ -56,9 +56,10 @@ git switch -c chore/upstream-sync
 git merge v0.6.3      # rồi v0.7.0 → v0.7.1 → v0.7.2
 ```
 
-### Bốn bước kiểm BẮT BUỘC mỗi chặng (rút từ lần merge 0.6.2→0.7.2)
+### Năm bước kiểm BẮT BUỘC mỗi chặng (rút từ lần merge 0.6.2→0.7.2)
 
-Bốn lỗi dưới đây đều **không hiện trong danh sách conflict của git** — chỉ lộ khi build/test:
+Năm lỗi dưới đây đều **không hiện trong danh sách conflict của git** — chỉ lộ khi build/test,
+hoặc tệ hơn là **không lộ ra gì cả** (mục 5).
 
 1. **`grep -rn "locales/zh-CN" frontend/src`** — upstream liên tục thêm test/helper đọc `zh-CN.ts`,
    file mà fork đã xoá. Đã gặp **3 lần** trong 4 chặng (`TagEditDialog.test.ts`,
@@ -73,6 +74,23 @@ Bốn lỗi dưới đây đều **không hiện trong danh sách conflict của
 4. **`go test ./internal/agent/tools/`** — 0.7.2 đặt ra hợp đồng "mọi tool lộ ra UI phải khai
    model-handle policy". Tool cờ khai ở `internal/modelcontext/tool_policy_chess.go` (file riêng,
    dùng `init()`). Thêm tool cờ mới thì **phải thêm tên vào đó**, nếu không test đỏ.
+5. **Đối chiếu default `SSRF_WHITELIST_EXTRA` giữa `docker-compose.yml` và `docker-compose.llm.yml`.**
+   Overlay cổng LLM buộc phải **chép lặp** danh sách mặc định của compose gốc (để nối thêm
+   `llm-gateway` mà không ghi đè giá trị trong `.env`), nên upstream thêm service mới vào
+   danh sách đó là overlay **lệch âm thầm** — không lỗi, không cảnh báo, chỉ mất whitelist.
+   Đã dính một lần: 0.7.x thêm `doris-be` (Stream Load đi theo redirect FE→BE cần Basic
+   credentials trên host BE đã whitelist) mà overlay còn giữ danh sách cũ.
+   Kiểm bằng lệnh so hai bên:
+   ```bash
+   grep -n 'SSRF_WHITELIST_EXTRA' docker-compose.yml docker-compose.llm.yml
+   # rồi xác nhận kết quả merge thật:
+   LITELLM_MASTER_KEY=dummy docker compose      -f docker-compose.yml -f docker-compose.chess.yml -f docker-compose.llm.yml      config | grep SSRF_WHITELIST_EXTRA
+   ```
+   ⚠️ **Không** "sửa cho gọn" bằng cách đổi sang `SSRF_WHITELIST`: từ 0.7.x,
+   `applySSRFWhitelist` (`internal/application/service/system_setting.go`) đọc whitelist chính
+   qua resolver 3 tầng `GetStringList("ssrf.whitelist", "SSRF_WHITELIST", …)` — hễ có setting
+   `ssrf.whitelist` trong DB (sửa qua giao diện) là biến môi trường `SSRF_WHITELIST` bị bỏ qua.
+   Chỉ `SSRF_WHITELIST_EXTRA` mới luôn được merge tươi từ ENV.
 
 ### File luôn phải kiểm bằng tay sau merge
 

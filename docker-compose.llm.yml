@@ -44,12 +44,18 @@ services:
       - LITELLM_LOG=${LITELLM_LOG:-INFO}
     # Liveliness chỉ kiểm tiến trình còn sống, KHÔNG gọi thử nhà cung cấp —
     # nên key sai/hết quota sẽ không làm container thành unhealthy và chặn app.
+    # ⚠️ Image này KHÔNG có curl lẫn wget — bắt buộc dùng python3 (đã xác nhận
+    # bằng `command -v` trong container thật). Nhưng spawn python3 ở đây tốn
+    # ~7,5 giây đo được, nên timeout phải rộng: đặt 5s như ban đầu thì
+    # healthcheck luôn báo "exceeded timeout", container thành unhealthy, và
+    # `app` (depends_on: service_healthy) KHÔNG BAO GIỜ KHỞI ĐỘNG ĐƯỢC.
+    # start_period cũng phải rộng vì LiteLLM nạp rất nhiều thư viện lúc boot.
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\" || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
+      interval: 30s
+      timeout: 25s
+      retries: 5
+      start_period: 180s
     # VPS Hetzner chỉ ~8GB và đã chật (postgres + qdrant + app + docreader +
     # frontend + chess-engine). Chặn trần để LiteLLM không bóp chết phần còn lại.
     # Nếu container bị OOM-kill (docker inspect → OOMKilled: true) thì nới lên.
@@ -64,11 +70,34 @@ services:
       # mọi lời gọi runtime đều bị chặn. Lý do: internal/utils/security.go
       # (isSSRFSafeURL + SSRFSafeDialContext) chặn mặc định mọi IP riêng, mà
       # llm-gateway nằm trên dải 172.x của WeKnora-network. Whitelist được kiểm
-      # TRƯỚC mọi tầng khác (ValidateURLForSSRF:1190) nên một dòng này là đủ.
+      # TRƯỚC mọi tầng khác (ValidateURLForSSRF, security.go:1224) nên đủ 1 dòng.
       #
       # Viết dạng "${VAR:-mặc-định-của-compose-gốc},llm-gateway" để NỐI THÊM chứ
       # không ghi đè: giá trị Thầy đặt trong .env (nếu có) vẫn được giữ nguyên.
-      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-searxng,qdrant,milvus,weaviate,doris-fe},llm-gateway
+      #
+      # ⚠️⚠️ PHẢI DÙNG `SSRF_WHITELIST_EXTRA`, KHÔNG ĐƯỢC ĐỔI SANG `SSRF_WHITELIST`.
+      # Từ 0.7.x, applySSRFWhitelist (service/system_setting.go:484-499) đọc
+      # whitelist chính bằng resolver 3 tầng GetStringList("ssrf.whitelist",
+      # "SSRF_WHITELIST", …): hễ có setting `ssrf.whitelist` trong DB (Thầy sửa
+      # qua giao diện) là biến môi trường SSRF_WHITELIST bị BỎ QUA — llm-gateway
+      # sẽ biến mất âm thầm. Còn SSRF_WHITELIST_EXTRA thì LUÔN được merge tươi
+      # từ ENV mỗi lần preload/Update/reload, không bao giờ bị DB ghi đè.
+      #
+      # ⚠️ MỖI CHẶNG MERGE UPSTREAM PHẢI ĐỐI CHIẾU LẠI danh sách mặc định dưới đây
+      # với `docker-compose.yml` (khoá SSRF_WHITELIST_EXTRA). Đây là chỗ DUY NHẤT
+      # buộc phải chép lặp giá trị của upstream; lệch là lỗi CÂM. Đã dính một lần:
+      # upstream 0.7.x thêm `doris-be` (Stream Load đi theo redirect FE→BE cần
+      # Basic credentials trên host BE đã whitelist) mà overlay này còn giữ danh
+      # sách cũ → bật cổng LLM là mất whitelist doris-be. Xem docs/deploy/upstream-sync.md.
+      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-searxng,qdrant,milvus,weaviate,doris-fe,doris-be},llm-gateway
+    # CỐ Ý dùng service_started, KHÔNG phải service_healthy.
+    # Bài học từ lần bật thử đầu tiên: với service_healthy, chỉ cần cổng LLM
+    # unhealthy vì bất kỳ lý do gì (healthcheck quá chặt, key sai, image lỗi)
+    # là `app` — trái tim của cả hệ thống — nằm im ở trạng thái `Created`, cả
+    # web chết theo. Cổng LLM chỉ là thành phần PHỤ TRỢ, không được phép có
+    # quyền chặn app khởi động. Đánh đổi: vài request LLM đầu tiên có thể lỗi
+    # nếu app hỏi trước lúc cổng sẵn sàng — nhưng nó tự phục hồi, còn app chết
+    # thì không.
     depends_on:
       llm-gateway:
-        condition: service_healthy
+        condition: service_started

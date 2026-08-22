@@ -208,8 +208,8 @@ Mục 3.1–3.4 dựng từ tài liệu chính thức của Meridian (README + `
 `internal/types/model.go:126` có cột `is_default`, và giao diện hiện nhãn "Mặc định" — nhưng **không có logic chọn model runtime nào đọc nó**:
 
 - `selectChatModelID` — `internal/application/service/session_knowledge_qa.go:234-311`
-- `resolveChatModelID` — `internal/application/service/session_qa_helpers.go:55-77`
-- `GenerateTitle` — `internal/application/service/session.go:471-490`
+- `resolveChatModelID` — `internal/application/service/session_qa_helpers.go:95-130`
+- `GenerateTitle` — `internal/application/service/session.go:615-720`
 
 Cả ba đều fallback bằng **"model `KnowledgeQA` đầu tiên trong `ListModels`"**, tức **theo thứ tự CSDL**. `is_default` cũng **không set được qua giao diện** (`CreateModelRequest` không có trường này) — nó chỉ được gán từ `config/builtin_models.yaml` lúc khởi động.
 
