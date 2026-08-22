@@ -9,7 +9,7 @@
 
 Fork của [Tencent/WeKnora](https://github.com/Tencent/WeKnora) (knowledge platform LLM: RAG + ReAct Agent + Auto-Wiki), **đã được xây thêm cả một lớp cờ vua (chess layer)** xuyên suốt backend Go, frontend Vue và CSDL — phục vụ Công ty CP Cờ vua Dương Sinh (slogan *"Vui trí tuệ"*).
 
-- **Phiên bản nền:** WeKnora **v0.6.2** (xem `VERSION`, `CHANGELOG.md`).
+- **Phiên bản nền:** WeKnora **v0.7.2** (xem `VERSION`, `CHANGELOG.md`). Đồng bộ 0.6.2 → 0.7.2 ngày 22/8/2026 — quy trình: `docs/deploy/upstream-sync.md`.
 - **Nhánh chính:** `main`. **Production:** `weknora.covuaduongsinh.com`.
 - **Định hướng:** cờ vua là **công cụ giáo dục** cho trẻ em; ưu tiên **phong trào hơn thành tích**. Khi phân vân hướng sản phẩm, chọn cái phục vụ học viên nhỏ tuổi và HLV phong trào.
 
@@ -42,7 +42,7 @@ Fork của [Tencent/WeKnora](https://github.com/Tencent/WeKnora) (knowledge plat
 | Service | `internal/application/service/chess_*` | course, knowledge_indexer, knowledge_text, library, library_position, **library_book**, resolve, slug |
 | Handler (API) | `internal/handler/chess_*` | course, library, position, **book**, ref — vd `GET /api/v1/chess/refs/search?q=` |
 | Types | `internal/types/...chess_*`, `wiki_chess_ref.go` | kiểu dữ liệu & interfaces |
-| Migrations | `migrations/versioned/000900`–`000909` | courses, games_puzzles, slugs, wiki_chess_refs, course_slug, refs_source_type, slug_aliases, kb_index, chess_positions, **chess_books (kệ/sách/chương/ảnh/phiên bản)** |
+| Migrations | `migrations/versioned/000900`–`000912` (13 cái) | courses, games_puzzles, slugs, wiki_chess_refs, course_slug, refs_source_type, slug_aliases, kb_index, chess_positions, **chess_books** (kệ/sách/chương/ảnh/phiên bản), **chess_articles** (Ngân hàng bài viết + chuyên mục), **chess_tags** (hệ thẻ thống nhất 8 loại), **chess_search_text** (cột khử dấu + GIN trigram) |
 | Frontend | `frontend/src/views/chess/` (ChessCourses, ChessManage, GameLibrary, PuzzleBank, PositionBank, **BookLibrary, BookPrint** + components), `views/chat/components/tool-results/ChessBoardDisplay.vue`, `api/chess/`, `stores/chessWikiDraft.ts`, `utils/chessBlocks.ts`, `utils/chessRef.ts` | UI quản lý cờ, bàn cờ tương tác, wikilink, **thư viện sách** |
 | Agent cấu hình | `config/builtin_agents.yaml` → agent `builtin-chess-coach` ("HLV Cờ vua") | system prompt tiếng Việt + 6 chess tools |
 | Docker | `docker-compose.chess.yml`, `docker/Dockerfile.chess-engine`, `docker/chess-engine/uci_http_bridge.py` | overlay engine |

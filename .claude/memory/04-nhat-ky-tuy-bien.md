@@ -5,7 +5,7 @@
 
 ## Thông tin fork
 - **Upstream:** `https://github.com/Tencent/WeKnora` · **Origin:** `github.com/covuaduongsinh/WeKnora_chess`
-- **Nền:** v0.6.2 · **Nhánh:** `main` · **Production:** `weknora.covuaduongsinh.com`
+- **Nền:** v0.7.2 (đồng bộ 0.6.2 → 0.7.2 ngày 22/8/2026) · **Nhánh:** `main` · **Production:** `weknora.covuaduongsinh.com`
 - **Điểm rẽ nhánh (merge-base) lúc lập inventory:** `5d0d317a` (2026-06-22). Upstream tip khi đó: `7d8a80ae` (2026-06-28).
 - **Quy mô tùy biến (diff `upstream/main...HEAD`):** ~75 file lớp cờ (mới) · **76 file dùng chung bị SỬA** · 1 file bị XÓA · 39 file mới non-chess (deploy/lite/i18n).
 - **Cập nhật lại inventory:**
@@ -20,7 +20,7 @@
 | Vùng | Đường dẫn |
 |---|---|
 | Engine | `internal/chess/` (board, engine, uci_engine, http_engine, *_test) |
-| Agent tools | `internal/agent/tools/chess_*.go` (6 tool + common + demo_test) |
+| Agent tools | `internal/agent/tools/chess_*.go` (7 tool + common + openings_data + test) |
 | Repository | `internal/application/repository/chess_*`, `wiki_chess_ref.go` |
 | Service | `internal/application/service/chess_*` |
 | Router | `internal/router/routes_chess.go` (từ 22/8/2026 — tách khỏi router.go khi upstream 0.7.2 module hoá) |
@@ -45,7 +45,7 @@ courses · games_puzzles · slugs · wiki_chess_refs · course_slug · refs_sour
 |---|---|---|
 | `internal/application/service/agent_service.go` | Gắn agent/tool cờ vào luồng agent. **WS1 (nối Puzzle Bank):** +field `chessLibraryService` + param `NewAgentService` + truyền vào `NewChessGeneratePuzzleTool(s.chessLibraryService)` để tool ra bài tập từ DB. | 32× |
 | `internal/config/config.go` | Đọc `WEKNORA_CHESS_*` (engine + `CHESS_EVALUATE_*`/`CHESS_LOOKUP_OPENING_LIMIT`). ⚠️ **KHÔNG** đọc `CHESS_KB_INDEX` — gate đó đọc thẳng bằng `os.Getenv` trong `chess_knowledge_indexer.go` (`Enabled()`), đừng tìm nhầm ở đây | 23× |
-| `internal/agent/tools/definitions.go` | Đăng ký 6 tool `chess_*` vào registry | 21× |
+| `internal/agent/tools/definitions.go` | Đăng ký 7 tool `chess_*` vào registry | 21× |
 | `internal/router/router.go` | Mount route `/api/v1/chess/...`. **WS2:** +nhóm `/chess/library` với `POST /reindex` (backfill KB cờ). **WS-RAG:** +`GET /chess/library/index-status` (chẩn đoán RAG, Contributor). | 17× |
 | `internal/container/container.go` | Wiring DI service/repo cờ | 11× |
 | `internal/types/custom_agent.go` | Field phục vụ agent cờ | 3× |
@@ -607,6 +607,17 @@ Upstream 0.7.x đổi `docker-compose.yml` từ `DB_HOST=postgres` (cứng) sang
 **Nghiệm thu production:** `schema_migrations` = **912, dirty=false** · **74 bảng** (đủ `mcp_oauth_clients`, `storage_backends`, `chunk_revisions`, `wiki_page_revisions`, `chess_tags`, `chess_tag_items`) · dữ liệu **nguyên vẹn** (2 sách, 1 bài viết, 35 ván, 3 bài giảng, 32 tài liệu — khớp trước deploy) · `/health` 200 · chess-engine `ok` · `https://weknora.covuaduongsinh.com` 200 · log 3 phút đầu **không lỗi** · **10/10 route cờ trả 401 chứ không phải 404** (xác nhận `routes_chess.go` mới đăng ký đúng sau khi upstream tách router).
 
 **Kiểm chứng migration TRƯỚC khi đụng production:** dựng DB tạm từ bản sao DB thật rồi chạy đúng runbook (force 61 → 20 migration upstream → 13 migration cờ). **33/33 sạch**, migration cờ chạy lại đúng là no-op — chứng minh tính idempotent trên dữ liệu thật thay vì suy luận từ việc đọc SQL. 60 → 74 bảng, dữ liệu cờ nguyên vẹn.
+
+### Rà soát đồng bộ sau upstream 0.7.2 — cổng LLM + tài liệu (2026-08-22)
+Rà lại toàn bộ lớp cờ sau khi đợt đồng bộ 0.6.2 → 0.7.2 đã deploy xong (3 agent song song: migrations/backend · cổng LLM · frontend). **Lớp cờ không mất gì** — 11 trang Vue + 16 component, `internal/chess/`, 7 tool, agent "HLV Cờ vua" (tên vi-VN, `kb_selection_mode: all`, đủ `knowledge_search`), i18n vi-VN, brand CSS/font, DOMPurify `data-chess-*`, node cờ WikiBrowser đều nguyên vẹn; 0 conflict marker sót. Nhưng lộ ra **một regression thật** ở cổng LLM và một loạt tài liệu ghi số cũ.
+
+- **⚠️ REGRESSION `doris-be` — mẫu lỗi đáng nhớ nhất đợt này.** `docker-compose.llm.yml` phải **chép lặp** danh sách mặc định `SSRF_WHITELIST_EXTRA` của `docker-compose.yml` (để nối thêm `llm-gateway` mà vẫn giữ giá trị Thầy đặt trong `.env`). Upstream 0.7.x thêm `doris-be` vào danh sách đó (Stream Load đi theo redirect FE→BE cần Basic credentials trên host BE đã whitelist) — overlay còn giữ bản cũ ⇒ **bật cổng LLM là ghi đè mất whitelist `doris-be`**, không lỗi, không cảnh báo. Đã đồng bộ lại và **thêm bước kiểm thứ 5** vào `docs/deploy/upstream-sync.md` (mỗi chặng merge phải đối chiếu 2 file + chạy `docker compose config | grep SSRF_WHITELIST_EXTRA`). Kiểm chứng thật: mặc định ra đủ 7 mục; đặt `SSRF_WHITELIST_EXTRA=abc` thì ra `abc,llm-gateway` (vẫn nối thêm, không ghi đè).
+  - **Đã cân nhắc và BÁC BỎ "cho gọn bằng cách đổi sang `SSRF_WHITELIST`":** từ 0.7.x `applySSRFWhitelist` (`service/system_setting.go:484-499`) đọc whitelist chính qua resolver 3 tầng `GetStringList("ssrf.whitelist", "SSRF_WHITELIST", …)` — hễ có setting `ssrf.whitelist` trong DB (sửa qua giao diện) là **ENV `SSRF_WHITELIST` bị bỏ qua**, `llm-gateway` biến mất âm thầm. Chỉ `SSRF_WHITELIST_EXTRA` mới **luôn** được merge tươi từ ENV (dòng 487-495). ⇒ bắt buộc giữ `SSRF_WHITELIST_EXTRA` và chấp nhận việc phải đồng bộ tay, bù lại bằng checklist.
+- **Hai bản vá `docker-compose.llm.yml` từ lần chạy thử thật** (phiên trước, nay chốt lại): (1) healthcheck `timeout` 5s→**25s**, `start_period` 40s→**180s** — image LiteLLM **không có `curl`/`wget`**, buộc dùng `python3`, mà spawn python tốn **~7,5s đo được** > timeout 5s ⇒ container LUÔN `unhealthy`; (2) `depends_on` `service_healthy`→**`service_started`** — với `service_healthy`, gateway hỏng vì bất kỳ lý do gì là `app` nằm im ở `Created`, **cả web chết theo** (đã xảy ra thật lúc bật thử). Nguyên tắc rút ra: **thành phần phụ trợ không được có quyền chặn `app` khởi động.**
+- **Số dòng tham chiếu lệch sau sync** (nội dung vẫn đúng, chỉ trỏ sai chỗ): `ValidateURLForSSRF` `security.go:1190`→**1224**; `resolveChatModelID` `session_qa_helpers.go:55-77`→**95-130**; `GenerateTitle` `session.go:471-490`→**615-720**. Đã xác minh lại **cạm bẫy `is_default` vẫn còn nguyên** sau sync: cả 3 hàm vẫn fallback bằng "model `KnowledgeQA` đầu tiên trong `ListModels`", `CreateModelRequest` vẫn không có trường đó.
+- **`.env.example` thiếu hẳn nhóm biến Giai đoạn 3**: `CLAUDE_BRIDGE_ENABLED`/`MERIDIAN_PROFILES`/`MERIDIAN_DEFAULT_PROFILE` được `docker-compose.llm-claude.yml` + `dc.sh` + `pull-deploy.sh` dùng nhưng không xuất hiện ở đâu trong `.env.example`. Đã bổ sung (comment-out) vào khối `[Dương Sinh] Cổng LLM`.
+- **Tài liệu ghi số/thông tin cũ đã sửa:** nền `v0.6.2`→**`v0.7.2`** (`AGENTS.md`, memory 03, memory 04); dải migration cờ liệt kê dừng ở `000909`→**đủ `000900`–`000912`** (`AGENTS.md`, memory 03, kèm ghi chú "mới đánh tiếp từ `000913`"); memory 05 playbook: `kb_selection_mode: none`→**`all`**, "6 tool"→**7 tool**, migration `000908+`→**`000913+`**, và viết lại bước 4 mục 5.4 (YAML đã cấu hình sẵn, chỉ còn xác nhận + cạm bẫy bản ghi đè `custom_agents`); memory 04 mục A/C1 "6 tool"→**7 tool**. Bổ sung `routes_chess.go`, `tool_policy_chess.go`, `search_rank.go`, `text.go` vào bản đồ kiến trúc memory 03.
+- **KHÔNG đụng** `.github/workflows/cicd-deploy.yml` (đang có thay đổi chưa commit) và các số `000063`–`000079` trong `docs/QA.md` (của upstream, đúng).
 
 ### Backlog cũ
 - [x] Áp nhận diện thương hiệu Dương Sinh (`#2B3990` navy + xanh, logo) vào `frontend/` — xong WS4a (màu+logo+title). *Còn có thể làm thêm:* pattern ô cờ nền, font Roboto bundle (hiện chỉ promote trong font-stack).

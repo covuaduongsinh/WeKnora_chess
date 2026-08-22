@@ -15,8 +15,8 @@ Overlay đã mount `config/builtin_agents.yaml` từ host → chỉnh agent HLV 
 
 ## 5.2. Agent "HLV Cờ vua" (đã có)
 Định nghĩa: `config/builtin_agents.yaml` → `builtin-chess-coach`.
-- System prompt tiếng Việt, hướng dạy học; `kb_selection_mode: none`.
-- 6 tool: `chess_analyze_position` (đánh giá thế cờ/FEN), `chess_best_move` (nước tốt nhất), `chess_evaluate_game` (chấm ván/PGN), `chess_explain_move` (giải thích 1 nước), `chess_lookup_opening` (tra khai cuộc), `chess_generate_puzzle` (sinh bài tập) + `thinking`.
+- System prompt tiếng Việt, hướng dạy học; `kb_selection_mode: "all"` (RAG cờ ĐÃ bật — xem 5.4).
+- **7 tool cờ**: `chess_analyze_position` (đánh giá thế cờ/FEN), `chess_best_move` (nước tốt nhất), `chess_evaluate_game` (chấm ván/PGN), `chess_explain_move` (giải thích 1 nước), `chess_lookup_opening` (tra khai cuộc), `chess_generate_puzzle` (sinh bài tập), `chess_lookup_position` (tra Ngân hàng thế cờ) — cộng `thinking`, `knowledge_search`, `grep_chunks`.
 - Tool cờ tự render **bàn cờ tương tác**; agent chỉ diễn giải kết quả bằng lời. Có thể chèn ` ```chess ` chứa FEN/PGN để hiển thị bàn cờ không cần gọi tool.
 
 **Chỉnh agent:** sửa block `builtin-chess-coach` trong YAML (prompt, temperature, allowed_tools…) → `docker compose ... restart app`. Mọi sửa đổi file dùng chung này → ghi `04-nhat-ky-tuy-bien.md` (mục C).
@@ -28,13 +28,15 @@ Cú pháp: `[[game/<slug>|Nhãn]]`, nhúng `![[…]]`. Loại: `game` / `positio
 - Link sai nhẹ vẫn mở đúng nhờ fuzzy; link gãy hẳn có nút "Tạo mới".
 - Chi tiết & demo: `docs/chess-wikilink-demo.md` (`node scripts/seed_chess_wikilink_demo.mjs` để tạo dữ liệu demo — cần `API_KEY` tenant lấy ở UI Cài đặt → API key).
 
-## 5.4. Bật RAG cờ (tùy chọn — mặc định TẮT)
-Để agent HLV **trích dẫn lý thuyết/sách/ván mẫu** từ kho tri thức:
+## 5.4. Bật RAG cờ (`CHESS_KB_INDEX` mặc định TẮT trong code, đã BẬT ở production)
+Để agent HLV **trích dẫn lý thuyết/sách/bài viết/ván mẫu** từ kho tri thức:
 1. Đảm bảo tenant có ≥1 KB đã cấu hình embedding (KB cờ sẽ sao chép cấu hình đó).
 2. Đặt `CHESS_KB_INDEX=true` cho service `app` (cần embedding + vector store + worker chạy ổn).
-3. Tạo/sửa ván/thế/bài giảng → KB **"Tri thức cờ vua"** tự sinh bản ghi (best-effort, không chặn thao tác; import PGN hàng loạt KHÔNG trigger).
-4. Trong `builtin-chess-coach`: đổi `kb_selection_mode` sang `selected`/`all` và thêm `knowledge_search` vào `allowed_tools` → restart `app`.
-5. Hỏi thử về ván vừa tạo → kiểm tra agent truy hồi được nội dung. Bật Langfuse (`--profile langfuse`) nếu cần soi pipeline.
+3. Tạo/sửa ván/thế/bài giảng/bài viết/sách → KB **"Tri thức cờ vua"** tự sinh bản ghi (best-effort, không chặn thao tác; import PGN hàng loạt KHÔNG trigger). Sách và bài viết **chỉ index khi `status="published"`**.
+4. Phần agent **KHÔNG cần làm gì nữa** — `config/builtin_agents.yaml` đã khai sẵn `kb_selection_mode: "all"` + `knowledge_search`/`grep_chunks` trong `allowed_tools`. Chỉ cần xác nhận VPS đang chạy đúng bản YAML này.
+   ⚠️ **Cạm bẫy:** nếu `builtin-chess-coach` từng bị sửa qua giao diện thì có bản ghi đè trong bảng `custom_agents`, và **YAML mất tác dụng** (`GetAgentByID` ưu tiên bản DB). Triệu chứng: log báo `tool not found: knowledge_search` dù YAML khai đủ.
+5. Hỏi thử về ván vừa tạo → kiểm tra agent truy hồi được nội dung. Dùng **panel "Kho tri thức"** (Quản lý cờ vua → nút góc trên phải) để soi `by_type` + tiến độ embedding. Bật Langfuse (`--profile langfuse`) nếu cần soi pipeline.
+> Runbook đầy đủ + bảng chẩn đoán: `docs/chess-rag-enable.md`.
 
 ## 5.5. Dựng knowledge base nội dung (cho RAG / Wiki)
 Nếu muốn KB tri thức cờ tổng quát (ngoài KB tự sinh), gợi ý tách theo nhóm `02-mien-co-vua.md` §2.1:
@@ -61,7 +63,7 @@ weknora chat "Y tuong chinh cua Sicilian la gi?"
 1. Tạo `internal/agent/tools/chess_<ten>.go` (theo mẫu các tool sẵn + `chess_common.go`).
 2. Đăng ký tool vào registry (file dùng chung → **ghi mục C của nhật ký**).
 3. Thêm vào `allowed_tools` của agent trong `builtin_agents.yaml`.
-4. Nếu cần dữ liệu mới → thêm migration `000908+` (`.up`/`.down`).
+4. Nếu cần dữ liệu mới → thêm migration **`000913+`** (`.up`/`.down`, **phải idempotent**). Dải cờ là `000900+`; `000900`–`000912` đã dùng hết. KHÔNG đụng dải `000062`–`000899` (của upstream) — xem `docs/deploy/upstream-sync.md`.
 5. `gofmt`, test, commit `feat(chess): ...`.
 
 ## 5.7. Lưu ý production

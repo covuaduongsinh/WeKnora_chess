@@ -1,6 +1,6 @@
 # 03 — Kiến trúc: WeKnora nền + lớp cờ vua
 
-Tham chiếu để agent định vị code nhanh. (Nền: WeKnora v0.6.2.)
+Tham chiếu để agent định vị code nhanh. (Nền: WeKnora v0.7.2 — đồng bộ 0.6.2 → 0.7.2 ngày 22/8/2026.)
 
 ## 3.1. Bản đồ thư mục nền (upstream)
 | Thư mục/File | Vai trò |
@@ -27,21 +27,32 @@ Tài liệu → docreader (parse) → chunking (3-tier, parent-child)
 Ba chế độ: **RAG Q&A** (nhanh), **ReAct Agent** (nhiều bước, tool calling), **Wiki Mode** (chưng cất tài liệu → Wiki + knowledge graph). RBAC 4 vai trò: Owner/Admin/Contributor/Viewer; sở hữu theo KB; audit log.
 
 ## 3.3. LỚP CỜ VUA (tùy biến của repo này)
-Khái niệm: **Game / Position / Lesson / Course / Puzzle / Chess Ref (wikilink)**.
+Khái niệm: **Game / Position / Lesson / Course / Puzzle / Book+Chapter / Article / Tag / Chess Ref (wikilink)** — 8 loại nội dung.
 
 **Backend Go:**
 ```
 internal/chess/                       # engine: board, engine, uci_engine, http_engine (bọc Arasan)
-internal/agent/tools/chess_*.go       # 6 tool agent + chess_common
+                                       # + fen.go, text.go (khử dấu), search_rank.go (chấm điểm tìm kiếm)
+internal/agent/tools/chess_*.go       # 7 tool agent + chess_common + chess_openings_data
 internal/application/repository/chess_*  + wiki_chess_ref.go
-internal/application/service/chess_*      # course, knowledge_indexer, knowledge_text, library, resolve, slug
-internal/handler/chess_*               # API: course, library, ref
+internal/application/service/chess_*      # course, knowledge_indexer, knowledge_text, library(+book/article/
+                                          # position/tag), resolve, slug, search
+internal/handler/chess_*               # API: course, library, position, book, article, tag, search, ref, engine
 internal/types/(interfaces/)chess_*    + wiki_chess_ref.go
+internal/router/routes_chess.go       # ⚠️ 0.7.2 module hoá router: 4 nhóm route cờ TÁCH khỏi router.go.
+                                       # router.go chỉ còn 4 field Chess*Handler + 4 dòng gọi.
+internal/modelcontext/tool_policy_chess.go  # ⚠️ BẮT BUỘC từ 0.7.2: mọi tool lộ ra UI phải khai
+                                       # model-handle policy, im lặng = go test ./internal/agent/tools/ ĐỎ.
+                                       # Bơm bằng init() → 0 dòng sửa tool_policy.go của upstream.
+                                       # Policy RỖNG là đúng cho cả 7 tool cờ (đầu vào FEN/PGN/slug,
+                                       # đầu ra là bàn cờ do frontend render, không phải đoạn trích).
+                                       # Thêm tool cờ mới → PHẢI thêm tên vào đây.
 ```
 
 **7 tool cờ (đăng ký cho agent):** `chess_analyze_position`, `chess_best_move`, `chess_evaluate_game`, `chess_explain_move`, `chess_lookup_opening`, `chess_generate_puzzle`, `chess_lookup_position`.
 
-**Migrations cờ:** `000900` courses · `000901` games_puzzles · `000902` slugs · `000903` wiki_chess_refs · `000904` course_slug · `000905` refs_source_type · `000906` slug_aliases · `000907` kb_index · `000908` chess_positions (Ngân hàng thế cờ) · `000909` chess_books (Thư viện sách: kệ/sách/chương/ảnh/phiên bản).
+**Migrations cờ:** `000900` courses · `000901` games_puzzles · `000902` slugs · `000903` wiki_chess_refs · `000904` course_slug · `000905` refs_source_type · `000906` slug_aliases · `000907` kb_index · `000908` chess_positions (Ngân hàng thế cờ) · `000909` chess_books (Thư viện sách: kệ/sách/chương/ảnh/phiên bản) · `000910` chess_articles (Ngân hàng bài viết: bài/chuyên mục/ảnh/phiên bản + cột `kind` cho slug alias) · `000911` chess_tags (hệ thẻ THỐNG NHẤT: từ điển thẻ + pivot ĐA HÌNH phủ cả 8 loại nội dung) · `000912` chess_search_text (cột `search_text` khử dấu + index GIN trigram cho cả 8 loại).
+> Dải cờ là **`000900+`** từ 22/8/2026 (trước đó `000062`–`000074`, đụng khít với upstream). Migration cờ mới đánh tiếp từ **`000913`**; dải `000062`–`000899` thuộc upstream. Xem `docs/deploy/upstream-sync.md`.
 
 **Frontend:**
 ```
