@@ -15,6 +15,10 @@ concurrency:
 env:
   # ghcr.io/<owner>/weknora-chess-<svc>:<tag>  (owner phải viết thường — covuaduongsinh OK)
   GHCR_PREFIX: ghcr.io/${{ github.repository_owner }}/weknora-chess
+  # Khai MỘT chỗ: vừa dùng cho setup-go, vừa nhúng vào binary làm "Phiên bản Go"
+  # trên trang Thông tin hệ thống — tránh hai nơi trôi lệch nhau.
+  GO_VERSION: "1.26"
+
 
 jobs:
   # ---- Frontend (cần dựng dist trước rồi mới docker build) ----
@@ -80,6 +84,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      # Dockerfile.app nhan 4 build-arg (VERSION/COMMIT_ID/BUILD_TIME/GO_VERSION)
+      # roi `make build-prod` nhung chung vao binary qua ldflags. Truoc day CI chi
+      # truyen COMMIT_ID nen trang "Thong tin he thong" hien Phien ban ung dung /
+      # Thoi gian build / Phien ban Go deu la "unknown".
+      - name: Chuan bi thong tin phien ban
+        id: meta
+        run: |
+          echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
       - name: Login GHCR
         uses: docker/login-action@v3
         with:
@@ -93,25 +106,30 @@ jobs:
           file: ${{ matrix.file }}
           platforms: linux/amd64
           push: true
-          build-args: ${{ matrix.args }}
+          build-args: |
+            ${{ matrix.args }}
+            VERSION_ARG=${{ steps.meta.outputs.version }}
+            BUILD_TIME_ARG=${{ steps.meta.outputs.build_time }}
+            GO_VERSION_ARG=${{ env.GO_VERSION }}
           tags: |
             ${{ env.GHCR_PREFIX }}-${{ matrix.name }}:latest
             ${{ env.GHCR_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
-  # ---- Test gate: chặn deploy nếu test/vet lớp cờ hỏng ----
-  # Phạm vi Go giới hạn ở package lớp cờ (thuần Go, không cần CGO/sqlite) để gate
-  # nhanh & ổn định; mở rộng dần khi cần. (Frontend đã được dựng ở job build-ui
-  # qua `vite build`; KHÔNG gate `vue-tsc` vì codebase còn lỗi type tồn đọng ở
-  # phần upstream — sẽ chặn deploy oan. Bật lại khi đã dọn sạch type.)
+  # ---- Test gate: chặn deploy nếu test hỏng ----
+  # Từ 22/8/2026 gate đã mở rộng ra TOÀN BỘ tầng service + modelcontext + frontend
+  # (`npm test`, `vue-tsc --noEmit`). Nợ type upstream từng là lý do không gate
+  # vue-tsc nay đã sạch, còn test tầng service thì đây là nơi DUY NHẤT chúng chạy
+  # được (máy Windows crash SIGSEGV gojieba ở internal/types.init). Ngay lần đầu
+  # bật đã bắt 6 lỗi thật — xem .claude/memory/04-nhat-ky-tuy-bien.md.
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26"
+          go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: go.sum
       - uses: actions/setup-node@v4
         with:
